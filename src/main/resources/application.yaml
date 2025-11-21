@@ -1,0 +1,67 @@
+spring:
+  application:
+    name: registo-horas-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/horasdb}
+    username: ${SPRING_DATASOURCE_USERNAME:horas_user}
+    password: ${SPRING_DATASOURCE_PASSWORD:horas_pass}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    open-in-view: true
+
+  rabbitmq:
+    host: ${RABBITMQ_PRIVATE_URL:localhost}   # Se estiver a correr o RabbitMQ localmente
+    port: ${RABBITMQ_PORT:5672}     # Porta padrão do RabbitMQ
+    username: ${RABBITMQ_DEFAULT_USER:guest}   # Usuário padrão
+    password: ${RABBITMQ_DEFAULT_PASS:guest}   # Password padrão
+
+
+  cloud:
+    vault:
+      host: localhost
+      port: 8200
+      scheme: http
+      enabled: false
+
+  flyway:
+    enabled: false
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,env,beans
+  endpoint:
+    health:
+      show-details: never
+  health:
+    mail:
+      enabled: false
+
+server:
+  port: ${PORT:8083}
+  forward-headers-strategy: native
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+    operations-sorter: method
+    tags-sorter: alpha
+    try-it-out-enabled: true
+    filter: true
+    display-request-duration: true
+
+logging:
+  level:
+    org.springframework.security: DEBUG
+    com.registo.horas_estagio: DEBUG
+    org.flywaydb: DEBUG
+  file:
+    name: logs/app.log
