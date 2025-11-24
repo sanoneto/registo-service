@@ -35,8 +35,9 @@ public class RegistroHorasController {
             @ApiResponse(responseCode = "201", description = "Registro criado com sucesso"),
             @ApiResponse(responseCode = "401", description = "Não autorizado")
     })
-    @PostMapping
+
     @PreAuthorize("hasRole('ADMIN') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
+    @PostMapping
     public ResponseEntity<RegisterResponse> submeterHoras(
             @Valid @RequestBody RegisterRequest request,
             // Obtém o username do header injetado pelo Gateway
@@ -46,29 +47,31 @@ public class RegistroHorasController {
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
 
-    @Operation(summary = "Busca todos os registros de horas")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Lista de registros retornada"),
-            @ApiResponse(responseCode = "403", description = "Acesso negado")
-    })
-    @GetMapping("/todos")
-    @PreAuthorize("hasRole('ADMIN')") // Apenas ADMIN pode ver todos
-    public ResponseEntity<List<RegisterResponse>> buscarTodosRegistros() {
-        List<RegisterResponse> registros = registroHorasService.buscarTodosRegistros();
-        return ResponseEntity.ok(registros);
-    }
-
     @Operation(summary = "Busca registros de horas do usuário autenticado")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Lista de registros do usuário retornada"),
             @ApiResponse(responseCode = "401", description = "Não autorizado")
     })
+
+    @PreAuthorize("hasRole('ADMIN') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
     @GetMapping
-    @PreAuthorize("hasRole('ESTAGIARIO') or hasRole('ADMIN')")
     public ResponseEntity<List<RegisterResponse>> buscarMeusRegistros(
             @RequestHeader(X_USER_ID) String username) {
         // Retorna apenas os registros do usuário
         List<RegisterResponse> registros = registroHorasService.buscarRegistrosPorUsuario(username);
+        return ResponseEntity.ok(registros);
+    }
+
+    @Operation(summary = "Busca todos os registros de horas")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Lista de registros retornada"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado")
+    })
+
+    @PreAuthorize("hasRole('ADMIN')") // Apenas ADMIN pode ver todos
+    @GetMapping("/todos")
+    public ResponseEntity<List<RegisterResponse>> buscarTodosRegistros() {
+        List<RegisterResponse> registros = registroHorasService.buscarTodosRegistros();
         return ResponseEntity.ok(registros);
     }
 

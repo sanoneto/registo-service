@@ -23,7 +23,6 @@ spring:
     username: ${RABBITMQ_DEFAULT_USER:guest}   # Usuário padrão
     password: ${RABBITMQ_DEFAULT_PASS:guest}   # Password padrão
 
-
   cloud:
     vault:
       host: localhost
