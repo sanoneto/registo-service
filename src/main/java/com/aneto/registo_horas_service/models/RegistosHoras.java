@@ -15,10 +15,10 @@ import java.time.LocalTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "registos_horas")
 @Data
 @NoArgsConstructor
 @EntityListeners(AuditingEntityListener.class)
+@Table(name = "registos_horas", schema = "REGISTOS")
 public class RegistosHoras {
 
     @Id

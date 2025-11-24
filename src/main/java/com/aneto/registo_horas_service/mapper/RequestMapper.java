@@ -12,6 +12,10 @@ import java.util.List;
 @Mapper(componentModel = "spring")
 public interface RequestMapper {
 
+
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "publicId", ignore = true)
+    @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "userName", source = "userName")
     @Mapping(target = "descricao", source = "descricao")
     @Mapping(target = "dataRegisto", source = "dataRegisto")
