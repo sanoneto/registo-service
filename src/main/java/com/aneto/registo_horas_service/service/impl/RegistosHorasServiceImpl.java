@@ -48,7 +48,7 @@ public class RegistosHorasServiceImpl implements RegistosHorasService {
     }
 
     @Override
-    public List<RegisterResponse> buscarTodosRegistros() {
+    public List<RegisterResponse> findAllRegisteredHours() {
         return registroHorasRepository.findAll().stream()
                 .map(requestMapper::toResponse)
                 .collect(Collectors.toList());
@@ -80,7 +80,7 @@ public class RegistosHorasServiceImpl implements RegistosHorasService {
     }
 
     @Override
-    public void deletarRegistro(UUID publicId) {
+    public void deleteRegistry(UUID publicId) {
         RegistosHoras registro = registroHorasRepository.findByPublicId(publicId)
                 .orElseThrow(() -> new RuntimeException("Registro não encontrado."));
         registroHorasRepository.delete(registro);

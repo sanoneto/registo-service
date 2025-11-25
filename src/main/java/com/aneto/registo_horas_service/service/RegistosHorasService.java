@@ -14,7 +14,7 @@ public interface RegistosHorasService {
     RegisterResponse submeterHoras(RegisterRequest request, String username);
 
     // Retorna todos os registros (somente ADMIN)
-    List<RegisterResponse> buscarTodosRegistros();
+    List<RegisterResponse> findAllRegisteredHours();
 
     // Retorna registros por usuário
     List<RegisterResponse> buscarRegistrosPorUsuario(String username);
@@ -23,7 +23,7 @@ public interface RegistosHorasService {
     RegisterResponse atualizarRegistro(UUID publicId, RegisterRequest request);
 
     // Deleta um registro
-    void deletarRegistro(UUID publicId);
+    void deleteRegistry(UUID publicId);
 
     // Retorna o total de horas
     double getTotalHorasPorUsuario(String username);

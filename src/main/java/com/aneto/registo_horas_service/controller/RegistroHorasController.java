@@ -61,6 +61,17 @@ public class RegistroHorasController {
         List<RegisterResponse> registros = registroHorasService.buscarRegistrosPorUsuario(username);
         return ResponseEntity.ok(registros);
     }
+    @GetMapping("/{uuid}")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('ESTAGIARIO')")
+    public ResponseEntity<RegisterResponse> getRegisterById(@PathVariable UUID uuid) {
+        // Usa o serviço existente que retorna todos os registros e filtra pelo publicId.
+        // Evita a necessidade de adicionar novos métodos ao service/repository.
+        return registroHorasService.findAllRegisteredHours().stream()
+                .filter(r -> r.publicId().equals(uuid))
+                .findFirst()
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
 
     @Operation(summary = "Busca todos os registros de horas")
     @ApiResponses(value = {
@@ -69,9 +80,9 @@ public class RegistroHorasController {
     })
 
     @PreAuthorize("hasRole('ADMIN')") // Apenas ADMIN pode ver todos
-    @GetMapping("/todos")
-    public ResponseEntity<List<RegisterResponse>> buscarTodosRegistros() {
-        List<RegisterResponse> registros = registroHorasService.buscarTodosRegistros();
+    @GetMapping("/all")
+    public ResponseEntity<List<RegisterResponse>> getAllRegisterHoras() {
+        List<RegisterResponse> registros = registroHorasService.findAllRegisteredHours();
         return ResponseEntity.ok(registros);
     }
 
@@ -79,7 +90,7 @@ public class RegistroHorasController {
     @PreAuthorize("hasRole('ESTAGIARIO')")
     // Apenas estagiários podem atualizar (o service deve validar se é o seu próprio)
     @PutMapping("/{publicId}")
-    public ResponseEntity<RegisterResponse> atualizarRegistro(
+    public ResponseEntity<RegisterResponse> updateRegister(
             @PathVariable UUID publicId,
             @Valid @RequestBody RegisterRequest request) {
         // Implementar validação de propriedade dentro do Service para garantir que o usuário só edita os seus.
@@ -90,8 +101,8 @@ public class RegistroHorasController {
     @Operation(summary = "Deleta um registro")
     @PreAuthorize("hasRole('ADMIN')") // Apenas ADMIN pode deletar (ou estagiário no seu service)
     @DeleteMapping("/{publicId}")
-    public ResponseEntity<Void> deletarRegistro(@PathVariable UUID publicId) {
-        registroHorasService.deletarRegistro(publicId);
+    public ResponseEntity<Void> deleteRegistry(@PathVariable UUID publicId) {
+        registroHorasService.deleteRegistry(publicId);
         return ResponseEntity.noContent().build();
     }
 

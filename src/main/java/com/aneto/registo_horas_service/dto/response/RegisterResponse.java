@@ -7,6 +7,7 @@ import java.util.UUID;
 
 public record RegisterResponse(
         UUID publicId,
+        String userName,
         String descricao,
         LocalDate dataRegisto,
         LocalTime horaEntrada,
