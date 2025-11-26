@@ -64,7 +64,7 @@ public record RegisterRequest(
                 requiredMode = Schema.RequiredMode.REQUIRED,
                 type = "double"
         )
-        double horasTrabalhadas
+        Double horasTrabalhadas
 
 ) {
 }
