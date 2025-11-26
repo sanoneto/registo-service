@@ -10,8 +10,6 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.client.ResourceAccessException;
 
@@ -103,24 +101,5 @@ public class GlobalExceptionHandler {
         );
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(error);
     }
-    // 1. Lida com Exceções Genéricas (ex: 500 - Falha de BD, NullPointer, etc.)
-    @ExceptionHandler(Exception.class)
-    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-    @ResponseBody
-    public ResponseEntity<Map<String, Object>> handleAllUncaughtException(Exception ex) {
 
-        // 🔑 Log da exceção (CRÍTICO para diagnóstico no Railway)
-        System.err.println("ERRO INTERNO NÃO TRATADO: " + ex.getMessage());
-        ex.printStackTrace();
-
-        Map<String, Object> errorDetails = new HashMap<>();
-        errorDetails.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
-        errorDetails.put("error", "Internal Server Error");
-        // 🔑 Devolve uma mensagem genérica de segurança no JSON
-        errorDetails.put("message", "Ocorreu um erro interno ao processar a requisição de registo.");
-        // Opcional: Devolver a mensagem real para DEBUG se estiver em ambiente de teste
-        // errorDetails.put("debugMessage", ex.getMessage());
-
-        return new ResponseEntity<>(errorDetails, HttpStatus.INTERNAL_SERVER_ERROR);
-    }
 }
