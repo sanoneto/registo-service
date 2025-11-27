@@ -1,88 +1,84 @@
-2025-11-26T00:14:22.065Z  INFO 21200 --- [registo-horas-service] [SpringApplicationShutdownHook] o.s.b.w.e.tomcat.GracefulShutdown        : Commencing graceful shutdown. Waiting for active requests to complete
-2025-11-26T00:14:22.085Z  INFO 21200 --- [registo-horas-service] [tomcat-shutdown] o.s.b.w.e.tomcat.GracefulShutdown        : Graceful shutdown complete
-2025-11-26T00:14:22.123Z  INFO 21200 --- [registo-horas-service] [SpringApplicationShutdownHook] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'default'
-2025-11-26T00:14:22.129Z  INFO 21200 --- [registo-horas-service] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
-2025-11-26T00:14:22.133Z  INFO 21200 --- [registo-horas-service] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
-2025-11-26T12:26:35.660Z  INFO 42112 --- [registo-horas-service] [main] c.a.r.RegistoHorasServiceApplication     : Starting RegistoHorasServiceApplication using Java 23.0.1 with PID 42112 (D:\Exemplo projecto\microserviços\registo-horas-service\target\classes started by User in D:\Exemplo projecto\microserviços\registo-horas-service)
-2025-11-26T12:26:35.663Z  INFO 42112 --- [registo-horas-service] [main] c.a.r.RegistoHorasServiceApplication     : No active profile set, falling back to 1 default profile: "default"
-2025-11-26T12:26:36.561Z  INFO 42112 --- [registo-horas-service] [main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
-2025-11-26T12:26:36.616Z  INFO 42112 --- [registo-horas-service] [main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 47 ms. Found 1 JPA repository interface.
-2025-11-26T12:26:37.061Z  INFO 42112 --- [registo-horas-service] [main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8083 (http)
-2025-11-26T12:26:37.074Z  INFO 42112 --- [registo-horas-service] [main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
-2025-11-26T12:26:37.074Z  INFO 42112 --- [registo-horas-service] [main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.48]
-2025-11-26T12:26:37.120Z  INFO 42112 --- [registo-horas-service] [main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
-2025-11-26T12:26:37.120Z  INFO 42112 --- [registo-horas-service] [main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 1409 ms
-2025-11-26T12:26:37.288Z  INFO 42112 --- [registo-horas-service] [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
-2025-11-26T12:26:37.394Z  INFO 42112 --- [registo-horas-service] [main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@5f3f57ff
-2025-11-26T12:26:37.395Z  INFO 42112 --- [registo-horas-service] [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
-2025-11-26T12:26:37.452Z  INFO 42112 --- [registo-horas-service] [main] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
-2025-11-26T12:26:37.484Z  INFO 42112 --- [registo-horas-service] [main] org.hibernate.Version                    : HHH000412: Hibernate ORM core version 6.6.33.Final
-2025-11-26T12:26:37.514Z  INFO 42112 --- [registo-horas-service] [main] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
-2025-11-26T12:26:37.772Z  INFO 42112 --- [registo-horas-service] [main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
-2025-11-26T12:26:37.841Z  INFO 42112 --- [registo-horas-service] [main] org.hibernate.orm.connections.pooling    : HHH10001005: Database info:
-	Database JDBC URL [Connecting through datasource 'HikariDataSource (HikariPool-1)']
-	Database driver: undefined/unknown
-	Database version: 15.15
-	Autocommit mode: undefined/unknown
-	Isolation level: undefined/unknown
-	Minimum pool size: undefined/unknown
-	Maximum pool size: undefined/unknown
-2025-11-26T12:26:38.460Z  INFO 42112 --- [registo-horas-service] [main] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
-2025-11-26T12:26:38.520Z  INFO 42112 --- [registo-horas-service] [main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
-2025-11-26T12:26:38.707Z  INFO 42112 --- [registo-horas-service] [main] o.s.d.j.r.query.QueryEnhancerFactory     : Hibernate is in classpath; If applicable, HQL parser will be used.
-2025-11-26T12:26:39.665Z  INFO 42112 --- [registo-horas-service] [main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 5 endpoints beneath base path '/actuator'
-2025-11-26T12:26:39.696Z  WARN 42112 --- [registo-horas-service] [main] .s.s.UserDetailsServiceAutoConfiguration : 
+2025-11-27T15:19:33.625Z  INFO 11768 --- [registo-horas-service] [main] c.a.r.RegistoHorasServiceApplication     : Starting RegistoHorasServiceApplication using Java 23.0.1 with PID 11768 (D:\Exemplo projecto\microserviços\registo-horas-service\target\classes started by User in D:\Exemplo projecto\microserviços\registo-horas-service)
+2025-11-27T15:19:33.630Z  INFO 11768 --- [registo-horas-service] [main] c.a.r.RegistoHorasServiceApplication     : No active profile set, falling back to 1 default profile: "default"
+2025-11-27T15:19:34.940Z  INFO 11768 --- [registo-horas-service] [main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2025-11-27T15:19:35.011Z  INFO 11768 --- [registo-horas-service] [main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 61 ms. Found 1 JPA repository interface.
+2025-11-27T15:19:35.604Z  INFO 11768 --- [registo-horas-service] [main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8083 (http)
+2025-11-27T15:19:35.624Z  INFO 11768 --- [registo-horas-service] [main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2025-11-27T15:19:35.625Z  INFO 11768 --- [registo-horas-service] [main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.48]
+2025-11-27T15:19:35.679Z  INFO 11768 --- [registo-horas-service] [main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2025-11-27T15:19:35.679Z  INFO 11768 --- [registo-horas-service] [main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 2001 ms
+2025-11-27T15:19:35.883Z  INFO 11768 --- [registo-horas-service] [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2025-11-27T15:19:36.934Z  WARN 11768 --- [registo-horas-service] [main] ConfigServletWebServerApplicationContext : Exception encountered during context initialization - cancelling refresh attempt: org.springframework.beans.factory.BeanCreationException: Error creating bean with name 'entityManagerFactory' defined in class path resource [org/springframework/boot/autoconfigure/orm/jpa/HibernateJpaConfiguration.class]: Failed to initialize dependency 'dataSourceScriptDatabaseInitializer' of LoadTimeWeaverAware bean 'entityManagerFactory': Error creating bean with name 'dataSourceScriptDatabaseInitializer' defined in class path resource [org/springframework/boot/autoconfigure/sql/init/DataSourceInitializationConfiguration.class]: Failed to execute database script
+2025-11-27T15:19:36.939Z  INFO 11768 --- [registo-horas-service] [main] o.apache.catalina.core.StandardService   : Stopping service [Tomcat]
+2025-11-27T15:19:36.970Z  INFO 11768 --- [registo-horas-service] [main] .s.b.a.l.ConditionEvaluationReportLogger : 
 
-Using generated security password: 4555d058-11af-4ab4-a4b9-b6a6827b12d5
+Error starting ApplicationContext. To display the condition evaluation report re-run your application with 'debug' enabled.
+2025-11-27T15:19:36.995Z ERROR 11768 --- [registo-horas-service] [main] o.s.boot.SpringApplication               : Application run failed
 
-This generated password is for development use only. Your security configuration must be updated before running your application in production.
+org.springframework.beans.factory.BeanCreationException: Error creating bean with name 'entityManagerFactory' defined in class path resource [org/springframework/boot/autoconfigure/orm/jpa/HibernateJpaConfiguration.class]: Failed to initialize dependency 'dataSourceScriptDatabaseInitializer' of LoadTimeWeaverAware bean 'entityManagerFactory': Error creating bean with name 'dataSourceScriptDatabaseInitializer' defined in class path resource [org/springframework/boot/autoconfigure/sql/init/DataSourceInitializationConfiguration.class]: Failed to execute database script
+	at org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:328) ~[spring-beans-6.2.12.jar:6.2.12]
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:207) ~[spring-beans-6.2.12.jar:6.2.12]
+	at org.springframework.context.support.AbstractApplicationContext.finishBeanFactoryInitialization(AbstractApplicationContext.java:973) ~[spring-context-6.2.12.jar:6.2.12]
+	at org.springframework.context.support.AbstractApplicationContext.refresh(AbstractApplicationContext.java:627) ~[spring-context-6.2.12.jar:6.2.12]
+	at org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext.refresh(ServletWebServerApplicationContext.java:146) ~[spring-boot-3.5.7.jar:3.5.7]
+	at org.springframework.boot.SpringApplication.refresh(SpringApplication.java:752) ~[spring-boot-3.5.7.jar:3.5.7]
+	at org.springframework.boot.SpringApplication.refreshContext(SpringApplication.java:439) ~[spring-boot-3.5.7.jar:3.5.7]
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:318) ~[spring-boot-3.5.7.jar:3.5.7]
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:1361) ~[spring-boot-3.5.7.jar:3.5.7]
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:1350) ~[spring-boot-3.5.7.jar:3.5.7]
+	at com.aneto.registo_horas_service.RegistoHorasServiceApplication.main(RegistoHorasServiceApplication.java:10) ~[classes/:na]
+Caused by: org.springframework.beans.factory.BeanCreationException: Error creating bean with name 'dataSourceScriptDatabaseInitializer' defined in class path resource [org/springframework/boot/autoconfigure/sql/init/DataSourceInitializationConfiguration.class]: Failed to execute database script
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.initializeBean(AbstractAutowireCapableBeanFactory.java:1826) ~[spring-beans-6.2.12.jar:6.2.12]
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.doCreateBean(AbstractAutowireCapableBeanFactory.java:607) ~[spring-beans-6.2.12.jar:6.2.12]
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBean(AbstractAutowireCapableBeanFactory.java:529) ~[spring-beans-6.2.12.jar:6.2.12]
+	at org.springframework.beans.factory.support.AbstractBeanFactory.lambda$doGetBean$0(AbstractBeanFactory.java:339) ~[spring-beans-6.2.12.jar:6.2.12]
+	at org.springframework.beans.factory.support.DefaultSingletonBeanRegistry.getSingleton(DefaultSingletonBeanRegistry.java:373) ~[spring-beans-6.2.12.jar:6.2.12]
+	at org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:337) ~[spring-beans-6.2.12.jar:6.2.12]
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:202) ~[spring-beans-6.2.12.jar:6.2.12]
+	at org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:315) ~[spring-beans-6.2.12.jar:6.2.12]
+	... 10 common frames omitted
+Caused by: org.springframework.jdbc.datasource.init.UncategorizedScriptException: Failed to execute database script
+	at org.springframework.jdbc.datasource.init.DatabasePopulatorUtils.execute(DatabasePopulatorUtils.java:67) ~[spring-jdbc-6.2.12.jar:6.2.12]
+	at org.springframework.boot.jdbc.init.DataSourceScriptDatabaseInitializer.runScripts(DataSourceScriptDatabaseInitializer.java:87) ~[spring-boot-3.5.7.jar:3.5.7]
+	at org.springframework.boot.sql.init.AbstractScriptDatabaseInitializer.runScripts(AbstractScriptDatabaseInitializer.java:146) ~[spring-boot-3.5.7.jar:3.5.7]
+	at org.springframework.boot.sql.init.AbstractScriptDatabaseInitializer.applyScripts(AbstractScriptDatabaseInitializer.java:108) ~[spring-boot-3.5.7.jar:3.5.7]
+	at org.springframework.boot.sql.init.AbstractScriptDatabaseInitializer.applySchemaScripts(AbstractScriptDatabaseInitializer.java:98) ~[spring-boot-3.5.7.jar:3.5.7]
+	at org.springframework.boot.sql.init.AbstractScriptDatabaseInitializer.initializeDatabase(AbstractScriptDatabaseInitializer.java:76) ~[spring-boot-3.5.7.jar:3.5.7]
+	at org.springframework.boot.sql.init.AbstractScriptDatabaseInitializer.afterPropertiesSet(AbstractScriptDatabaseInitializer.java:66) ~[spring-boot-3.5.7.jar:3.5.7]
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.invokeInitMethods(AbstractAutowireCapableBeanFactory.java:1873) ~[spring-beans-6.2.12.jar:6.2.12]
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.initializeBean(AbstractAutowireCapableBeanFactory.java:1822) ~[spring-beans-6.2.12.jar:6.2.12]
+	... 17 common frames omitted
+Caused by: org.springframework.jdbc.CannotGetJdbcConnectionException: Failed to obtain JDBC Connection
+	at org.springframework.jdbc.datasource.DataSourceUtils.getConnection(DataSourceUtils.java:84) ~[spring-jdbc-6.2.12.jar:6.2.12]
+	at org.springframework.jdbc.datasource.init.DatabasePopulatorUtils.execute(DatabasePopulatorUtils.java:52) ~[spring-jdbc-6.2.12.jar:6.2.12]
+	... 25 common frames omitted
+Caused by: org.postgresql.util.PSQLException: Connection to localhost:5432 refused. Check that the hostname and port are correct and that the postmaster is accepting TCP/IP connections.
+	at org.postgresql.core.v3.ConnectionFactoryImpl.openConnectionImpl(ConnectionFactoryImpl.java:373) ~[postgresql-42.7.8.jar:42.7.8]
+	at org.postgresql.core.ConnectionFactory.openConnection(ConnectionFactory.java:57) ~[postgresql-42.7.8.jar:42.7.8]
+	at org.postgresql.jdbc.PgConnection.<init>(PgConnection.java:279) ~[postgresql-42.7.8.jar:42.7.8]
+	at org.postgresql.Driver.makeConnection(Driver.java:448) ~[postgresql-42.7.8.jar:42.7.8]
+	at org.postgresql.Driver.connect(Driver.java:298) ~[postgresql-42.7.8.jar:42.7.8]
+	at com.zaxxer.hikari.util.DriverDataSource.getConnection(DriverDataSource.java:144) ~[HikariCP-6.3.3.jar:na]
+	at com.zaxxer.hikari.pool.PoolBase.newConnection(PoolBase.java:370) ~[HikariCP-6.3.3.jar:na]
+	at com.zaxxer.hikari.pool.PoolBase.newPoolEntry(PoolBase.java:207) ~[HikariCP-6.3.3.jar:na]
+	at com.zaxxer.hikari.pool.HikariPool.createPoolEntry(HikariPool.java:488) ~[HikariCP-6.3.3.jar:na]
+	at com.zaxxer.hikari.pool.HikariPool.checkFailFast(HikariPool.java:576) ~[HikariCP-6.3.3.jar:na]
+	at com.zaxxer.hikari.pool.HikariPool.<init>(HikariPool.java:97) ~[HikariCP-6.3.3.jar:na]
+	at com.zaxxer.hikari.HikariDataSource.getConnection(HikariDataSource.java:111) ~[HikariCP-6.3.3.jar:na]
+	at org.springframework.jdbc.datasource.DataSourceUtils.fetchConnection(DataSourceUtils.java:160) ~[spring-jdbc-6.2.12.jar:6.2.12]
+	at org.springframework.jdbc.datasource.DataSourceUtils.doGetConnection(DataSourceUtils.java:118) ~[spring-jdbc-6.2.12.jar:6.2.12]
+	at org.springframework.jdbc.datasource.DataSourceUtils.getConnection(DataSourceUtils.java:81) ~[spring-jdbc-6.2.12.jar:6.2.12]
+	... 26 common frames omitted
+Caused by: java.net.ConnectException: Connection refused: getsockopt
+	at java.base/sun.nio.ch.Net.pollConnect(Native Method) ~[na:na]
+	at java.base/sun.nio.ch.Net.pollConnectNow(Net.java:682) ~[na:na]
+	at java.base/sun.nio.ch.NioSocketImpl.timedFinishConnect(NioSocketImpl.java:542) ~[na:na]
+	at java.base/sun.nio.ch.NioSocketImpl.connect(NioSocketImpl.java:592) ~[na:na]
+	at java.base/java.net.SocksSocketImpl.connect(SocksSocketImpl.java:327) ~[na:na]
+	at java.base/java.net.Socket.connect(Socket.java:760) ~[na:na]
+	at org.postgresql.core.PGStream.createSocket(PGStream.java:261) ~[postgresql-42.7.8.jar:42.7.8]
+	at org.postgresql.core.PGStream.<init>(PGStream.java:122) ~[postgresql-42.7.8.jar:42.7.8]
+	at org.postgresql.core.v3.ConnectionFactoryImpl.tryConnect(ConnectionFactoryImpl.java:146) ~[postgresql-42.7.8.jar:42.7.8]
+	at org.postgresql.core.v3.ConnectionFactoryImpl.openConnectionImpl(ConnectionFactoryImpl.java:289) ~[postgresql-42.7.8.jar:42.7.8]
+	... 40 common frames omitted
 
-2025-11-26T12:26:39.701Z  INFO 42112 --- [registo-horas-service] [main] r$InitializeUserDetailsManagerConfigurer : Global AuthenticationManager configured with UserDetailsService bean with name inMemoryUserDetailsManager
-2025-11-26T12:26:39.762Z DEBUG 42112 --- [registo-horas-service] [main] o.s.s.web.DefaultSecurityFilterChain     : Will secure any request with filters: DisableEncodeUrlFilter, WebAsyncManagerIntegrationFilter, SecurityContextHolderFilter, HeaderWriterFilter, LogoutFilter, GatewayAuthFilter, RequestCacheAwareFilter, SecurityContextHolderAwareRequestFilter, AnonymousAuthenticationFilter, SessionManagementFilter, ExceptionTranslationFilter, AuthorizationFilter
-2025-11-26T12:26:40.160Z  INFO 42112 --- [registo-horas-service] [main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8083 (http) with context path '/'
-2025-11-26T12:26:40.174Z  INFO 42112 --- [registo-horas-service] [main] c.a.r.RegistoHorasServiceApplication     : Started RegistoHorasServiceApplication in 4.87 seconds (process running for 5.401)
-2025-11-26T12:26:40.403Z  INFO 42112 --- [registo-horas-service] [RMI TCP Connection(4)-172.29.128.1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
-2025-11-26T12:26:40.403Z  INFO 42112 --- [registo-horas-service] [RMI TCP Connection(3)-172.29.128.1] o.s.a.r.c.CachingConnectionFactory       : Attempting to connect to: [localhost:5672]
-2025-11-26T12:26:40.403Z  INFO 42112 --- [registo-horas-service] [RMI TCP Connection(4)-172.29.128.1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
-2025-11-26T12:26:40.403Z  INFO 42112 --- [registo-horas-service] [RMI TCP Connection(4)-172.29.128.1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 0 ms
-2025-11-26T12:26:40.454Z  INFO 42112 --- [registo-horas-service] [RMI TCP Connection(3)-172.29.128.1] o.s.a.r.c.CachingConnectionFactory       : Created new connection: rabbitConnectionFactory#339b1c34:0/SimpleConnection@35fca83c [delegate=amqp://guest@127.0.0.1:5672/, localPort=49601]
-2025-11-26T12:26:44.968Z DEBUG 42112 --- [registo-horas-service] [http-nio-8083-exec-1] o.s.security.web.FilterChainProxy        : Securing GET /api/registos/all
-2025-11-26T12:26:44.975Z  INFO 42112 --- [registo-horas-service] [http-nio-8083-exec-1] c.a.r.security.GatewayAuthFilter         : Autenticação configurada - User: adminhoras, Authorities: [ROLE_ADMIN]
-2025-11-26T12:26:44.975Z DEBUG 42112 --- [registo-horas-service] [http-nio-8083-exec-1] o.s.security.web.FilterChainProxy        : Secured GET /api/registos/all
-2025-11-26T12:26:44.994Z DEBUG 42112 --- [registo-horas-service] [http-nio-8083-exec-1] horizationManagerBeforeMethodInterceptor : Authorizing method invocation ReflectiveMethodInvocation: public org.springframework.http.ResponseEntity com.aneto.registo_horas_service.controller.RegistroHorasController.getAllRegisterHoras(); target is of class [com.aneto.registo_horas_service.controller.RegistroHorasController]
-2025-11-26T12:26:45.000Z DEBUG 42112 --- [registo-horas-service] [http-nio-8083-exec-1] horizationManagerBeforeMethodInterceptor : Authorized method invocation ReflectiveMethodInvocation: public org.springframework.http.ResponseEntity com.aneto.registo_horas_service.controller.RegistroHorasController.getAllRegisterHoras(); target is of class [com.aneto.registo_horas_service.controller.RegistroHorasController]
-2025-11-26T12:26:45.088Z DEBUG 42112 --- [registo-horas-service] [http-nio-8083-exec-2] o.s.security.web.FilterChainProxy        : Securing GET /api/registos/all
-2025-11-26T12:26:45.096Z  INFO 42112 --- [registo-horas-service] [http-nio-8083-exec-2] c.a.r.security.GatewayAuthFilter         : Autenticação configurada - User: adminhoras, Authorities: [ROLE_ADMIN]
-2025-11-26T12:26:45.097Z DEBUG 42112 --- [registo-horas-service] [http-nio-8083-exec-2] o.s.security.web.FilterChainProxy        : Secured GET /api/registos/all
-2025-11-26T12:26:45.098Z DEBUG 42112 --- [registo-horas-service] [http-nio-8083-exec-2] horizationManagerBeforeMethodInterceptor : Authorizing method invocation ReflectiveMethodInvocation: public org.springframework.http.ResponseEntity com.aneto.registo_horas_service.controller.RegistroHorasController.getAllRegisterHoras(); target is of class [com.aneto.registo_horas_service.controller.RegistroHorasController]
-2025-11-26T12:26:45.098Z DEBUG 42112 --- [registo-horas-service] [http-nio-8083-exec-2] horizationManagerBeforeMethodInterceptor : Authorized method invocation ReflectiveMethodInvocation: public org.springframework.http.ResponseEntity com.aneto.registo_horas_service.controller.RegistroHorasController.getAllRegisterHoras(); target is of class [com.aneto.registo_horas_service.controller.RegistroHorasController]
-2025-11-26T12:27:22.135Z DEBUG 42112 --- [registo-horas-service] [http-nio-8083-exec-3] o.s.security.web.FilterChainProxy        : Securing POST /api/registos
-2025-11-26T12:27:22.137Z  INFO 42112 --- [registo-horas-service] [http-nio-8083-exec-3] c.a.r.security.GatewayAuthFilter         : Autenticação configurada - User: adminhoras, Authorities: [ROLE_ADMIN]
-2025-11-26T12:27:22.137Z DEBUG 42112 --- [registo-horas-service] [http-nio-8083-exec-3] o.s.security.web.FilterChainProxy        : Secured POST /api/registos
-2025-11-26T12:27:22.195Z DEBUG 42112 --- [registo-horas-service] [http-nio-8083-exec-3] horizationManagerBeforeMethodInterceptor : Authorizing method invocation ReflectiveMethodInvocation: public org.springframework.http.ResponseEntity com.aneto.registo_horas_service.controller.RegistroHorasController.submeterHoras(com.aneto.registo_horas_service.dto.request.RegisterRequest,java.lang.String); target is of class [com.aneto.registo_horas_service.controller.RegistroHorasController]
-2025-11-26T12:27:22.196Z DEBUG 42112 --- [registo-horas-service] [http-nio-8083-exec-3] horizationManagerBeforeMethodInterceptor : Authorized method invocation ReflectiveMethodInvocation: public org.springframework.http.ResponseEntity com.aneto.registo_horas_service.controller.RegistroHorasController.submeterHoras(com.aneto.registo_horas_service.dto.request.RegisterRequest,java.lang.String); target is of class [com.aneto.registo_horas_service.controller.RegistroHorasController]
-2025-11-26T12:27:24.066Z DEBUG 42112 --- [registo-horas-service] [http-nio-8083-exec-4] o.s.security.web.FilterChainProxy        : Securing GET /api/registos/all
-2025-11-26T12:27:24.067Z  INFO 42112 --- [registo-horas-service] [http-nio-8083-exec-4] c.a.r.security.GatewayAuthFilter         : Autenticação configurada - User: adminhoras, Authorities: [ROLE_ADMIN]
-2025-11-26T12:27:24.067Z DEBUG 42112 --- [registo-horas-service] [http-nio-8083-exec-4] o.s.security.web.FilterChainProxy        : Secured GET /api/registos/all
-2025-11-26T12:27:24.068Z DEBUG 42112 --- [registo-horas-service] [http-nio-8083-exec-4] horizationManagerBeforeMethodInterceptor : Authorizing method invocation ReflectiveMethodInvocation: public org.springframework.http.ResponseEntity com.aneto.registo_horas_service.controller.RegistroHorasController.getAllRegisterHoras(); target is of class [com.aneto.registo_horas_service.controller.RegistroHorasController]
-2025-11-26T12:27:24.068Z DEBUG 42112 --- [registo-horas-service] [http-nio-8083-exec-4] horizationManagerBeforeMethodInterceptor : Authorized method invocation ReflectiveMethodInvocation: public org.springframework.http.ResponseEntity com.aneto.registo_horas_service.controller.RegistroHorasController.getAllRegisterHoras(); target is of class [com.aneto.registo_horas_service.controller.RegistroHorasController]
-2025-11-26T12:27:24.100Z DEBUG 42112 --- [registo-horas-service] [http-nio-8083-exec-5] o.s.security.web.FilterChainProxy        : Securing GET /api/registos/all
-2025-11-26T12:27:24.100Z  INFO 42112 --- [registo-horas-service] [http-nio-8083-exec-5] c.a.r.security.GatewayAuthFilter         : Autenticação configurada - User: adminhoras, Authorities: [ROLE_ADMIN]
-2025-11-26T12:27:24.101Z DEBUG 42112 --- [registo-horas-service] [http-nio-8083-exec-5] o.s.security.web.FilterChainProxy        : Secured GET /api/registos/all
-2025-11-26T12:27:24.101Z DEBUG 42112 --- [registo-horas-service] [http-nio-8083-exec-5] horizationManagerBeforeMethodInterceptor : Authorizing method invocation ReflectiveMethodInvocation: public org.springframework.http.ResponseEntity com.aneto.registo_horas_service.controller.RegistroHorasController.getAllRegisterHoras(); target is of class [com.aneto.registo_horas_service.controller.RegistroHorasController]
-2025-11-26T12:27:24.103Z DEBUG 42112 --- [registo-horas-service] [http-nio-8083-exec-5] horizationManagerBeforeMethodInterceptor : Authorized method invocation ReflectiveMethodInvocation: public org.springframework.http.ResponseEntity com.aneto.registo_horas_service.controller.RegistroHorasController.getAllRegisterHoras(); target is of class [com.aneto.registo_horas_service.controller.RegistroHorasController]
-2025-11-26T12:38:26.467Z DEBUG 42112 --- [registo-horas-service] [http-nio-8083-exec-7] o.s.security.web.FilterChainProxy        : Securing GET /api/registos/all
-2025-11-26T12:38:26.468Z  INFO 42112 --- [registo-horas-service] [http-nio-8083-exec-7] c.a.r.security.GatewayAuthFilter         : Autenticação configurada - User: adminhoras, Authorities: [ROLE_ADMIN]
-2025-11-26T12:38:26.468Z DEBUG 42112 --- [registo-horas-service] [http-nio-8083-exec-7] o.s.security.web.FilterChainProxy        : Secured GET /api/registos/all
-2025-11-26T12:38:26.469Z DEBUG 42112 --- [registo-horas-service] [http-nio-8083-exec-7] horizationManagerBeforeMethodInterceptor : Authorizing method invocation ReflectiveMethodInvocation: public org.springframework.http.ResponseEntity com.aneto.registo_horas_service.controller.RegistroHorasController.getAllRegisterHoras(); target is of class [com.aneto.registo_horas_service.controller.RegistroHorasController]
-2025-11-26T12:38:26.469Z DEBUG 42112 --- [registo-horas-service] [http-nio-8083-exec-7] horizationManagerBeforeMethodInterceptor : Authorized method invocation ReflectiveMethodInvocation: public org.springframework.http.ResponseEntity com.aneto.registo_horas_service.controller.RegistroHorasController.getAllRegisterHoras(); target is of class [com.aneto.registo_horas_service.controller.RegistroHorasController]
-2025-11-26T12:38:26.486Z DEBUG 42112 --- [registo-horas-service] [http-nio-8083-exec-8] o.s.security.web.FilterChainProxy        : Securing GET /api/registos/all
-2025-11-26T12:38:26.486Z  INFO 42112 --- [registo-horas-service] [http-nio-8083-exec-8] c.a.r.security.GatewayAuthFilter         : Autenticação configurada - User: adminhoras, Authorities: [ROLE_ADMIN]
-2025-11-26T12:38:26.486Z DEBUG 42112 --- [registo-horas-service] [http-nio-8083-exec-8] o.s.security.web.FilterChainProxy        : Secured GET /api/registos/all
-2025-11-26T12:38:26.487Z DEBUG 42112 --- [registo-horas-service] [http-nio-8083-exec-8] horizationManagerBeforeMethodInterceptor : Authorizing method invocation ReflectiveMethodInvocation: public org.springframework.http.ResponseEntity com.aneto.registo_horas_service.controller.RegistroHorasController.getAllRegisterHoras(); target is of class [com.aneto.registo_horas_service.controller.RegistroHorasController]
-2025-11-26T12:38:26.488Z DEBUG 42112 --- [registo-horas-service] [http-nio-8083-exec-8] horizationManagerBeforeMethodInterceptor : Authorized method invocation ReflectiveMethodInvocation: public org.springframework.http.ResponseEntity com.aneto.registo_horas_service.controller.RegistroHorasController.getAllRegisterHoras(); target is of class [com.aneto.registo_horas_service.controller.RegistroHorasController]
-2025-11-26T13:21:09.404Z  INFO 42112 --- [registo-horas-service] [SpringApplicationShutdownHook] o.s.b.w.e.tomcat.GracefulShutdown        : Commencing graceful shutdown. Waiting for active requests to complete
-2025-11-26T13:21:09.408Z  INFO 42112 --- [registo-horas-service] [tomcat-shutdown] o.s.b.w.e.tomcat.GracefulShutdown        : Graceful shutdown complete
-2025-11-26T13:21:09.430Z  INFO 42112 --- [registo-horas-service] [SpringApplicationShutdownHook] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'default'
-2025-11-26T13:21:09.433Z  INFO 42112 --- [registo-horas-service] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
-2025-11-26T13:21:09.435Z  INFO 42112 --- [registo-horas-service] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.

@@ -3,7 +3,9 @@ package com.aneto.registo_horas_service.service;
 
 
 import com.aneto.registo_horas_service.dto.request.RegisterRequest;
+import com.aneto.registo_horas_service.dto.response.PerfilResponse;
 import com.aneto.registo_horas_service.dto.response.RegisterResponse;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.UUID;
@@ -27,4 +29,6 @@ public interface RegistosHorasService {
 
     // Retorna o total de horas
     double getTotalHorasPorUsuario(String username);
+
+    List<PerfilResponse> findTotalHoursAndRequiredHoursByUserName(@Param("username") String name );
 }

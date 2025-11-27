@@ -2,6 +2,7 @@
 package com.aneto.registo_horas_service.controller;
 
 import com.aneto.registo_horas_service.dto.request.RegisterRequest;
+import com.aneto.registo_horas_service.dto.response.PerfilResponse;
 import com.aneto.registo_horas_service.dto.response.RegisterResponse;
 import com.aneto.registo_horas_service.service.RegistosHorasService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -123,5 +124,17 @@ public class RegistroHorasController {
                 "totalHoursDecimal", total
         );
         return ResponseEntity.ok(body);
+    }
+
+    @Operation(summary = "Retorna o total de horas de um usuário")
+    @GetMapping("/perfil")
+    @PreAuthorize("hasRole('ADMIN') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
+    public ResponseEntity< List<PerfilResponse>> getPerfil(
+            @RequestHeader(X_USER_ID) String username,
+            Authentication authentication) {
+
+
+        List<PerfilResponse> perfilResponseList= registroHorasService.findTotalHoursAndRequiredHoursByUserName(username);
+        return ResponseEntity.ok(perfilResponseList);
     }
 }

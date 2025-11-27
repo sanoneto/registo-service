@@ -3,6 +3,7 @@ package com.aneto.registo_horas_service.service.impl;
 
 
 import com.aneto.registo_horas_service.dto.request.RegisterRequest;
+import com.aneto.registo_horas_service.dto.response.PerfilResponse;
 import com.aneto.registo_horas_service.dto.response.RegisterResponse;
 import com.aneto.registo_horas_service.mapper.RequestMapper;
 import com.aneto.registo_horas_service.models.RegistosHoras;
@@ -91,5 +92,10 @@ public class RegistosHorasServiceImpl implements RegistosHorasService {
         // Assume-se que o repositório tem um método de soma
         Double total = registroHorasRepository.sumHorasCalculadasByEstagiarioUsername(username);
         return total != null ? total : 0.0;
+    }
+
+    @Override
+    public List<PerfilResponse> findTotalHoursAndRequiredHoursByUserName(String name) {
+        return registroHorasRepository.findTotalHoursAndRequiredHoursByUserName(name);
     }
 }
