@@ -35,6 +35,6 @@ public interface RegistroHorasRepository extends JpaRepository<RegistosHoras, Lo
                     "group by u.username,  u.email, u.required_hours",
             nativeQuery = true
     )
-    List<PerfilResponse> findTotalHoursAndRequiredHoursByUserName(@Param("username") String name );
+    PerfilResponse findTotalHoursAndRequiredHoursByUserName(@Param("username") String name );
 
 }
