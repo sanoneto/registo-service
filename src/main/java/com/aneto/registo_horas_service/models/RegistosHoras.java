@@ -45,6 +45,7 @@ public class RegistosHoras {
     @Column(name = "hora_saida")
     private LocalTime horaSaida;
 
+
     @Column(name = "descricao", length = 500)
     private String descricao;
 
