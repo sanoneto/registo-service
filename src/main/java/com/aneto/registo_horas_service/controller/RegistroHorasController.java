@@ -88,12 +88,12 @@ public class RegistroHorasController {
     }
 
     @Operation(summary = "Atualiza um registro existente")
-    @PreAuthorize("hasRole('ESTAGIARIO')")
-    // Apenas estagiários podem atualizar (o service deve validar se é o seu próprio)
+    @PreAuthorize("hasRole('ADMIN') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
     @PutMapping("/{publicId}")
     public ResponseEntity<RegisterResponse> updateRegister(
             @PathVariable UUID publicId,
-            @Valid @RequestBody RegisterRequest request) {
+            @Valid @RequestBody RegisterRequest request,
+            @RequestHeader(X_USER_ID) String username)  {
         // Implementar validação de propriedade dentro do Service para garantir que o usuário só edita os seus.
         RegisterResponse response = registroHorasService.atualizarRegistro(publicId, request);
         return ResponseEntity.ok(response);
