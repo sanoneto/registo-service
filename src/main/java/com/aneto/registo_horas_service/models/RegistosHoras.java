@@ -36,6 +36,9 @@ public class RegistosHoras {
     @Column(name = "username", nullable = false, length = 100)
     private String userName;
 
+    @Column(name = "project_name")
+    private String projectName;
+
     @Column(name = "data_registo", nullable = false)
     private LocalDate dataRegisto;
 
@@ -45,13 +48,12 @@ public class RegistosHoras {
     @Column(name = "hora_saida")
     private LocalTime horaSaida;
 
-
-    @Column(name = "descricao", length = 500)
-    private String descricao;
-
     // Horas calculadas (em decimal, ex: 8.5 para 8h30)
     @Column(name = "horas_Trabalhadas")
     private Double horasTrabalhadas;
+
+    @Column(name = "descricao", length = 500)
+    private String descricao;
 
     // Campos de auditoria
     @CreatedDate

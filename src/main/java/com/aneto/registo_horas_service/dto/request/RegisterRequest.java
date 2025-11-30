@@ -23,10 +23,8 @@ public record RegisterRequest(
                 example = "Desenvolvimento de API REST",
                 requiredMode = Schema.RequiredMode.REQUIRED
         )
-        @NotBlank(message = "O primeiro nome é obrigatório")
-        @Size(min = 2, max = 50, message = "Nome deve ter entre 2 e 50 caracteres")
-        String descricao,
-
+        @NotNull(message = "o nome do projecto nao pode sr null")
+        String projectName,
 
         @Schema(
                 description = "Data e hora de início",
@@ -64,7 +62,10 @@ public record RegisterRequest(
                 requiredMode = Schema.RequiredMode.REQUIRED,
                 type = "double"
         )
-        Double horasTrabalhadas
+        Double horasTrabalhadas,
 
+        @NotBlank(message = "O primeiro nome é obrigatório")
+        @Size(min = 2, max = 50, message = "Nome deve ter entre 2 e 50 caracteres")
+        String descricao
 ) {
 }

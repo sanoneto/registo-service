@@ -27,15 +27,15 @@ public interface RegistroHorasRepository extends JpaRepository<RegistosHoras, Lo
     Optional<RegistosHoras> findByPublicId(UUID attr0);
 
     @Query(
-            value = "select u.username, u.email, tp.required_hours,\n" +
+            value = "select u.username, tp.project_name, u.email, tp.required_hours,\n" +
                     "sum(r.horas_trabalhadas ) as Total_horas_trabalhadas \n" +
                     "from auth.tb_users u\n" +
                     "inner join registos.registos_horas r on u.username = r.username\n" +
                     "inner join auth.tb_projetos tp  on u.username = tp.username\n" +
                     "where u.username ='adminhoras'\n" +
-                    "group by u.username,  u.email, tp.required_hours",
+                    "group by u.username,  u.email, tp.required_hours, tp.project_name",
             nativeQuery = true
     )
-    PerfilResponse findTotalHoursAndRequiredHoursByUserName(@Param("username") String name );
+    List<PerfilResponse> findTotalHoursAndRequiredHoursByUserName(@Param("username") String name );
 
 }

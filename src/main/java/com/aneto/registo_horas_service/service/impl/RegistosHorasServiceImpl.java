@@ -95,7 +95,7 @@ public class RegistosHorasServiceImpl implements RegistosHorasService {
     }
 
     @Override
-    public PerfilResponse findTotalHoursAndRequiredHoursByUserName(String name) {
+    public List<PerfilResponse>  findTotalHoursAndRequiredHoursByUserName(String name) {
         return registroHorasRepository.findTotalHoursAndRequiredHoursByUserName(name);
     }
 }

@@ -129,12 +129,9 @@ public class RegistroHorasController {
     @Operation(summary = "Retorna o total de horas de um usuário")
     @GetMapping("/perfil")
     @PreAuthorize("hasRole('ADMIN') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
-    public ResponseEntity< PerfilResponse> getPerfil(
+    public ResponseEntity <List<PerfilResponse>>  getPerfil(
             @RequestHeader(X_USER_ID) String username,
             Authentication authentication) {
-
-
-        PerfilResponse perfilResponseList= registroHorasService.findTotalHoursAndRequiredHoursByUserName(username);
-        return ResponseEntity.ok(perfilResponseList);
+return ResponseEntity.ok(registroHorasService.findTotalHoursAndRequiredHoursByUserName(username));
     }
 }

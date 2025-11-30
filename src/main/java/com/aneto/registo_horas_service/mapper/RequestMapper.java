@@ -17,13 +17,13 @@ public interface RequestMapper {
     @Mapping(target = "publicId", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "userName", source = "userName")
-    @Mapping(target = "descricao", source = "descricao")
+    @Mapping(target = "projectName", source = "projectName")
     @Mapping(target = "dataRegisto", source = "dataRegisto")
     @Mapping(target = "horaEntrada", source = "horaEntrada")
     @Mapping(target = "horaSaida", source = "horaSaida")
     @Mapping(target = "horasTrabalhadas", source = "horasTrabalhadas")
+    @Mapping(target = "descricao", source = "descricao")
     RegistosHoras mapToRegisterHoras(RegisterRequest registerRequest);
-
     RegisterResponse toResponse(RegistosHoras registerHoras);
 
 

@@ -30,5 +30,5 @@ public interface RegistosHorasService {
     // Retorna o total de horas
     double getTotalHorasPorUsuario(String username);
 
-    PerfilResponse findTotalHoursAndRequiredHoursByUserName(@Param("username") String name );
+    List<PerfilResponse>  findTotalHoursAndRequiredHoursByUserName(@Param("username") String name );
 }

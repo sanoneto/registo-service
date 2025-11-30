@@ -8,11 +8,12 @@ import java.util.UUID;
 public record RegisterResponse(
         UUID publicId,
         String userName,
-        String descricao,
+        String projectName,
         LocalDate dataRegisto,
         LocalTime horaEntrada,
         LocalTime horaSaida,
-        double horasTrabalhadas
+        double horasTrabalhadas,
+         String descricao
 
 ) {
 }
