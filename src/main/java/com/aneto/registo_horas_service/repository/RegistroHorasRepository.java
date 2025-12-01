@@ -23,7 +23,6 @@ public interface RegistroHorasRepository extends JpaRepository<RegistosHoras, Lo
 
     Page<RegistosHoras> findByUserName(String name, Pageable pageable);
 
-
     Optional<RegistosHoras> findByPublicId(UUID attr0);
 
     @Query(

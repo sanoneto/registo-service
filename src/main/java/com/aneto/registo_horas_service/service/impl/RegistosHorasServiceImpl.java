@@ -10,6 +10,7 @@ import com.aneto.registo_horas_service.models.RegistosHoras;
 import com.aneto.registo_horas_service.repository.RegistroHorasRepository;
 import com.aneto.registo_horas_service.service.RegistosHorasService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -50,7 +51,8 @@ public class RegistosHorasServiceImpl implements RegistosHorasService {
 
     @Override
     public List<RegisterResponse> findAllRegisteredHours() {
-        return registroHorasRepository.findAll().stream()
+        Sort sortByDataRegisto = Sort.by(Sort.Direction.DESC, "dataRegisto");
+        return registroHorasRepository.findAll(sortByDataRegisto).stream()
                 .map(requestMapper::toResponse)
                 .collect(Collectors.toList());
     }
