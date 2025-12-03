@@ -5,7 +5,7 @@ spring:
   sql:
     init:
       schema-locations: classpath:schema.sql
-      mode: always
+      mode: never
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/horasdb}
     username: ${SPRING_DATASOURCE_USERNAME:horas_user}
