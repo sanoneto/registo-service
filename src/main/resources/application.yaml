@@ -7,10 +7,10 @@ spring:
       schema-locations: classpath:schema.sql
       mode: never
   datasource:
-    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/horasdb}
-    username: ${PGUSER:horas_user}
-    password: ${PGPASSWORD:horas_pass}
-    driver-class-name: org.postgresql.Driver
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/horasdb}
+    username: ${SPRING_DATASOURCE_USERNAME:horas_user}
+    password: ${SPRING_DATASOURCE_PASSWORD:horas_pass}
+    driver-class-name: ${SPRING_DATASOURCE_DRIVER:org.postgresql.Driver}
   jpa:
     hibernate:
       ddl-auto: update
