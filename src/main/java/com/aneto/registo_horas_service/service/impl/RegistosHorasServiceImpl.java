@@ -45,8 +45,15 @@ public class RegistosHorasServiceImpl implements RegistosHorasService {
             return 0.0;
         }
         Duration duration = Duration.between(entrada, saida);
-        // Retorna horas em formato decimal (ex: 8.5 para 8h30)
-        return duration.toMinutes() / 60.0;
+
+        // Calcula as horas em formato decimal
+        double horasDecimais = duration.toMinutes() / 60.0;
+
+        // Arredonda o valor para uma casa decimal
+        // 1. Multiplica por 10 (ex: 2.666... vira 26.666...)
+        // 2. Arredonda para o inteiro mais próximo (ex: 27)
+        // 3. Divide por 10.0 (ex: 27 vira 2.7)
+        return Math.round(horasDecimais * 10.0) / 10.0;
     }
 
     @Override
