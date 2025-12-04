@@ -4,8 +4,10 @@ package com.aneto.registo_horas_service.service;
 
 import com.aneto.registo_horas_service.dto.request.RegisterRequest;
 import com.aneto.registo_horas_service.dto.response.MonthlySummary;
+import com.aneto.registo_horas_service.dto.response.PageResponse;
 import com.aneto.registo_horas_service.dto.response.PerfilResponse;
 import com.aneto.registo_horas_service.dto.response.RegisterResponse;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
@@ -35,4 +37,7 @@ public interface RegistosHorasService {
 
     List<MonthlySummary> findMonthlySummary();
     List<MonthlySummary> findMonthlySummary(@Param("username") String name );
+
+    PageResponse<RegisterResponse> findAllRegisteredHoursUser(String name, Pageable pageable);
+    PageResponse<RegisterResponse> findAllRegisteredHoursPage(Pageable pageable);
 }

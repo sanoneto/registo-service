@@ -58,4 +58,6 @@ public interface RegistroHorasRepository extends JpaRepository<RegistosHoras, Lo
     )
     List<PerfilResponse> findTotalHoursAndRequiredHoursByUserName(@Param("username") String name );
 
+
+
 }

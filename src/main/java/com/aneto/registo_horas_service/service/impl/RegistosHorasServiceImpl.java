@@ -4,6 +4,7 @@ package com.aneto.registo_horas_service.service.impl;
 
 import com.aneto.registo_horas_service.dto.request.RegisterRequest;
 import com.aneto.registo_horas_service.dto.response.MonthlySummary;
+import com.aneto.registo_horas_service.dto.response.PageResponse;
 import com.aneto.registo_horas_service.dto.response.PerfilResponse;
 import com.aneto.registo_horas_service.dto.response.RegisterResponse;
 import com.aneto.registo_horas_service.mapper.RequestMapper;
@@ -11,8 +12,13 @@ import com.aneto.registo_horas_service.models.RegistosHoras;
 import com.aneto.registo_horas_service.repository.RegistroHorasRepository;
 import com.aneto.registo_horas_service.service.RegistosHorasService;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.LocalTime;
@@ -24,6 +30,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class RegistosHorasServiceImpl implements RegistosHorasService {
 
+    private static final Logger log = LoggerFactory.getLogger(RegistosHorasServiceImpl.class);
     private final RegistroHorasRepository registroHorasRepository;
     private final RequestMapper requestMapper;
 
@@ -117,6 +124,52 @@ public class RegistosHorasServiceImpl implements RegistosHorasService {
     @Override
     public List<MonthlySummary> findMonthlySummary(String name) {
         return registroHorasRepository.findMonthlySummaryByUsername(name);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<RegisterResponse> findAllRegisteredHoursUser(String name, Pageable pageable) {
+        log.debug("Buscando registros paginados do usuário: {} - Página: {}, Tamanho: {}",
+                name, pageable.getPageNumber(), pageable.getPageSize());
+
+        Page<RegistosHoras> page = registroHorasRepository.findByUserName(name, pageable);
+        List<RegisterResponse> content = requestMapper.mapToListRegisterResponse(page.getContent());
+
+        log.info("Encontrados {} registros para o usuário {} na página {} de {}",
+                page.getNumberOfElements(), name, page.getNumber(), page.getTotalPages());
+
+        return PageResponse.of(
+                content,
+                page.getNumber(),
+                page.getSize(),
+                page.getTotalElements(),
+                page.getTotalPages(),
+                page.isFirst(),
+                page.isLast()
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<RegisterResponse> findAllRegisteredHoursPage(Pageable pageable) {
+        log.debug("Buscando registros paginados - Página: {}, Tamanho: {}",
+                pageable.getPageNumber(), pageable.getPageSize());
+
+        Page<RegistosHoras> page = registroHorasRepository.findAll(pageable);
+        List<RegisterResponse> content = requestMapper.mapToListRegisterResponse(page.getContent());
+
+        log.info("Encontrados {} registros na página {} de {}",
+                page.getNumberOfElements(), page.getNumber(), page.getTotalPages());
+
+        return PageResponse.of(
+                content,
+                page.getNumber(),
+                page.getSize(),
+                page.getTotalElements(),
+                page.getTotalPages(),
+                page.isFirst(),
+                page.isLast()
+        );
     }
 
 
