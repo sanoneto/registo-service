@@ -2,6 +2,7 @@
 package com.aneto.registo_horas_service.controller;
 
 import com.aneto.registo_horas_service.dto.request.RegisterRequest;
+import com.aneto.registo_horas_service.dto.response.MonthlySummary;
 import com.aneto.registo_horas_service.dto.response.PerfilResponse;
 import com.aneto.registo_horas_service.dto.response.RegisterResponse;
 import com.aneto.registo_horas_service.service.RegistosHorasService;
@@ -87,6 +88,13 @@ public class RegistroHorasController {
         return ResponseEntity.ok(registros);
     }
 
+    @PreAuthorize("hasRole('ADMIN')") // Apenas ADMIN pode ver todos
+    @GetMapping("monthly-summary/all")
+    public ResponseEntity<List<MonthlySummary>> findMonthlySummary() {
+        List<MonthlySummary> registros = registroHorasService.findMonthlySummary();
+        return ResponseEntity.ok(registros);
+    }
+
     @Operation(summary = "Atualiza um registro existente")
     @PreAuthorize("hasRole('ADMIN') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
     @PutMapping("/{publicId}")
@@ -113,10 +121,6 @@ public class RegistroHorasController {
     public ResponseEntity<Map<String, Object>> getTotalHoras(
             @RequestHeader(X_USER_ID) String username,
             Authentication authentication) {
-
-        // Nota: authentication.name é o username setado pelo GatewayAuthFilter do serviço (8082)
-        // Isso é uma medida de segurança extra.
-
         double total = registroHorasService.getTotalHorasPorUsuario(username);
 
         Map<String, Object> body = Map.of(
@@ -124,6 +128,16 @@ public class RegistroHorasController {
                 "totalHoursDecimal", total
         );
         return ResponseEntity.ok(body);
+    }
+
+    @Operation(summary = "Retorna o total de horas de um usuário")
+    @GetMapping("/monthly-summary")
+    @PreAuthorize("hasRole('ADMIN') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
+    public ResponseEntity<List<MonthlySummary>> findMonthlySummary(
+            @RequestHeader(X_USER_ID) String username,
+            Authentication authentication) {
+        List<MonthlySummary> total = registroHorasService.findMonthlySummary(username);
+        return ResponseEntity.ok(total);
     }
 
     @Operation(summary = "Retorna o total de horas de um usuário")

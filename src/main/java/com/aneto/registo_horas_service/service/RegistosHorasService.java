@@ -3,6 +3,7 @@ package com.aneto.registo_horas_service.service;
 
 
 import com.aneto.registo_horas_service.dto.request.RegisterRequest;
+import com.aneto.registo_horas_service.dto.response.MonthlySummary;
 import com.aneto.registo_horas_service.dto.response.PerfilResponse;
 import com.aneto.registo_horas_service.dto.response.RegisterResponse;
 import org.springframework.data.repository.query.Param;
@@ -31,4 +32,7 @@ public interface RegistosHorasService {
     double getTotalHorasPorUsuario(String username);
 
     List<PerfilResponse>  findTotalHoursAndRequiredHoursByUserName(@Param("username") String name );
+
+    List<MonthlySummary> findMonthlySummary();
+    List<MonthlySummary> findMonthlySummary(@Param("username") String name );
 }

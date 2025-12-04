@@ -3,6 +3,7 @@ package com.aneto.registo_horas_service.service.impl;
 
 
 import com.aneto.registo_horas_service.dto.request.RegisterRequest;
+import com.aneto.registo_horas_service.dto.response.MonthlySummary;
 import com.aneto.registo_horas_service.dto.response.PerfilResponse;
 import com.aneto.registo_horas_service.dto.response.RegisterResponse;
 import com.aneto.registo_horas_service.mapper.RequestMapper;
@@ -107,4 +108,16 @@ public class RegistosHorasServiceImpl implements RegistosHorasService {
     public List<PerfilResponse>  findTotalHoursAndRequiredHoursByUserName(String name) {
         return registroHorasRepository.findTotalHoursAndRequiredHoursByUserName(name);
     }
+
+    @Override
+    public List<MonthlySummary> findMonthlySummary() {
+        return registroHorasRepository.findMonthlySummary();
+    }
+
+    @Override
+    public List<MonthlySummary> findMonthlySummary(String name) {
+        return registroHorasRepository.findMonthlySummaryByUsername(name);
+    }
+
+
 }
