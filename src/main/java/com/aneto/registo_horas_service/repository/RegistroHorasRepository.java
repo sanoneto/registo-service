@@ -21,6 +21,14 @@ public interface RegistroHorasRepository extends JpaRepository<RegistosHoras, Lo
     @Query("SELECT SUM(r.horasTrabalhadas) FROM RegistosHoras r WHERE r.userName = :username")
     Double sumHorasCalculadasByEstagiarioUsername(@Param("username") String username);
 
+    @Query(value= "SELECT SUM(r.horas_trabalhadas) AS totalHours" +
+            "FROM registos.registos_horas r " +
+            "inner join auth.tb_projetos tp  on r.username = tp.username " +
+            "WHERE r.userName = :username " +
+            "and r.project_name =:project_name",
+            nativeQuery = true)
+    Double sumHorasCalculadasByEstagiarioUsernameByProject(@Param("username") String username , @Param("project_name") String project_name);
+
     // 1. Uso de @Query para consulta nativa
     // 2. Uso de nativeQuery = true (IMPRESCINDÍVEL)
     // 3. Tipo de retorno List<MonthlySummary> (a sua nova interface/projeção)

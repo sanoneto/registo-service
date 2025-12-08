@@ -106,9 +106,9 @@ public class RegistroHorasController {
     public ResponseEntity<RegisterResponse> updateRegister(
             @PathVariable UUID publicId,
             @Valid @RequestBody RegisterRequest request,
-            @RequestHeader(X_USER_ID) String username) {
+            @RequestHeader(X_USER_ID) String username) throws Exception {
         // Implementar validação de propriedade dentro do Service para garantir que o usuário só edita os seus.
-        RegisterResponse response = registroHorasService.atualizarRegistro(publicId, request);
+        RegisterResponse response = registroHorasService.atualizarRegistro(publicId, request, username);
         return ResponseEntity.ok(response);
     }
 
@@ -133,6 +133,17 @@ public class RegistroHorasController {
                 "totalHoursDecimal", total
         );
         return ResponseEntity.ok(body);
+    }
+
+    @Operation(summary = "Retorna o total de horas de um usuário")
+    @GetMapping("/total-user-project/{username}{projectName}")
+    @PreAuthorize("hasRole('ADMIN') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
+    public ResponseEntity<Double> getTotalHorasPorUser(
+            @RequestParam String username,
+            @RequestParam String projectName,
+            Authentication authentication) {
+        double total = registroHorasService.getTotalHorasPorUsuarioProjrct(username, projectName);
+        return ResponseEntity.ok(total);
     }
 
     @Operation(summary = "Retorna o total de horas de um usuário")

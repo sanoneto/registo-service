@@ -25,13 +25,15 @@ public interface RegistosHorasService {
     List<RegisterResponse> buscarRegistrosPorUsuario(String username);
 
     // Atualiza um registro existente
-    RegisterResponse atualizarRegistro(UUID publicId, RegisterRequest request);
+    RegisterResponse atualizarRegistro(UUID publicId, RegisterRequest request,String username)throws Exception;
 
     // Deleta um registro
     void deleteRegistry(UUID publicId);
 
     // Retorna o total de horas
     double getTotalHorasPorUsuario(String username);
+
+    double getTotalHorasPorUsuarioProjrct(String username , String project_name);
 
     List<PerfilResponse>  findTotalHoursAndRequiredHoursByUserName(@Param("username") String name );
 
@@ -40,4 +42,6 @@ public interface RegistosHorasService {
 
     PageResponse<RegisterResponse> findAllRegisteredHoursUser(String name, Pageable pageable);
     PageResponse<RegisterResponse> findAllRegisteredHoursPage(Pageable pageable);
+
+
 }

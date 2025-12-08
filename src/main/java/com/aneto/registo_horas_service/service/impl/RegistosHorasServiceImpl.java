@@ -8,9 +8,13 @@ import com.aneto.registo_horas_service.dto.response.PageResponse;
 import com.aneto.registo_horas_service.dto.response.PerfilResponse;
 import com.aneto.registo_horas_service.dto.response.RegisterResponse;
 import com.aneto.registo_horas_service.mapper.RequestMapper;
+import com.aneto.registo_horas_service.models.OperacaoAuditoria;
+import com.aneto.registo_horas_service.models.RegistoHistorico;
 import com.aneto.registo_horas_service.models.RegistosHoras;
+import com.aneto.registo_horas_service.repository.RegistoHistoricoRepository;
 import com.aneto.registo_horas_service.repository.RegistroHorasRepository;
 import com.aneto.registo_horas_service.service.RegistosHorasService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
@@ -32,7 +37,9 @@ public class RegistosHorasServiceImpl implements RegistosHorasService {
 
     private static final Logger log = LoggerFactory.getLogger(RegistosHorasServiceImpl.class);
     private final RegistroHorasRepository registroHorasRepository;
+    private final RegistoHistoricoRepository registoHistoricoRepository;
     private final RequestMapper requestMapper;
+    private final ObjectMapper objectMapper; // Jackson ou similar para JSON
 
     @Override
     public RegisterResponse submeterHoras(RegisterRequest request, String username) {
@@ -80,15 +87,28 @@ public class RegistosHorasServiceImpl implements RegistosHorasService {
     }
 
     @Override
-    public RegisterResponse atualizarRegistro(UUID publicId, RegisterRequest request) {
+    public RegisterResponse atualizarRegistro(UUID publicId, RegisterRequest request, String username) throws Exception{
         RegistosHoras existing = registroHorasRepository.findByPublicId(publicId)
                 .orElseThrow(() -> new RuntimeException("Registro não encontrado."));
+
+        String dadosAnteriores = objectMapper.writeValueAsString(existing);
 
         // Atualiza campos
         existing.setDataRegisto(request.dataRegisto());
         existing.setHoraEntrada(request.horaEntrada());
         existing.setHoraSaida(request.horaSaida());
         existing.setDescricao(request.descricao());
+
+        // 4. Salva a entrada no Histórico
+        RegistoHistorico historico= RegistoHistorico.builder()
+                .registoPublicId(String.valueOf(publicId))
+                .operacao(OperacaoAuditoria.UPDATE)
+                .dataAlteracao(LocalDateTime.now())
+                .utilizadorAlteracao(username)
+                .dadosAnterioresJson(dadosAnteriores)
+                .build();
+
+        registoHistoricoRepository.save(historico);
 
         // Recalcula horas
         existing.setHorasTrabalhadas(calcularHoras(existing.getHoraEntrada(), existing.getHoraSaida()));
@@ -108,6 +128,12 @@ public class RegistosHorasServiceImpl implements RegistosHorasService {
     public double getTotalHorasPorUsuario(String username) {
         // Assume-se que o repositório tem um método de soma
         Double total = registroHorasRepository.sumHorasCalculadasByEstagiarioUsername(username);
+        return total != null ? total : 0.0;
+    }
+
+    @Override
+    public double getTotalHorasPorUsuarioProjrct(String username, String project_name) {
+        Double total = registroHorasRepository.sumHorasCalculadasByEstagiarioUsernameByProject(username,project_name);
         return total != null ? total : 0.0;
     }
 
