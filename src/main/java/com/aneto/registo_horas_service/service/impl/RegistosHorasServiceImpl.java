@@ -141,25 +141,13 @@ public class RegistosHorasServiceImpl implements RegistosHorasService {
         registroHorasRepository.delete(registro);
     }
 
-    @Override
-    public double getTotalHorasPorUsuario(String username) {
-        // Assume-se que o repositório tem um método de soma
-        Optional<BigDecimal> total = registroHorasRepository.findSumHorasTrabalhadasByUserName(username);
-        return total
-                .map(BigDecimal::doubleValue)
-                .orElse(0.0);
-    }
 
     @Override
     public double getTotalHorasPorUsuarioProjrct(String username, String project_name) {
-        if (Objects.equals(project_name, "all"))
-            return getTotalHorasPorUsuario(username);
-        else {
-            Optional<BigDecimal> total = registroHorasRepository.findSumHorasTrabalhadasByUserNameAndProjectName(username, project_name);
-            return total
-                    .map(BigDecimal::doubleValue)
-                    .orElse(0.0);
-        }
+            Optional<Double> total = registroHorasRepository.findSumHorasTrabalhadasByUserNameAndProjectName(username, project_name);
+            return total.orElse(0.0);
+
+
     }
 
     @Transactional(readOnly = true)

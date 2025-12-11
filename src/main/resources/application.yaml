@@ -76,7 +76,7 @@ app:
   queries:
     monthly-summary-global: "SELECT 
         TO_CHAR(data_registo, 'YYYY-MM') AS mes_e_ano, 
-        SUM(horas_trabalhadas) AS total_horas_trabalhadas 
+        ROUND(CAST(SUM(r.horas_trabalhadas) AS NUMERIC), 1) AS total_horas_trabalhadas 
     FROM 
         registos.registos_horas rh 
     GROUP BY 
@@ -87,7 +87,7 @@ app:
     # 3. Query findMonthlySummaryByUsername (Por Utilizador)
     monthly-summary-by-user: "SELECT 
         TO_CHAR(data_registo, 'YYYY-MM') AS mes_e_ano, 
-        SUM(horas_trabalhadas) AS total_horas_trabalhadas 
+        ROUND(CAST(SUM(r.horas_trabalhadas) AS NUMERIC), 1) AS total_horas_trabalhadas 
     FROM 
         registos.registos_horas rh 
     WHERE 

@@ -30,9 +30,6 @@ public interface RegistosHorasService {
     // Deleta um registro
     void deleteRegistry(UUID publicId);
 
-    // Retorna o total de horas
-    double getTotalHorasPorUsuario(String username);
-
     double getTotalHorasPorUsuarioProjrct(String username , String project_name);
 
     List<PerfilResponse>  findTotalHoursAndRequiredHoursByUserName(@Param("username") String name );

@@ -16,14 +16,11 @@ import java.util.UUID;
 
 public interface RegistroHorasRepository extends JpaRepository<RegistosHoras, Long> {
 
-    // 1. Query JPQL (Mantida)
-    @Query("SELECT SUM(r.horasTrabalhadas) as totalHours FROM RegistosHoras r WHERE r.userName = :username")
-    Optional <BigDecimal>  findSumHorasTrabalhadasByUserName(@Param("username") String username);
-
-    //Optional <BigDecimal> findSumHorasTrabalhadasByUserName(String userName);
-
-    @Query("SELECT SUM(r.horasTrabalhadas) as totalHours FROM RegistosHoras r WHERE r.userName = :userName AND r.projectName = :projectName")
-    Optional<BigDecimal> findSumHorasTrabalhadasByUserNameAndProjectName(
+    @Query("SELECT ROUND(SUM(r.horasTrabalhadas), 1) " +
+            "FROM RegistosHoras r " +
+            "WHERE r.userName = :userName " +
+            "AND (:projectName IS NULL OR :projectName = 'all' OR r.projectName = :projectName)")
+    Optional<Double> findSumHorasTrabalhadasByUserNameAndProjectName(
             @Param("userName") String userName,
             @Param("projectName") String projectName
     );

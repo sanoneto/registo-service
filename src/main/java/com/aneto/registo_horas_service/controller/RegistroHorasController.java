@@ -126,7 +126,7 @@ public class RegistroHorasController {
     public ResponseEntity<Map<String, Object>> getTotalHoras(
             @RequestHeader(X_USER_ID) String username,
             Authentication authentication) {
-        double total = registroHorasService.getTotalHorasPorUsuario(username);
+        double total = registroHorasService.getTotalHorasPorUsuarioProjrct(username,null);
 
         Map<String, Object> body = Map.of(
                 "user", username,
