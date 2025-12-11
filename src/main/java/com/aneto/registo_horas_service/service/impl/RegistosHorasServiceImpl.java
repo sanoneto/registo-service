@@ -140,12 +140,10 @@ public class RegistosHorasServiceImpl implements RegistosHorasService {
         registroHorasRepository.delete(registro);
     }
 
-
     @Override
     public double getTotalHorasPorUsuarioProjrct(String username, String project_name) {
-            Optional<Double> total = registroHorasRepository.findSumHorasTrabalhadasByUserNameAndProjectName(username, project_name);
+            Optional<Double> total = registroHorasRepository.findSumHorasTrabalhadasByProjectName( project_name);
             return total.orElse(0.0);
-
 
     }
 
