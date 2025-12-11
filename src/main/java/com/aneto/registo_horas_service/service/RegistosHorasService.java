@@ -34,7 +34,6 @@ public interface RegistosHorasService {
 
     List<PerfilResponse>  findTotalHoursAndRequiredHoursByUserName(@Param("username") String name );
 
-    List<MonthlySummary> findMonthlySummary();
     List<MonthlySummary> findMonthlySummary(@Param("username") String name );
 
     PageResponse<RegisterResponse> findAllRegisteredHoursUser(String name, Pageable pageable);

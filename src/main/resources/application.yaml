@@ -72,30 +72,20 @@ logging:
   file:
     name: logs/app.log
 
+
 app:
   queries:
-    monthly-summary-global: "SELECT 
-        TO_CHAR(data_registo, 'YYYY-MM') AS mes_e_ano, 
-        ROUND(CAST(SUM(r.horas_trabalhadas) AS NUMERIC), 1) AS total_horas_trabalhadas 
+    monthly-summary: "SELECT 
+    TO_CHAR(data_registo, 'YYYY-MM') AS mes_e_ano, 
+    SUM(horas_trabalhadas) AS total_horas_trabalhadas 
     FROM 
-        registos.registos_horas rh 
-    GROUP BY 
-        mes_e_ano 
-    ORDER BY 
-        mes_e_ano DESC"
-
-    # 3. Query findMonthlySummaryByUsername (Por Utilizador)
-    monthly-summary-by-user: "SELECT 
-        TO_CHAR(data_registo, 'YYYY-MM') AS mes_e_ano, 
-        ROUND(CAST(SUM(r.horas_trabalhadas) AS NUMERIC), 1) AS total_horas_trabalhadas 
-    FROM 
-        registos.registos_horas rh 
+    registos.registos_horas rh 
     WHERE 
-        rh.username = :username 
+    :username IS NULL OR :username = 'all' OR rh.username = :username 
     GROUP BY 
-        mes_e_ano 
+    mes_e_ano 
     ORDER BY 
-        mes_e_ano DESC"
+    mes_e_ano DESC"
 
     # 4. Query findTotalHoursAndRequiredHoursByUserName (A mais longa)
     user-required-vs-total-hours: "SELECT

@@ -48,15 +48,14 @@ public class RegistosHorasServiceImpl implements RegistosHorasService {
     private final ObjectMapper objectMapper; // Jackson ou similar para JSON
 
     private final EntityManager entityManager;
-    // ... outros repositórios e dependências
 
     // 🔑 Injete a Query do YAML
     @Value("${app.queries.user-required-vs-total-hours}")
     private String userRequiredVsTotalHoursQuery;
 
     // 🔑 Injete a Query do YAML
-    @Value("${app.queries.monthly-summary-global}")
-    private String monthlySummaryGlobalQuery;
+    @Value("${app.queries.monthly-summary}")
+    private String monthlySummaryQuery;
 
     @Override
     public RegisterResponse submeterHoras(RegisterRequest request, String username) {
@@ -186,26 +185,28 @@ public class RegistosHorasServiceImpl implements RegistosHorasService {
      * Exemplo para o MonthlySummary (Query sem parâmetros)
      */
     @Transactional(readOnly = true)
-    public List<MonthlySummary> findMonthlySummary() {
+    public List<MonthlySummary> findMonthlySummary(String username) {
 
-        // 1. Cria a Native Query
-        Query nativeQuery = entityManager.createNativeQuery(monthlySummaryGlobalQuery);
+        // O username pode ser null para indicar "todos", conforme a lógica SQL.
+        // Se o cliente passar uma string vazia (""), converta para null ou "all" para padronização.
+        String userToFilter = (username != null && !username.trim().isEmpty()) ? username.trim() : "all";
 
-        // 2. Obtém o resultado
+        // OBS: O 'monthlySummaryQuery' DEVE conter a lógica condicional "WHERE :username IS NULL OR :username = 'all' OR rh.username = :username"
+        Query nativeQuery = entityManager.createNativeQuery(monthlySummaryQuery);
+
+        nativeQuery.setParameter("username", userToFilter);
+
+        // 3. Obtém o resultado
         @SuppressWarnings("unchecked")
         List<Object[]> results = nativeQuery.getResultList();
 
+        // 4. Mapeamento do resultado para o objeto MonthlySummary
         return results.stream()
                 .map(row -> new MonthlySummary(
                         (String) row[0], // mes_e_ano
-                        (Double) row[1]  // total_horas_trabalhadas
+                        ((Number) row[1]).doubleValue()  // total_horas_trabalhadas
                 ))
                 .collect(Collectors.toList());
-    }
-
-    @Override
-    public List<MonthlySummary> findMonthlySummary(String name) {
-        return registroHorasRepository.findMonthlySummaryByUsername(name);
     }
 
     @Override

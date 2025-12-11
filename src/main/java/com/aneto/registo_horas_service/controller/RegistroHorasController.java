@@ -96,7 +96,7 @@ public class RegistroHorasController {
     @PreAuthorize("hasRole('ADMIN')") // Apenas ADMIN pode ver todos
     @GetMapping("monthly-summary/all")
     public ResponseEntity<List<MonthlySummary>> findMonthlySummary() {
-        List<MonthlySummary> registros = registroHorasService.findMonthlySummary();
+        List<MonthlySummary> registros = registroHorasService.findMonthlySummary("all");
         return ResponseEntity.ok(registros);
     }
 
