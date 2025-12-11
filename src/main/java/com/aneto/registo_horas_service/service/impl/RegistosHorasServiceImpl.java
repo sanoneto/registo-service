@@ -15,19 +15,25 @@ import com.aneto.registo_horas_service.repository.RegistoHistoricoRepository;
 import com.aneto.registo_horas_service.repository.RegistroHorasRepository;
 import com.aneto.registo_horas_service.service.RegistosHorasService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.Query;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -40,6 +46,17 @@ public class RegistosHorasServiceImpl implements RegistosHorasService {
     private final RegistoHistoricoRepository registoHistoricoRepository;
     private final RequestMapper requestMapper;
     private final ObjectMapper objectMapper; // Jackson ou similar para JSON
+
+    private final EntityManager entityManager;
+    // ... outros repositórios e dependências
+
+    // 🔑 Injete a Query do YAML
+    @Value("${app.queries.user-required-vs-total-hours}")
+    private String userRequiredVsTotalHoursQuery;
+
+    // 🔑 Injete a Query do YAML
+    @Value("${app.queries.monthly-summary-global}")
+    private String monthlySummaryGlobalQuery;
 
     @Override
     public RegisterResponse submeterHoras(RegisterRequest request, String username) {
@@ -87,7 +104,7 @@ public class RegistosHorasServiceImpl implements RegistosHorasService {
     }
 
     @Override
-    public RegisterResponse atualizarRegistro(UUID publicId, RegisterRequest request, String username) throws Exception{
+    public RegisterResponse atualizarRegistro(UUID publicId, RegisterRequest request, String username) throws Exception {
         RegistosHoras existing = registroHorasRepository.findByPublicId(publicId)
                 .orElseThrow(() -> new RuntimeException("Registro não encontrado."));
 
@@ -100,7 +117,7 @@ public class RegistosHorasServiceImpl implements RegistosHorasService {
         existing.setDescricao(request.descricao());
 
         // 4. Salva a entrada no Histórico
-        RegistoHistorico historico= RegistoHistorico.builder()
+        RegistoHistorico historico = RegistoHistorico.builder()
                 .registoPublicId(String.valueOf(publicId))
                 .operacao(OperacaoAuditoria.UPDATE)
                 .dataAlteracao(LocalDateTime.now())
@@ -127,24 +144,75 @@ public class RegistosHorasServiceImpl implements RegistosHorasService {
     @Override
     public double getTotalHorasPorUsuario(String username) {
         // Assume-se que o repositório tem um método de soma
-        Double total = registroHorasRepository.sumHorasCalculadasByEstagiarioUsername(username);
-        return total != null ? total : 0.0;
+        Optional<BigDecimal> total = registroHorasRepository.findSumHorasTrabalhadasByUserName(username);
+        return total
+                .map(BigDecimal::doubleValue)
+                .orElse(0.0);
     }
 
     @Override
     public double getTotalHorasPorUsuarioProjrct(String username, String project_name) {
-        Double total = registroHorasRepository.sumHorasCalculadasByEstagiarioUsernameByProject(username,project_name);
-        return total != null ? total : 0.0;
+        if (Objects.equals(project_name, "all"))
+            return getTotalHorasPorUsuario(username);
+        else {
+            Optional<BigDecimal> total = registroHorasRepository.findSumHorasTrabalhadasByUserNameAndProjectName(username, project_name);
+            return total
+                    .map(BigDecimal::doubleValue)
+                    .orElse(0.0);
+        }
     }
 
-    @Override
-    public List<PerfilResponse>  findTotalHoursAndRequiredHoursByUserName(String name) {
-        return registroHorasRepository.findTotalHoursAndRequiredHoursByUserName(name);
+    @Transactional(readOnly = true)
+    public List<PerfilResponse> findTotalHoursAndRequiredHoursByUserName(String username) {
+
+        // 1. Cria a Native Query
+        Query nativeQuery = entityManager.createNativeQuery(userRequiredVsTotalHoursQuery);
+
+        // 2. Define o parâmetro
+        nativeQuery.setParameter("username", username);
+
+        // 3. Obtém o resultado como Object[] e mapeia manualmente para o DTO
+        @SuppressWarnings("unchecked")
+        List<Object[]> results = nativeQuery.getResultList();
+
+        return results.stream()
+                .map(row -> {
+                    // 1. Recebe o valor como BigDecimal (o tipo real retornado)
+                    java.math.BigDecimal totalHorasBd = (java.math.BigDecimal) row[4];
+
+                    // 2. Converte para Double usando doubleValue()
+                    Double totalHorasDouble = totalHorasBd.doubleValue();
+
+                    return new PerfilResponse(
+                            (String) row[0],
+                            (String) row[1],
+                            (String) row[2],
+                            (Double) row[3], // required_hours (Mantido como Double)
+                            totalHorasDouble // Total_horas_trabalhadas (Convertido para Double)
+                    );
+                })
+                .collect(Collectors.toList());
     }
 
-    @Override
+    /**
+     * Exemplo para o MonthlySummary (Query sem parâmetros)
+     */
+    @Transactional(readOnly = true)
     public List<MonthlySummary> findMonthlySummary() {
-        return registroHorasRepository.findMonthlySummary();
+
+        // 1. Cria a Native Query
+        Query nativeQuery = entityManager.createNativeQuery(monthlySummaryGlobalQuery);
+
+        // 2. Obtém o resultado
+        @SuppressWarnings("unchecked")
+        List<Object[]> results = nativeQuery.getResultList();
+
+        return results.stream()
+                .map(row -> new MonthlySummary(
+                        (String) row[0], // mes_e_ano
+                        (Double) row[1]  // total_horas_trabalhadas
+                ))
+                .collect(Collectors.toList());
     }
 
     @Override

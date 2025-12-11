@@ -1,6 +1,5 @@
 package com.aneto.registo_horas_service.repository;
 
-
 import com.aneto.registo_horas_service.dto.response.MonthlySummary;
 import com.aneto.registo_horas_service.dto.response.PerfilResponse;
 import com.aneto.registo_horas_service.models.RegistosHoras;
@@ -10,62 +9,35 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 public interface RegistroHorasRepository extends JpaRepository<RegistosHoras, Long> {
 
-    List<RegistosHoras> findByUserName(String estagiarioUsername);
+    // 1. Query JPQL (Mantida)
+    @Query("SELECT SUM(r.horasTrabalhadas) as totalHours FROM RegistosHoras r WHERE r.userName = :username")
+    Optional <BigDecimal>  findSumHorasTrabalhadasByUserName(@Param("username") String username);
 
-    @Query("SELECT SUM(r.horasTrabalhadas) FROM RegistosHoras r WHERE r.userName = :username")
-    Double sumHorasCalculadasByEstagiarioUsername(@Param("username") String username);
+    //Optional <BigDecimal> findSumHorasTrabalhadasByUserName(String userName);
 
-    @Query(value= "SELECT SUM(r.horas_trabalhadas) AS totalHours" +
-            "FROM registos.registos_horas r " +
-            "inner join auth.tb_projetos tp  on r.username = tp.username " +
-            "WHERE r.userName = :username " +
-            "and r.project_name =:project_name",
-            nativeQuery = true)
-    Double sumHorasCalculadasByEstagiarioUsernameByProject(@Param("username") String username , @Param("project_name") String project_name);
-
-    // 1. Uso de @Query para consulta nativa
-    // 2. Uso de nativeQuery = true (IMPRESCINDÍVEL)
-    // 3. Tipo de retorno List<MonthlySummary> (a sua nova interface/projeção)
-    @Query(value = "SELECT TO_CHAR(data_registo, 'YYYY-MM') AS mes_e_ano, " +
-            "SUM(horas_trabalhadas) AS total_horas_trabalhadas " +
-            "FROM registos.registos_horas rh " +
-            "GROUP BY mes_e_ano " +
-            "ORDER BY mes_e_ano DESC",
-            nativeQuery = true)
-    List<MonthlySummary> findMonthlySummary();
-
-    // Se precisar da versão do utilizador (que tinha no erro anterior, mas corrigida):
-    @Query(value = "SELECT TO_CHAR(data_registo, 'YYYY-MM') AS mes_e_ano, " +
-            "SUM(horas_trabalhadas) AS total_horas_trabalhadas " +
-            "FROM registos.registos_horas rh " +
-            "WHERE rh.username = :username " +
-            "GROUP BY mes_e_ano " +
-            "ORDER BY mes_e_ano DESC",
-            nativeQuery = true)
+    @Query("SELECT SUM(r.horasTrabalhadas) as totalHours FROM RegistosHoras r WHERE r.userName = :userName AND r.projectName = :projectName")
+    Optional<BigDecimal> findSumHorasTrabalhadasByUserNameAndProjectName(
+            @Param("userName") String userName,
+            @Param("projectName") String projectName
+    );
+    // 4. Nativa: Injetada do YAML (monthly-summary-by-user)
+    @Query(
+            value = "${app.queries.monthly-summary-by-user}",
+            nativeQuery = true
+    )
     List<MonthlySummary> findMonthlySummaryByUsername(@Param("username") String username);
+
+    // Métodos Spring Data JPA (Mantidos)
+    List<RegistosHoras> findByUserName(String estagiarioUsername);
 
     Page<RegistosHoras> findByUserName(String name, Pageable pageable);
 
     Optional<RegistosHoras> findByPublicId(UUID attr0);
-
-    @Query(
-            value = "select u.username, tp.project_name, u.email, tp.required_hours,\n" +
-                    "sum(r.horas_trabalhadas ) as Total_horas_trabalhadas \n" +
-                    "from auth.tb_users u\n" +
-                    "inner join registos.registos_horas r on u.username = r.username\n" +
-                    "inner join auth.tb_projetos tp  on u.username = tp.username\n" +
-                    "where u.username =:username\n" +
-                    "group by u.username,  u.email, tp.required_hours, tp.project_name",
-            nativeQuery = true
-    )
-    List<PerfilResponse> findTotalHoursAndRequiredHoursByUserName(@Param("username") String name );
-
-
-
 }

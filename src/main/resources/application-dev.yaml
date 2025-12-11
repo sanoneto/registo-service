@@ -70,3 +70,47 @@ logging:
     org.flywaydb: DEBUG
   file:
     name: logs/app.log
+# src/main/resources/application.yml
+
+app:
+  queries:
+    monthly-summary-global: "SELECT 
+        TO_CHAR(data_registo, 'YYYY-MM') AS mes_e_ano, 
+        SUM(horas_trabalhadas) AS total_horas_trabalhadas 
+    FROM 
+        registos.registos_horas rh 
+    GROUP BY 
+        mes_e_ano 
+    ORDER BY 
+        mes_e_ano DESC"
+
+    # 3. Query findMonthlySummaryByUsername (Por Utilizador)
+    monthly-summary-by-user: "SELECT 
+        TO_CHAR(data_registo, 'YYYY-MM') AS mes_e_ano, 
+        SUM(horas_trabalhadas) AS total_horas_trabalhadas 
+    FROM 
+        registos.registos_horas rh 
+    WHERE 
+        rh.username = :username 
+    GROUP BY 
+        mes_e_ano 
+    ORDER BY 
+        mes_e_ano DESC"
+
+    # 4. Query findTotalHoursAndRequiredHoursByUserName (A mais longa)
+    user-required-vs-total-hours: "SELECT
+    u.username,
+    tp.project_name,
+    u.email,
+    tp.required_hours,
+    ROUND(CAST(SUM(r.horas_trabalhadas) AS NUMERIC), 1) AS Total_horas_trabalhadas
+FROM
+    auth.tb_users u
+INNER JOIN
+    registos.registos_horas r ON u.username = r.username
+INNER JOIN
+    auth.tb_projetos tp ON u.username = tp.username
+WHERE
+    u.username = :username
+GROUP BY
+    u.username, u.email, tp.required_hours, tp.project_name"

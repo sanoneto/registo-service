@@ -135,12 +135,13 @@ public class RegistroHorasController {
         return ResponseEntity.ok(body);
     }
 
+
     @Operation(summary = "Retorna o total de horas de um usuário")
-    @GetMapping("/total-user-project/{username}{projectName}")
+    @GetMapping("/total-user-project")
     @PreAuthorize("hasRole('ADMIN') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
     public ResponseEntity<Double> getTotalHorasPorUser(
             @RequestParam String username,
-            @RequestParam String projectName,
+            @RequestParam(defaultValue = "all") String projectName,
             Authentication authentication) {
         double total = registroHorasService.getTotalHorasPorUsuarioProjrct(username, projectName);
         return ResponseEntity.ok(total);
