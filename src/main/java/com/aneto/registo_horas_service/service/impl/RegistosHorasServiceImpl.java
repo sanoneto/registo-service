@@ -27,12 +27,10 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -142,8 +140,8 @@ public class RegistosHorasServiceImpl implements RegistosHorasService {
 
     @Override
     public double getTotalHorasPorUsuarioProjrct(String username, String project_name) {
-            Optional<Double> total = registroHorasRepository.findSumHorasTrabalhadasByProjectName( project_name);
-            return total.orElse(0.0);
+        Optional<Double> total = registroHorasRepository.findSumHorasTrabalhadasByProjectName(project_name);
+        return total.orElse(0.0);
 
     }
 
@@ -209,11 +207,15 @@ public class RegistosHorasServiceImpl implements RegistosHorasService {
 
     @Override
     @Transactional(readOnly = true)
-    public PageResponse<RegisterResponse> findAllRegisteredHoursUser(String name, Pageable pageable) {
+    public PageResponse<RegisterResponse> findAllRegisteredHoursUserProjectName(String name, String projectName, Pageable pageable) {
         log.debug("Buscando registros paginados do usuário: {} - Página: {}, Tamanho: {}",
                 name, pageable.getPageNumber(), pageable.getPageSize());
-
-        Page<RegistosHoras> page = registroHorasRepository.findByUserName(name, pageable);
+        Page<RegistosHoras> page;
+        if (projectName.equals("all")) {
+            page = registroHorasRepository.findByUserName(name, pageable);
+        } else {
+            page = registroHorasRepository.findByUserNameAndProjectName(name, projectName, pageable);
+        }
         List<RegisterResponse> content = requestMapper.mapToListRegisterResponse(page.getContent());
 
         log.info("Encontrados {} registros para o usuário {} na página {} de {}",
@@ -232,11 +234,15 @@ public class RegistosHorasServiceImpl implements RegistosHorasService {
 
     @Override
     @Transactional(readOnly = true)
-    public PageResponse<RegisterResponse> findAllRegisteredHoursPage(Pageable pageable) {
+    public PageResponse<RegisterResponse> findAllRegisteredHoursPageProjectName(String projectName,Pageable pageable) {
         log.debug("Buscando registros paginados - Página: {}, Tamanho: {}",
                 pageable.getPageNumber(), pageable.getPageSize());
-
-        Page<RegistosHoras> page = registroHorasRepository.findAll(pageable);
+        Page<RegistosHoras> page;
+        if (projectName.equals("all")) {
+         page = registroHorasRepository.findAll(pageable);
+        } else {
+            page = registroHorasRepository.findByProjectName(projectName,pageable);
+        }
         List<RegisterResponse> content = requestMapper.mapToListRegisterResponse(page.getContent());
 
         log.info("Encontrados {} registros na página {} de {}",

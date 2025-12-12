@@ -36,8 +36,8 @@ public interface RegistosHorasService {
 
     List<MonthlySummary> findMonthlySummary(@Param("username") String name );
 
-    PageResponse<RegisterResponse> findAllRegisteredHoursUser(String name, Pageable pageable);
-    PageResponse<RegisterResponse> findAllRegisteredHoursPage(Pageable pageable);
+    PageResponse<RegisterResponse> findAllRegisteredHoursUserProjectName(String name,String projectName, Pageable pageable);
+    PageResponse<RegisterResponse> findAllRegisteredHoursPageProjectName(String projectName,Pageable pageable);
 
 
 }

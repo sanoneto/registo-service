@@ -34,7 +34,10 @@ public interface RegistroHorasRepository extends JpaRepository<RegistosHoras, Lo
     // Métodos Spring Data JPA (Mantidos)
     List<RegistosHoras> findByUserName(String estagiarioUsername);
 
+    Page<RegistosHoras> findByUserNameAndProjectName(String name, String projectName, Pageable pageable);
     Page<RegistosHoras> findByUserName(String name, Pageable pageable);
+
+    Page<RegistosHoras> findByProjectName(String projectName, Pageable pageable);
 
     Optional<RegistosHoras> findByPublicId(UUID attr0);
 }

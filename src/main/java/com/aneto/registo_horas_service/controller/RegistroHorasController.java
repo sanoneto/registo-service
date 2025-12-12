@@ -179,6 +179,7 @@ public class RegistroHorasController {
     @PreAuthorize("hasRole('ADMIN') or (hasRole('ESTAGIARIO') and #name == authentication.name)")
     public ResponseEntity<PageResponse<RegisterResponse>> getAllRegisterHorasUserPaginated(
             @PathVariable String name,
+            @RequestParam (defaultValue = "all") String projectName,
 
             @Parameter(description = "Número da página (0-based)", example = "0")
             @RequestParam(value = "page", required = false) String pageStr,
@@ -211,7 +212,7 @@ public class RegistroHorasController {
                 : Sort.Direction.DESC;
 
         Pageable pageable = PageRequest.of(page, size, Sort.by(sortDirection, sortBy));
-        PageResponse<RegisterResponse> response = registroHorasService.findAllRegisteredHoursUser(name, pageable);
+        PageResponse<RegisterResponse> response = registroHorasService.findAllRegisteredHoursUserProjectName(name,projectName, pageable);
 
         return ResponseEntity.ok(response);
     }
@@ -219,6 +220,8 @@ public class RegistroHorasController {
     @GetMapping("/Pageable/list")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<PageResponse<RegisterResponse>> getAllRegisterHorasPaginated(
+            @RequestParam (defaultValue = "all") String projectName,
+
             @Parameter(description = "Número da página (0-based)", example = "0")
             @RequestParam(value = "page", required = false) String pageStr, // <-- MUDANÇA PARA String
 
@@ -251,7 +254,7 @@ public class RegistroHorasController {
                 : Sort.Direction.DESC;
 
         Pageable pageable = PageRequest.of(page, size, Sort.by(sortDirection, sortBy));
-        PageResponse<RegisterResponse> response = registroHorasService.findAllRegisteredHoursPage(pageable);
+        PageResponse<RegisterResponse> response = registroHorasService.findAllRegisteredHoursPageProjectName( projectName,pageable);
 
         return ResponseEntity.ok(response);
     }
