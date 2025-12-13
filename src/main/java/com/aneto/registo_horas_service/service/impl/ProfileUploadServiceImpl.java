@@ -28,14 +28,15 @@ public class ProfileUploadServiceImpl implements ProfileUploadService {
     @Value("${aws.s3.bucket-name}")
     private String bucketName;
 
-    private static final String S3_FOLDER = "profile-pics/";
+    @Value("${aws.s3.folder-name}")
+    private String S3FOLDER;
 
     @Override
     // Este é o método onde a exceção de permissão ocorre.
     public String uploadImageAndSaveUrl(MultipartFile file, String userName) {
         // Lógica para construir o nome da chave (caminho no S3)
         String fileExtension = getFileExtension(file.getOriginalFilename());
-        String key = S3_FOLDER + userName + "." + fileExtension;
+        String key = S3FOLDER + userName + "." + fileExtension;
 
         // Configurações e Metadata
         ObjectMetadata metadata = new ObjectMetadata();

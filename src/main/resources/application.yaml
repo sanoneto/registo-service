@@ -64,7 +64,8 @@ cloud:
     region: ${AWS_REGION}
 aws:
   s3:
-    bucket-name: treg-profile-bucket-fotos
+    bucket-name: ${AWS_S3_BUCKET_NAME}
+    folder-name: ${AWS_S3_FOLDER_NAME}
 
 url:
   micro-servico-auth: ${URI_AUTH_SERVICE}
