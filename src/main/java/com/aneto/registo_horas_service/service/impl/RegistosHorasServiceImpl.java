@@ -171,7 +171,9 @@ public class RegistosHorasServiceImpl implements RegistosHorasService {
                             (String) row[1],
                             (String) row[2],
                             (Double) row[3], // required_hours (Mantido como Double)
-                            totalHorasDouble // Total_horas_trabalhadas (Convertido para Double)
+                            totalHorasDouble,
+                            (String) row[5]
+                            // Total_horas_trabalhadas (Convertido para Double)
                     );
                 })
                 .collect(Collectors.toList());
@@ -234,14 +236,14 @@ public class RegistosHorasServiceImpl implements RegistosHorasService {
 
     @Override
     @Transactional(readOnly = true)
-    public PageResponse<RegisterResponse> findAllRegisteredHoursPageProjectName(String projectName,Pageable pageable) {
+    public PageResponse<RegisterResponse> findAllRegisteredHoursPageProjectName(String projectName, Pageable pageable) {
         log.debug("Buscando registros paginados - Página: {}, Tamanho: {}",
                 pageable.getPageNumber(), pageable.getPageSize());
         Page<RegistosHoras> page;
         if (projectName.equals("all")) {
-         page = registroHorasRepository.findAll(pageable);
+            page = registroHorasRepository.findAll(pageable);
         } else {
-            page = registroHorasRepository.findByProjectName(projectName,pageable);
+            page = registroHorasRepository.findByProjectName(projectName, pageable);
         }
         List<RegisterResponse> content = requestMapper.mapToListRegisterResponse(page.getContent());
 

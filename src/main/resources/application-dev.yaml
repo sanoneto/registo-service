@@ -2,10 +2,15 @@ spring:
   application:
     name: registo-horas-service
   # Certifique-se de que a execução do script está habilitada
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
   sql:
     init:
       schema-locations: classpath:schema.sql
-      mode: always
+      mode: never
   datasource:
     url: ${SPRING_DATASOURCE_URL}
     username: ${SPRING_DATASOURCE_USERNAME}
@@ -50,6 +55,18 @@ management:
 server:
   port: ${PORT:8083}
   forward-headers-strategy: native
+cloud:
+  aws:
+    credentials:
+      accessKey: ${AWS_ACCESS_KEY}
+      secretKey: ${AWS_SECRET_KEY}
+    region: ${AWS_REGION}
+aws:
+  s3:
+    bucket-name: treg-profile-bucket-fotos
+
+url:
+  micro-servico-auth: http://localhost:8081/api/auth
 
 springdoc:
   api-docs:
@@ -72,6 +89,9 @@ logging:
     name: logs/app.log
 # src/main/resources/application.yml
 
+file:
+  upload-dir: ./uploads/profile_pics
+
 app:
   queries:
     monthly-summary: "SELECT 
@@ -92,7 +112,8 @@ app:
     tp.project_name,
     u.email,
     tp.required_hours,
-    ROUND(CAST(SUM(r.horas_trabalhadas) AS NUMERIC), 1) AS Total_horas_trabalhadas
+    ROUND(CAST(SUM(r.horas_trabalhadas) AS NUMERIC), 1) AS Total_horas_trabalhadas,
+   u.profile_picture_url
 FROM
     auth.tb_users u
 INNER JOIN
@@ -100,6 +121,6 @@ INNER JOIN
 INNER JOIN
     auth.tb_projetos tp ON u.username = tp.username
 WHERE
-    u.username = :username
+    u.username =:username 
 GROUP BY
-    u.username, u.email, tp.required_hours, tp.project_name"
+    u.username, u.email, tp.required_hours, tp.project_name,u.profile_picture_url"

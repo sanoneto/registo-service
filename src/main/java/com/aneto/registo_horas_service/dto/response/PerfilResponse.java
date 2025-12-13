@@ -5,7 +5,7 @@ public record PerfilResponse(
         String project_name,
         String email,
         Double required_hours,
-        Double Total_horas_trabalhadas
-       // String profile_picture_url
+        Double Total_horas_trabalhadas,
+        String profile_picture_url
 ) {
 }
