@@ -64,6 +64,9 @@ public class RegistosHoras {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    @Column(name = "has_audit_history")
+    private Boolean hasAuditHistory = false;
+
     @PrePersist
     protected void onCreate() {
         if (publicId == null) {

@@ -112,6 +112,7 @@ public class RegistosHorasServiceImpl implements RegistosHorasService {
         existing.setHoraEntrada(request.horaEntrada());
         existing.setHoraSaida(request.horaSaida());
         existing.setDescricao(request.descricao());
+        existing.setHasAuditHistory(true);
 
         // 4. Salva a entrada no Histórico
         RegistoHistorico historico = RegistoHistorico.builder()
@@ -231,6 +232,7 @@ public class RegistosHorasServiceImpl implements RegistosHorasService {
                 page.getTotalPages(),
                 page.isFirst(),
                 page.isLast()
+
         );
     }
 
