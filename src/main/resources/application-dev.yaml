@@ -93,6 +93,31 @@ logging:
 file:
   upload-dir: ./uploads/profile_pics
 
+gcp:
+  project:
+    id: project-acc-398519
+    location: us-central1
+  credentials:
+    json-content: |
+      {
+        "type": "service_account",
+        "project_id": "project-acc-398519",
+        "private_key_id": "f461aaa4002b58710c6cec4932f3cae4af5f049a",
+        "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDgShjHe2g372E8\nPNQLJbKJp+O9J+gRYv2HXp9jFkVM7A3SOvwLo5O/kBnGdv7+3TpiS38IgY6zFRkv\nhddZSVpRl53ggBiI67c+ZHCGqtxqC6qT+/XvaCGD8M4RpLUPvW4D6jcpaYRcvxcW\naAlSeYKsO011grbiy28x9/wReCIClmEsYcDQIzRowLUmSvtWB1UELHUQdJmTjO3m\nJPGexLfIiabL/wZLlcrRoB30XCrjSJd8g8igK6oG+JAnRj3vNIpgNEj5sciBRAFL\nDAsCZz60btuycYvx0nDtHl7RxtDTMnYnpTAgZ/0wcHvngEl0GQRrNV/PvaXOitqT\nB1w4uYUvAgMBAAECggEAAw/6mvgBj3NKdGxE3ZVur3gmNmYjQjWD+QNe5sHzlp4f\nKYXaUihcyJVQR3LxfrZePosBrt03VGpPKo8dG8rSG7dtFZck0/Mapenw1WM42OPU\nOOq29sVeYR2lGqg75qfzUW9dwHLV4VRPSDmJwwwGBOcBuD8y0xGXBkDOEB5VTIwN\ni/PyczfPxHUY1wDfdFUJrsnSvV89ohdGC+3pVVgKZuLWwQMvw8/Z6x7uXZ3DTmlP\nM8aDe7FQd4zTXClkLtCooaKcHhbtXz07r0gEBsQbRfcQH4CFGthhQ0rL3n33LYkK\naiaDwCfuUQa8/CUQ5jp4DlcJ8Bvd629D+tjMBXv2+QKBgQD596iIWSO5QpCvR7rv\nMDuRwMDRNyfVOHInlqPU3L1B9qhHkBAev6h4u+R13jt3g/3fia0fRsdj7wdevOt/\nUjqMnPlo+iFixxqN5uKCY8NBcoHb/lfzPc43fLwCkQeFyGyrKeh+G/dHcPCsjX9Q\nWasRJoLrCDmKHOr+7SMJ7ChEOQKBgQDls8unOoLYxADUNGAj1Y0ClgCiskEt07eC\nyKBdGiHaWkZeRnzeAsNLm7ZeKsjYtFJpD0pDD9R4Mo9UUli9H6sL72i4OQ4AHme+\nfCLdmisPBafubKH7THUaNNBEVHBtd7WMSJGq6WacAzDYxzoI5Za7TDQd9Rt81FS8\nq7mjCcUkpwKBgQDr81BMVAgaibDVI1pbCSZRsKbRVcTtyXhH0jQXa73iFBhIZL4y\nqCs4u/MtJ3bum9L6PJUEHuV7eVd1n9KTvmSx8kKjSuhUuyhfpf9NoSngD1xw8qbG\nXiLX0ZAOxCNbrxKUhtyEnZVPBFbKKk5w5BNL/xQ5EuxtaFqSA/m9FgP0UQKBgDAO\nWIoI/Lz67K14s7Brig/DcCiZoHdE9vyemqY/xFtZTaWFm7Qa4d7cmd/Dlbd4qlEe\niMvU8P+gnEno3HXcvT1G/iKklSBDPDMm52hzS5Td+w8vnQflLA6qg/P3snnEdK//\nsrIOGJCFPl/r9mFMHyfaPoER+Yk5Ju0+BB1u+ta7AoGBAJYATqM37FOrcVISui2b\n2WpF38KdQ6UX/x4Hup1jRF8Y6zOpZoVbuvsiO3d/HO+WO4gMisf3mly9sZTHyGNO\nUaSTztESt7cbRWUbB1olzcnfwY3H98HvEU7krvFNGkm/63yLl8V0aZ5keTNWyeql\nvij5WPz9fNlYxGeIX+co+7ED\n-----END PRIVATE KEY-----\n",
+        "client_email": "app-treg@project-acc-398519.iam.gserviceaccount.com",
+        "client_id": "103384274493882185143",
+        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+        "token_uri": "https://oauth2.googleapis.com/token",
+        "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+        "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/app-treg%40project-acc-398519.iam.gserviceaccount.com",
+        "universe_domain": "googleapis.com"
+      }
+
+
+gemini:
+    base:
+      url: https://generativelanguage.googleapis.com
+      key: AQ.Ab8RN6KgvgK7VMa_n5biKG3SPY_VO15JgDD9osk6pGFseqEMGw
 app:
   queries:
     monthly-summary: "SELECT 
