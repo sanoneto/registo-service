@@ -12,6 +12,7 @@ public record UserProfileRequest(String bodyType,
                                  String pathology,        // Inicializado vazio
                                  @NotNull(message = "A frequência deve ser informada")
                                  @Min(1) @Max(7)
-                                 Integer frequencyPerWeek){  // Sugestão padrão de 3 dias) {
+                                 Integer frequencyPerWeek,
+                                 String objective){  // Sugestão padrão de 3 dias) {
 
 }

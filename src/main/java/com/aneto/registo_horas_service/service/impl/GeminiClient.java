@@ -81,6 +81,7 @@ public class GeminiClient {
                 DIRETRIZES:
                 1. Adapte os exercícios considerando as patologias mencionadas.
                 2. O plano deve ser dividido exatamente em %d dias.
+                3. O objetivo do treino é %s
                 
                 FORMATO DE RESPOSTA (JSON APENAS):
                 {
@@ -108,7 +109,8 @@ public class GeminiClient {
                 userRequest.weightKg(),
                 userRequest.exerciseHistory(),
                 userRequest.pathology(),
-                userRequest.frequencyPerWeek() // Dias para a regra
+                userRequest.frequencyPerWeek(), // Dias para a regra
+                userRequest.objective()
         );
 
         Content content = Content.newBuilder()
