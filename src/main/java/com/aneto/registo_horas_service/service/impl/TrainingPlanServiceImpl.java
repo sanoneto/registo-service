@@ -53,6 +53,9 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
             if (existingPlan.isPresent()) {
                 // Retornamos o plano marcado como existente
                 return existingPlan.get();
+            } else {
+                // Se o request é vazio e não há nada no S3, não podemos fazer nada
+                throw new RuntimeException("Nenhum plano encontrado e dados insuficientes para gerar um novo.");
             }
         }
 
@@ -70,8 +73,8 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
     @Override
     public TrainingPlanResponse generateTrainingPlan(UserProfileRequest userRequest) {
         String userPrompt = """
-                Atue como um Personal Trainer especialista.
-                Gere um plano de treino personalizado de %d dias por semana em Português.
+                Atue como um Personal Trainer e Nutricionista especialista.
+                Gere um plano de treino e um plano alimentar personalizado de %d dias por semana em Português.
                 
                 PERFIL DO ALUNO:
                 - Biótipo: %s
@@ -80,15 +83,21 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
                 - Peso: %.2f kg
                 - Histórico de Exercício: %s
                 - Patologias/Limitações: %s
+                - Localização: %s, %s (País: %s)
+                - Objetivo: %s
                 
-                DIRETRIZES:
+                DIRETRIZES DE TREINO:
                 1. Adapte os exercícios considerando as patologias mencionadas.
                 2. O plano deve ser dividido exatamente em %d dias.
-                3. O objetivo do treino é %s
+                
+                DIRETRIZES DE NUTRIÇÃO:
+                1. Calcule o gasto calórico diário estimado para o objetivo de %s.
+                2. Sugira alimentos típicos e acessíveis na região de %s, %s.
+                3. Distribua as refeições ao longo do dia com foco em macronutrientes adequados ao biótipo %s.
                 
                 FORMATO DE RESPOSTA (JSON APENAS):
                 {
-                  "summary": "Breve explicação da estratégia de treino focada no biótipo e limitações.",
+                  "summary": "Explicação da estratégia de treino e nutrição focada no biótipo e limitações.",
                   "plan": [
                     {
                       "day": "Dia 1 - [Foco do Treino]",
@@ -98,22 +107,42 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
                           "sets": "Séries",
                           "reps": "Repetições",
                           "rest": "Tempo de descanso",
-                          "details": "Dica de execução ou observação de segurança"
+                          "details": "Dica de segurança"
                         }
                       ]
                     }
-                  ]
+                  ],
+                  "dietPlan": {
+                    "dailyCalories": 2500,
+                    "macroDistribution": {
+                      "protein": "180g",
+                      "carbs": "300g",
+                      "fats": "70g"
+                    },
+                    "meals": [
+                      {
+                        "time": "08:00",
+                        "description": "Pequeno-almoço/Café da manhã",
+                        "ingredients": ["Ovos", "Pão integral", "Fruta local"]
+                      }
+                    ],
+                    "localTips": "Breve comentário sobre alimentos específicos da região sugeridos."
+                  }
                 }
                 """.formatted(
-                userRequest.frequencyPerWeek(), // Dias no texto
+                userRequest.frequencyPerWeek(),
                 userRequest.bodyType(),
                 userRequest.gender(),
                 userRequest.heightCm(),
                 userRequest.weightKg(),
                 userRequest.exerciseHistory(),
                 userRequest.pathology(),
-                userRequest.frequencyPerWeek(), // Dias para a regra
-                userRequest.objective()
+                userRequest.location(), userRequest.country(), userRequest.country(), // Localização e País
+                userRequest.objective(),
+                userRequest.frequencyPerWeek(),
+                userRequest.objective(),
+                userRequest.location(), userRequest.country(), // Para a nutrição local
+                userRequest.bodyType()
         );
 
         Content content = Content.newBuilder()
@@ -123,10 +152,8 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
                 .build();
 
         try {
-            // Chamada limpa
             GenerateContentResponse response = generativeModel.generateContent(content);
             String textResponse = ResponseHandler.getText(response);
-
             return objectMapper.readValue(cleanMarkdown(textResponse), TrainingPlanResponse.class);
         } catch (Exception e) {
             throw new RuntimeException("Erro Gemini: " + e.getMessage(), e);

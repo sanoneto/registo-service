@@ -15,5 +15,6 @@ public class TrainingPlanResponse
     private  Boolean isExistingPlan;
     private  String summary;
     private List<TrainingDay> plan;
+    private DietPlan dietPlan;
     private UserProfileRequest userProfile; // ADICIONE ESTE CAMPO
 }
