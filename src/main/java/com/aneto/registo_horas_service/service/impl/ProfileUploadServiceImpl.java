@@ -36,7 +36,7 @@ public class ProfileUploadServiceImpl implements ProfileUploadService {
     public String uploadImageAndSaveUrl(MultipartFile file, String userName) {
         // Lógica para construir o nome da chave (caminho no S3)
         String fileExtension = getFileExtension(file.getOriginalFilename());
-        String key = S3FOLDER + userName + "." + fileExtension;
+        String key = S3FOLDER+ userName + "/profile/" + "." + fileExtension;
 
         // Configurações e Metadata
         ObjectMetadata metadata = new ObjectMetadata();

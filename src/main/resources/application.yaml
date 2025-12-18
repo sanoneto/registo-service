@@ -41,6 +41,7 @@ spring:
     enabled: false
     locations: classpath:db/migration
     baseline-on-migrate: true
+
 management:
   endpoints:
     web:

@@ -19,14 +19,12 @@ public class TrainingController {
 
     @PostMapping("/plan")
     @PreAuthorize("hasRole('ADMIN') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
-    public ResponseEntity<TrainingPlanResponse> generatePlan(@RequestBody UserProfileRequest request, @RequestHeader(X_USER_ID) String username) {
-        // Verifica se a requisição base é válida
-        if (request == null || request.gender() == null || request.weightKg() == null) {
-            return ResponseEntity.badRequest().build();
-        }
+    public ResponseEntity<TrainingPlanResponse> generatePlan(
+            @RequestBody(required = false) UserProfileRequest request,
+            @RequestHeader(X_USER_ID) String username) {
 
-        TrainingPlanResponse response = trainingPlanService.generateTrainingPlan(request);
-
+        // Agora o request pode chegar como null sem dar erro 400
+        TrainingPlanResponse response = trainingPlanService.getOrGeneratePlan(request, username);
         return ResponseEntity.ok(response);
     }
 

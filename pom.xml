@@ -20,7 +20,7 @@
         <spring-cloud-aws.version>3.4.2</spring-cloud-aws.version>
 
         <google-cloud-aiplatform.version>3.42.0</google-cloud-aiplatform.version>
-        <libraries-bom.version>26.37.0</libraries-bom.version> <gson.version>2.10.1</gson.version>
+        <libraries-bom.version>26.50.0</libraries-bom.version> <gson.version>2.10.1</gson.version>
         <mapstruct.version>1.5.5.Final</mapstruct.version>
         <protobuf.version>3.25.3</protobuf.version>
     </properties>
@@ -168,13 +168,13 @@
         <dependency>
             <groupId>com.google.cloud</groupId>
             <artifactId>google-cloud-vertexai</artifactId>
-            <version>1.40.0</version>
+            <version>1.14.0</version>
         </dependency>
+
         <dependency>
-            <groupId>com.google.genai</groupId>
-            <artifactId>google-genai</artifactId>
-            <version>1.31.0</version>
-        </dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
+            <version>2.29.0</version> </dependency>
     </dependencies>
 
     <build>

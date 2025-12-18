@@ -65,6 +65,7 @@ aws:
   s3:
     bucket-name: ${AWS_S3_BUCKET_NAME}
     folder-name: ${AWS_S3_FOLDER_NAME}
+    path:
 
 url:
   micro-servico-auth: ${URI_AUTH_SERVICE}
@@ -83,9 +84,11 @@ springdoc:
 
 logging:
   level:
-    org.springframework.security: DEBUG
-    com.registo.horas_estagio: DEBUG
-    org.flywaydb: DEBUG
+    .org:
+      springframework:
+        security: DEBUG
+      hibernate: DEBUG
+      flywaydb: DEBUG
   file:
     name: logs/app.log
 # src/main/resources/application.yml
