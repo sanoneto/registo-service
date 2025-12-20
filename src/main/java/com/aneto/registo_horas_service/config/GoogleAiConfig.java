@@ -1,7 +1,6 @@
 package com.aneto.registo_horas_service.config;
 
 import com.google.auth.oauth2.GoogleCredentials;
-import com.google.auth.oauth2.ServiceAccountCredentials;
 import com.google.cloud.vertexai.VertexAI;
 import com.google.cloud.vertexai.api.GenerationConfig;
 import com.google.cloud.vertexai.generativeai.GenerativeModel;
@@ -27,6 +26,7 @@ public class GoogleAiConfig {
 
     @Value("${gcp.credentials.json-content}")
     private String jsonContent;
+
     @Bean
     public GenerativeModel generativeModel() throws IOException {
         if (jsonContent == null || jsonContent.isEmpty()) {

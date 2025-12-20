@@ -7,7 +7,12 @@ import java.util.Optional;
 
 public interface TrainingPlanService {
     TrainingPlanResponse generateTrainingPlan(UserProfileRequest request);
+
     Optional<TrainingPlanResponse> loadFromS3(String key);
-     void saveToS3 (String key, TrainingPlanResponse plan);
-     TrainingPlanResponse getOrGeneratePlan(UserProfileRequest request, String username);
+
+    void saveToS3(String key, TrainingPlanResponse plan);
+
+    TrainingPlanResponse getOrGeneratePlan(UserProfileRequest request, String username);
+
+
 }
