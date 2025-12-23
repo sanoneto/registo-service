@@ -26,6 +26,8 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -210,7 +212,11 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
 
     // Criado um método auxiliar para evitar repetição de código
     private String gerarCaminhoPadrao(String username) {
-        return String.format("%s%s/plan/%s.json", S3FOLDER, username, username);
+        // Define o formato: AnoMesDia_HoraMinutoSegundo
+        String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+
+        // O caminho incluirá o username e o momento da criação
+        return String.format("%s%s/plan/%s_%s.json", S3FOLDER, username, username, timestamp);
     }
     private boolean isRequestEmpty(UserProfileRequest request) {
         return request == null || (request.bodyType() == null && request.objective() == null);
