@@ -18,13 +18,15 @@ public class TrainingController {
 
 
     @PostMapping("/plan")
-    @PreAuthorize("hasRole('ADMIN') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('ESPECIALISTA') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
     public ResponseEntity<TrainingPlanResponse> generatePlan(
             @RequestBody(required = false) UserProfileRequest request,
-            @RequestHeader(X_USER_ID) String username) {
+            @RequestHeader(X_USER_ID) String username,
+            @RequestParam(value = "id", required = false) String planId) { // Adicionado o parâmetro id
 
-        // Agora o request pode chegar como null sem dar erro 400
-        TrainingPlanResponse response = trainingPlanService.getOrGeneratePlan(request, username);
+        // Passamos o request E o planId para o serviço decidir o que fazer
+        TrainingPlanResponse response = trainingPlanService.getOrGeneratePlan(request, username, planId);
+
         return ResponseEntity.ok(response);
     }
 

@@ -1,8 +1,10 @@
 package com.aneto.registo_horas_service.service.impl;
 
+import com.aneto.registo_horas_service.dto.request.PlanoRequestDTO;
 import com.aneto.registo_horas_service.dto.request.UserProfileRequest;
-import com.aneto.registo_horas_service.dto.response.ListJogosResponse;
+import com.aneto.registo_horas_service.dto.response.PlanoResponseDTO;
 import com.aneto.registo_horas_service.dto.response.TrainingPlanResponse;
+import com.aneto.registo_horas_service.service.PlanoService;
 import com.aneto.registo_horas_service.service.TrainingPlanService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.cloud.vertexai.api.Content;
@@ -24,7 +26,9 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -33,6 +37,7 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
 
     private final ObjectMapper objectMapper;
     private final GenerativeModel generativeModel;
+    private final PlanoService planoService;
 
     private final S3Client s3Client;
     @Value("${aws.s3.bucket-name}")
@@ -42,32 +47,19 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
     private String S3FOLDER;
 
     @Override
-    public TrainingPlanResponse getOrGeneratePlan(UserProfileRequest request, String username) {
-        String key = S3FOLDER + username + "/plan/" + username + ".json";
-
-        boolean isRequestEmpty = (request == null) || (request.bodyType() == null && request.objective() == null);
-
-        if (isRequestEmpty) {
-            // Tentar buscar plano existente se não foram enviados dados novos
-            Optional<TrainingPlanResponse> existingPlan = loadFromS3(key);
-
-            if (existingPlan.isPresent()) {
-                // Retornamos o plano marcado como existente
-                return existingPlan.get();
-            } else {
-                // Se o request é vazio e não há nada no S3, não podemos fazer nada
-                throw new RuntimeException("Nenhum plano encontrado e dados insuficientes para gerar um novo.");
-            }
+    public TrainingPlanResponse getOrGeneratePlan(UserProfileRequest request, String username, String planId) {
+        // 1. Determina a chave (prioriza a existente no banco, senão usa o padrão)
+        String key = buscarChaveDoPlano(planId, username);
+        // 2. Se o request for insuficiente para gerar algo novo, tenta carregar do S3
+        if (isRequestEmpty(request)) {
+            return loadFromS3(key)
+                    .orElseThrow(() -> new RuntimeException("Dados insuficientes para gerar novo plano e nenhum histórico encontrado."));
         }
-
-        // 2. Se não existir ou for antigo, gera novo
+        // 3. Se chegou aqui, temos dados para gerar um novo plano
         TrainingPlanResponse newPlan = generateTrainingPlan(request);
-        //guarda os input e true é para depois o escrever que o plano ja existe
-        newPlan.setIsExistingPlan(true);
-        newPlan.setUserProfile(request);
-        // 3. Salva na Cloud (aqui o isExistingPlan irá como null ou false conforme o JSON gerado)
-        saveToS3(key, newPlan);
-
+        configurarNovoPlano(newPlan, request);
+        // 4. Persistência (Banco e S3)
+        salvarDadosDoPlano(username, request, key, newPlan);
         return newPlan;
     }
 
@@ -198,4 +190,47 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
                 .trim();
     }
 
+    // --- Métodos Auxiliares para Limpar o Fluxo Principal ---
+    private String buscarChaveDoPlano(String planId, String username) {
+        // 1. Verifica se o planId não é nulo e não está em branco
+        if (planId != null && !planId.isBlank()) {
+            try {
+                return Optional.ofNullable(planoService.getByPlanoById(UUID.fromString(planId)))
+                        .map(PlanoResponseDTO::link)
+                        .filter(link -> !link.isBlank())
+                        .orElse(gerarCaminhoPadrao(username));
+            } catch (IllegalArgumentException e) {
+                log.error("ID do plano inválido: {}", planId);
+                // Se o UUID for inválido, cai no fallback também
+            }
+        }
+        // 2. Fallback: Se planId for null ou der erro, gera o caminho padrão
+        return gerarCaminhoPadrao(username);
+    }
+
+    // Criado um método auxiliar para evitar repetição de código
+    private String gerarCaminhoPadrao(String username) {
+        return String.format("%s%s/plan/%s.json", S3FOLDER, username, username);
+    }
+    private boolean isRequestEmpty(UserProfileRequest request) {
+        return request == null || (request.bodyType() == null && request.objective() == null);
+    }
+
+    private void configurarNovoPlano(TrainingPlanResponse plan, UserProfileRequest request) {
+        plan.setIsExistingPlan(true); // Se entendi, isso marca que o arquivo passará a existir
+        plan.setUserProfile(request);
+    }
+
+    private void salvarDadosDoPlano(String username, UserProfileRequest request, String key, TrainingPlanResponse plan) {
+        PlanoRequestDTO dto = new PlanoRequestDTO(
+                username,
+                request.objective(),
+                request.objective(), // Assumindo que o especialista aqui seja o objetivo ou vice-versa
+                "ATIVO",
+                "PENDENTE",
+                key
+        );
+        planoService.createPlano(dto);
+        saveToS3(key, plan);
+    }
 }
