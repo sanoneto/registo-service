@@ -15,7 +15,7 @@ spring:
     url: ${SPRING_DATASOURCE_URL}
     username: ${SPRING_DATASOURCE_USERNAME}
     password: ${SPRING_DATASOURCE_PASSWORD}
-    driver-class-name: ${SPRING_DATASOURCE_DRIVER}
+    driver-class-name: ${SPRING_DATASOURCE_DRIVER:org.postgresql.Driver}
   jpa:
     hibernate:
       ddl-auto: update
@@ -85,7 +85,7 @@ springdoc:
 
 logging:
   level:
-    org.springframework.security: DEBUG
+    org.springframework.security: INFO
     com.registo.horas_estagio: DEBUG
     org.flywaydb: DEBUG
   file:
