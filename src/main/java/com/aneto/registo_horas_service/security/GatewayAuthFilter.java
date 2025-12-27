@@ -34,33 +34,40 @@ public class GatewayAuthFilter extends OncePerRequestFilter {
         String rolesString = request.getHeader(USER_ROLES_HEADER);
 
         log.debug("Headers recebidos - User-Id: {}, Roles: {}", userId, rolesString);
+        try {
+            if (userId != null && !userId.isBlank() && rolesString != null && !rolesString.isBlank()) {
 
-        if (userId != null && !userId.isBlank() && rolesString != null && !rolesString.isBlank()) {
+                Collection<SimpleGrantedAuthority> authorities = Arrays.stream(rolesString.split(","))
+                        .map(String::trim)
+                        .filter(role -> !role.isEmpty())
+                        .map(role -> {
+                            String trimmedRole = role.trim().toUpperCase();
+                            String normalizedRole = trimmedRole.startsWith("ROLE_")
+                                    ? trimmedRole
+                                    : "ROLE_" + trimmedRole;
+                            return new SimpleGrantedAuthority(normalizedRole);
+                        })
+                        .collect(Collectors.toList());
 
-            Collection<SimpleGrantedAuthority> authorities = Arrays.stream(rolesString.split(","))
-                    .map(String::trim)
-                    .filter(role -> !role.isEmpty())
-                    .map(role -> {
-                        String trimmedRole = role.trim().toUpperCase();
-                        String normalizedRole = trimmedRole.startsWith("ROLE_")
-                                ? trimmedRole
-                                : "ROLE_" + trimmedRole;
-                        return new SimpleGrantedAuthority(normalizedRole);
-                    })
-                    .collect(Collectors.toList());
+                UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                        userId,
+                        null,
+                        authorities
+                );
 
-            UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                    userId,
-                    null,
-                    authorities
-            );
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+                log.info("Autenticação configurada - User: {}, Authorities: {}", userId, authorities);
+            } else {
+                log.warn("Headers de autenticação ausentes ou vazios - User-Id: {}, Roles: {}", userId, rolesString);
+            }
 
-            SecurityContextHolder.getContext().setAuthentication(authentication);
-            log.info("Autenticação configurada - User: {}, Authorities: {}", userId, authorities);
-        } else {
-            log.warn("Headers de autenticação ausentes ou vazios - User-Id: {}, Roles: {}", userId, rolesString);
+            filterChain.doFilter(request, response);
+
+        } catch (Exception e) {
+            // Em vez de deixar o Java imprimir 100 linhas, você imprime apenas uma:
+            log.error("Falha na autenticação da Gateway: {}", e.getMessage());
+            // Opcional: enviar um erro customizado para o cliente
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         }
-
-        filterChain.doFilter(request, response);
     }
 }

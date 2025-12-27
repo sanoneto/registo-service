@@ -1,10 +1,8 @@
 package com.aneto.registo_horas_service.service.impl;
 
-
-import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.model.ObjectMetadata;
-import com.amazonaws.services.s3.model.PutObjectRequest;
 import com.aneto.registo_horas_service.service.ProfileUploadService;
+import io.awspring.cloud.s3.ObjectMetadata;
+import io.awspring.cloud.s3.S3Template;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,63 +18,49 @@ import java.io.InputStream;
 public class ProfileUploadServiceImpl implements ProfileUploadService {
     private static final Logger log = LoggerFactory.getLogger(ProfileUploadServiceImpl.class);
 
-    // Injetado automaticamente pelo Spring Cloud AWS
-    private final AmazonS3 s3Client;
-
+    // O S3Template substitui o AmazonS3 (SDK v1)
+    private final S3Template s3Template;
     private final TargetServiceClientImpl targetServiceClient;
 
     @Value("${aws.s3.bucket-name}")
     private String bucketName;
 
     @Value("${aws.s3.folder-name}")
-    private String S3FOLDER;
+    private String s3Folder;
 
     @Override
-    // Este é o método onde a exceção de permissão ocorre.
     public String uploadImageAndSaveUrl(MultipartFile file, String userName) {
-        // Lógica para construir o nome da chave (caminho no S3)
         String fileExtension = getFileExtension(file.getOriginalFilename());
-        String key = S3FOLDER+ userName + "/profile/" +  userName +"." + fileExtension;
-
-        // Configurações e Metadata
-        ObjectMetadata metadata = new ObjectMetadata();
-        metadata.setContentLength(file.getSize());
-        metadata.setContentType(file.getContentType());
+        String key = s3Folder + userName + "/profile/" + userName + "." + fileExtension;
 
         try (InputStream inputStream = file.getInputStream()) {
-            // LINHA 52 (Provável local da chamada putObject, dependendo da formatação)
-            // AQUI É ONDE O ERRO 's3:PutObject' OCORRE.
-            PutObjectRequest putRequest = new PutObjectRequest(bucketName, key, inputStream, metadata);
+            // A sintaxe correta para passar o Content-Type no S3Template:
+            var s3Resource = s3Template.upload(bucketName, key, inputStream,
+                    ObjectMetadata.builder()
+                            .contentType(file.getContentType())
+                            .build()
+            );
+            // Obter a URL (o SDK v2 gera a URL baseada na região configurada)
+            String publicUrl = s3Resource.getURL().toString();
 
-            s3Client.putObject(putRequest);
-
-            String publicUrl = s3Client.getUrl(bucketName, key).toString();
             targetServiceClient.updateProfilePicUrl(userName, publicUrl);
 
             log.info("Imagem {} carregada com sucesso para o bucket {}.", key, bucketName);
-            log.info("publicUrl: {} ", publicUrl );
-            // Construir a URL pública
             return publicUrl;
 
         } catch (IOException e) {
-            // Tratar erro de I/O do arquivo
             throw new RuntimeException("Falha ao ler o arquivo de imagem.", e);
         }
     }
 
-    // Método auxiliar (Simplificado para o exemplo)
     private String getFileExtension(String filename) {
-        if (filename == null || filename.isEmpty()) {
-            return "jpg"; // default
-        }
+        if (filename == null || filename.isEmpty()) return "jpg";
         int dotIndex = filename.lastIndexOf('.');
         return (dotIndex > 0) ? filename.substring(dotIndex + 1) : "jpg";
     }
 
     @Override
     public void deleteOldImage(String s3Key) {
-        if (s3Client.doesObjectExist(bucketName, s3Key)) {
-            s3Client.deleteObject(bucketName, s3Key);
-        }
+        s3Template.deleteObject(bucketName, s3Key);
     }
 }

@@ -121,11 +121,6 @@
             <groupId>io.awspring.cloud</groupId>
             <artifactId>spring-cloud-aws-starter-s3</artifactId>
         </dependency>
-        <dependency>
-            <groupId>com.amazonaws</groupId>
-            <artifactId>aws-java-sdk-s3</artifactId>
-            <version>1.12.795</version>
-        </dependency>
 
         <dependency>
             <groupId>org.flywaydb</groupId>

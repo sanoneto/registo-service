@@ -60,12 +60,11 @@ cloud:
     credentials:
       accessKey: ${AWS_ACCESS_KEY}
       secretKey: ${AWS_SECRET_KEY}
-    region: ${AWS_REGION}
-aws:
-  s3:
-    bucket-name: ${AWS_S3_BUCKET_NAME}
-    folder-name: ${AWS_S3_FOLDER_NAME}
-    path:
+    region:
+      static: ${AWS_REGION}
+    s3:
+      bucket-name: ${AWS_S3_BUCKET_NAME}
+      folder-name: ${AWS_S3_FOLDER_NAME}
 
 url:
   micro-servico-auth: ${URI_AUTH_SERVICE}
@@ -86,9 +85,9 @@ logging:
   level:
     .org:
       springframework:
-        security: DEBUG
-      hibernate: DEBUG
-      flywaydb: DEBUG
+        security: WARN
+      hibernate: INFO
+      flywaydb: INFO
   file:
     name: logs/app.log
 # src/main/resources/application.yml
