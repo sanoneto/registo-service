@@ -24,10 +24,10 @@ spring:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
 
   rabbitmq:
-    host: ${RABBITMQ_PRIVATE_URL}   # Se estiver a correr o RabbitMQ localmente
-    port: ${RABBITMQ_PORT}     # Porta padrão do RabbitMQ
-    username: ${RABBITMQ_DEFAULT_USER}   # Usuário padrão
-    password: ${RABBITMQ_DEFAULT_PASS}   # Password padrão
+    host:  ${SPRING_RABBITMQ_HOST}   # Se estiver a correr o RabbitMQ localmente
+    port: ${SPRING_RABBITMQ_PORT}           # Porta padrão do RabbitMQ
+    username:  ${SPRING_RABBITMQ_USERNAME}   # Usuário padrão
+    password: ${SPRING_RABBITMQ_PASSWORD}   # Password padrão
 
   cloud:
     vault:
