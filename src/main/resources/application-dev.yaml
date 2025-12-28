@@ -83,11 +83,12 @@ springdoc:
 
 logging:
   level:
-    .org:
+    org:
       springframework:
-        security: WARN
-      hibernate: INFO
-      flywaydb: INFO
+        security:
+          web:
+            ObservationFilterChainDecorator: ERROR
+            FilterChainProxy: ERROR
   file:
     name: logs/app.log
 # src/main/resources/application.yml

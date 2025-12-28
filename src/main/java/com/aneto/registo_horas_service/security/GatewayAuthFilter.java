@@ -56,18 +56,20 @@ public class GatewayAuthFilter extends OncePerRequestFilter {
                 );
 
                 SecurityContextHolder.getContext().setAuthentication(authentication);
-                log.info("Autenticação configurada - User: {}, Authorities: {}", userId, authorities);
+                log.info("Autenticação configurada para o user: {}", userId);
             } else {
-                log.warn("Headers de autenticação ausentes ou vazios - User-Id: {}, Roles: {}", userId, rolesString);
+                // Se for uma rota que exige autenticação, isso vai causar erro no FilterChain seguinte
+                log.warn("Request sem headers de autenticação para: {}", request.getRequestURI());
             }
 
+            // Continua a execução para o próximo filtro
             filterChain.doFilter(request, response);
 
         } catch (Exception e) {
-            // Em vez de deixar o Java imprimir 100 linhas, você imprime apenas uma:
-            log.error("Falha na autenticação da Gateway: {}", e.getMessage());
-            // Opcional: enviar um erro customizado para o cliente
+            log.error("Erro crítico no GatewayAuthFilter: {}", e.getMessage());
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.getWriter().write("Erro na autenticação interna.");
+            // IMPORTANTE: Não chama o filterChain.doFilter(request, response) se deu erro aqui
         }
     }
 }
