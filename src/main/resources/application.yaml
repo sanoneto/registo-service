@@ -85,7 +85,7 @@ springdoc:
 
 logging:
   level:
-    org.springframework.security: ERROR
+    org.springframework.security: INFO
     com.registo.horas_estagio: INFO
     org.flywaydb: INFO
   file:
