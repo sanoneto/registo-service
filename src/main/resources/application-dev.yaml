@@ -47,7 +47,7 @@ management:
         include: health,info,metrics,prometheus,env,beans
   endpoint:
     health:
-      show-details: never
+      show-details: always
   health:
     mail:
       enabled: false

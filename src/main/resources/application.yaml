@@ -49,7 +49,7 @@ management:
         include: health,info,metrics,prometheus,env,beans
   endpoint:
     health:
-      show-details: never
+      show-details: always
   health:
     mail:
       enabled: false
@@ -92,8 +92,11 @@ logging:
             ObservationFilterChainDecorator: ERROR
             FilterChainProxy: ERROR
     com:
-      registo:
-        horas_estagio: INFO
+      aneto:
+        registo_horas_service:
+          security:
+            GatewayAuthFilter: ERROR
+
     org.flywaydb: INFO
   file:
     name: logs/app.log
