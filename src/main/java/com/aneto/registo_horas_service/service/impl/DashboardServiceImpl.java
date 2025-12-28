@@ -3,7 +3,11 @@ package com.aneto.registo_horas_service.service.impl;
 import com.aneto.registo_horas_service.dto.response.ListJogosResponse;
 import com.aneto.registo_horas_service.service.DashboardService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.cloud.vertexai.api.Content;
 import com.google.cloud.vertexai.api.GenerateContentResponse;
+import com.google.cloud.vertexai.api.GoogleSearchRetrieval;
+import com.google.cloud.vertexai.api.Tool;
+import com.google.cloud.vertexai.generativeai.ContentMaker;
 import com.google.cloud.vertexai.generativeai.GenerativeModel;
 import com.google.cloud.vertexai.generativeai.ResponseHandler;
 import lombok.RequiredArgsConstructor;
@@ -32,10 +36,10 @@ public class DashboardServiceImpl implements DashboardService {
     private final GenerativeModel generativeModel;
 
     private final S3Client s3Client;
-    @Value("${aws.s3.bucket-name}")
+    @Value("${cloud.aws.s3.bucket-name}")
     private String bucketName;
 
-    @Value("${aws.s3.folder-name}")
+    @Value("${cloud.aws.s3.folder-name}")
     private String S3FOLDER;
 
 
@@ -53,7 +57,7 @@ public class DashboardServiceImpl implements DashboardService {
         // 2. Se não existir ou for antigo, gera novo
         ListJogosResponse newPlan = createtListJogo(username);
         //guarda os input e true é para depois o escrever que o plano ja existe
-        saveToS3(key, newPlan);
+        //saveToS3(key, newPlan);
 
         return newPlan;
     }
@@ -96,28 +100,18 @@ public class DashboardServiceImpl implements DashboardService {
                 """, intervaloDatas);
         try {
             GenerateContentResponse response = generativeModel.generateContent(userPrompt);
-            String textResponse = ResponseHandler.getText(response);
 
-            // 1. Usa o método cleanMarkdown que já criaste!
-            String jsonClean = cleanMarkdown(textResponse);
+            String rawResponse = ResponseHandler.getText(response);
+            String jsonResponse = cleanMarkdown(rawResponse);
+            // Log para conferir o que o Google pesquisou e retornou
+            log.info("Resposta estruturada recebida: {}", jsonResponse);
 
-            // 2. Log para depuração (vê na consola o que o Gemini respondeu de facto)
-            log.info("Resposta bruta do Gemini: {}", textResponse);
-            log.info("JSON limpo para conversão: {}", jsonClean);
-
-            // 3. Converter para Objeto Java
-            ListJogosResponse result = objectMapper.readValue(jsonClean, ListJogosResponse.class);
-
-            // Se após converter a lista estiver vazia, talvez o modelo não tenha encontrado nada
-            if (result.getDias() == null || result.getDias().isEmpty()) {
-                log.warn("O modelo não encontrou jogos para o período solicitado.");
-            }
-
-            return result;
+            // Se o MimeType na Config for application/json, o Jackson lê diretamente
+            return objectMapper.readValue(jsonResponse, ListJogosResponse.class);
 
         } catch (Exception e) {
-            log.error("Erro ao converter JSON: {}", e.getMessage());
-            throw new RuntimeException("Erro ao processar jogos: " + e.getMessage());
+            log.error("Erro ao processar Vertex AI: {}", e.getMessage());
+            throw new RuntimeException("Não foi possível obter a lista de jogos: " + e.getMessage());
         }
     }
 
@@ -129,7 +123,7 @@ public class DashboardServiceImpl implements DashboardService {
 
             // Verifica se o plano tem menos de 7 dias (opcional)
             Instant lastModified = s3Object.response().lastModified();
-            if (Duration.between(lastModified, Instant.now()).toDays() > 1) {
+            if (Duration.between(lastModified, Instant.now()).toDays() > 0) {
                 return Optional.empty();
             }
             return Optional.of(objectMapper.readValue(s3Object, ListJogosResponse.class));
