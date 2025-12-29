@@ -1,15 +1,14 @@
 package com.aneto.registo_horas_service.service.impl;
 
 import com.aneto.registo_horas_service.dto.response.ListJogosResponse;
+import com.aneto.registo_horas_service.models.JogoTV;
+import com.aneto.registo_horas_service.repository.JogoTVRepository;
+import com.aneto.registo_horas_service.repository.PlanoRepository;
 import com.aneto.registo_horas_service.service.DashboardService;
+import com.aneto.registo_horas_service.service.FootballService;
+import com.aneto.registo_horas_service.service.ProgramacaoTVService;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.cloud.vertexai.api.Content;
-import com.google.cloud.vertexai.api.GenerateContentResponse;
-import com.google.cloud.vertexai.api.GoogleSearchRetrieval;
-import com.google.cloud.vertexai.api.Tool;
-import com.google.cloud.vertexai.generativeai.ContentMaker;
 import com.google.cloud.vertexai.generativeai.GenerativeModel;
-import com.google.cloud.vertexai.generativeai.ResponseHandler;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,8 +23,7 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -33,86 +31,49 @@ import java.util.Optional;
 public class DashboardServiceImpl implements DashboardService {
     private static final Logger log = LoggerFactory.getLogger(DashboardServiceImpl.class);
     private final ObjectMapper objectMapper;
-    private final GenerativeModel generativeModel;
+    //private final JogoTVRepository jogoTVRepository;
+    private final FootballService footballService;
+    //private final ProgramacaoTVService programacaoTVService;
 
     private final S3Client s3Client;
-    @Value("${cloud.aws.s3.bucket-name}")
+    @Value("${spring.cloud.aws.s3.bucket-name}")
     private String bucketName;
 
-    @Value("${cloud.aws.s3.folder-name}")
+    @Value("${spring.cloud.aws.s3.folder-name}")
     private String S3FOLDER;
 
+    @Value("${FootballData.dataInicio}")
+    private String dataInicio;
+
+    @Value("${FootballData.dataFim}")
+    private String dataFim;
 
     @Override
     public ListJogosResponse getListJogo(String username) {
         String key = S3FOLDER + username + "/jogos/" + username + ".json";
-
         // Tentar buscar plano existente se não foram enviados dados novos
         Optional<ListJogosResponse> existingPlan = loadFromS3jogos(key);
 
+      // List<JogoTV> jogos= programacaoTVService.extrairJogos();
+        //List<JogoTV> jogos = jogoTVRepository.findAll();
+
+// Isto imprime linha a linha na consola do IntelliJ/Eclipse
+       /* jogos.forEach(jogo -> {
+            System.out.println("-------------------------");
+            System.out.println("Equipas: " + jogo.getEquipas());
+            System.out.println("Canal:   " + jogo.getCanal());
+            System.out.println("Hora:    " + jogo.getHora());
+        });*/
+
         if (existingPlan.isPresent()) {
-            // Retornamos o plano marcado como existente
             return existingPlan.get();
         }
         // 2. Se não existir ou for antigo, gera novo
-        ListJogosResponse newPlan = createtListJogo(username);
+        ListJogosResponse  newPlan = footballService.buscarJogosParaReact(dataInicio,dataFim).block();
         //guarda os input e true é para depois o escrever que o plano ja existe
-        //saveToS3(key, newPlan);
+        saveToS3(key, newPlan);
 
         return newPlan;
-    }
-
-    @Override
-    public ListJogosResponse createtListJogo(String username) {
-        LocalDate hoje = LocalDate.now();
-        LocalDate dataFim = hoje.plusDays(3);
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
-
-        String intervaloDatas = String.format("de %s até %s", hoje.format(formatter), dataFim.format(formatter));
-
-        // Prompt otimizado para pesquisa real
-        String userPrompt = String.format("""
-                Tarefa: Listar obrigatoriamente os jogos de futebol das ligas: Liga Portugal, Premier League, La Liga, Ligue 1 e Bundesliga.
-                Datas: %s.
-                
-                CANAIS OBRIGATÓRIOS (Atribua o mais provável se não tiver a certeza):
-                - Sport TV (1 a 7)
-                - DAZN (1 a 5)
-                - BTV 1
-                
-                INSTRUÇÕES DE PREENCHIMENTO:
-                1. Se souberes que há um jogo (ex: Benfica, Porto, Sporting, Real Madrid, Man City), mas não tiveres o canal exato, escreve "Sport TV / DAZN".
-                2. NÃO DEIXES as listas de jogos vazias. Se houver jogos nestas ligas nestes dias, eles TÊM de aparecer.
-                3. valide todos os resultado antes de devolver.
-                5. Responde APENAS o JSON puro.
-                
-                FORMATO:
-                {
-                  "dias": [
-                    {
-                      "data": "YYYY-MM-DD",
-                      "jogos": [
-                        { "liga": "...", "equipa_casa": "...", "equipa_fora": "...", "hora": "HH:MM", "canal": "..." }
-                      ]
-                    }
-                  ]
-                }
-                """, intervaloDatas);
-        try {
-            GenerateContentResponse response = generativeModel.generateContent(userPrompt);
-
-            String rawResponse = ResponseHandler.getText(response);
-            String jsonResponse = cleanMarkdown(rawResponse);
-            // Log para conferir o que o Google pesquisou e retornou
-            log.info("Resposta estruturada recebida: {}", jsonResponse);
-
-            // Se o MimeType na Config for application/json, o Jackson lê diretamente
-            return objectMapper.readValue(jsonResponse, ListJogosResponse.class);
-
-        } catch (Exception e) {
-            log.error("Erro ao processar Vertex AI: {}", e.getMessage());
-            throw new RuntimeException("Não foi possível obter a lista de jogos: " + e.getMessage());
-        }
     }
 
     @Override
@@ -123,7 +84,7 @@ public class DashboardServiceImpl implements DashboardService {
 
             // Verifica se o plano tem menos de 7 dias (opcional)
             Instant lastModified = s3Object.response().lastModified();
-            if (Duration.between(lastModified, Instant.now()).toDays() > 0) {
+            if (Duration.between(lastModified, Instant.now()).toDays() > 1) {
                 return Optional.empty();
             }
             return Optional.of(objectMapper.readValue(s3Object, ListJogosResponse.class));

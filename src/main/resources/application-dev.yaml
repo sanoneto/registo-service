@@ -35,11 +35,21 @@ spring:
       port: 8200
       scheme: http
       enabled: false
+    aws:
+      credentials:
+        accessKey: ${AWS_ACCESS_KEY}
+        secretKey: ${AWS_SECRET_KEY}
+      region:
+        static: ${AWS_REGION}
+      s3:
+        bucket-name: ${AWS_S3_BUCKET_NAME}
+        folder-name: ${AWS_S3_FOLDER_NAME}
 
   flyway:
     enabled: false
     locations: classpath:db/migration
     baseline-on-migrate: true
+
 management:
   endpoints:
     web:
@@ -55,16 +65,7 @@ management:
 server:
   port: ${PORT:8083}
   forward-headers-strategy: native
-cloud:
-  aws:
-    credentials:
-      accessKey: ${AWS_ACCESS_KEY}
-      secretKey: ${AWS_SECRET_KEY}
-    region:
-      static: ${AWS_REGION}
-    s3:
-      bucket-name: ${AWS_S3_BUCKET_NAME}
-      folder-name: ${AWS_S3_FOLDER_NAME}
+
 
 url:
   micro-servico-auth: ${URI_AUTH_SERVICE}
@@ -92,6 +93,12 @@ logging:
   file:
     name: logs/app.log
 # src/main/resources/application.yml
+
+FootballData:
+  url: https://api.football-data.org/v4
+  API_TOKEN: ddaffc67601e45eabfb56b549d424fbd
+  dataInicio: 2025-12-28
+  dataFim: 2025-12-30
 
 file:
   upload-dir: ./uploads/profile_pics
