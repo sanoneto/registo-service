@@ -36,6 +36,15 @@ spring:
       port: 8200
       scheme: http
       enabled: false
+    aws:
+      credentials:
+        accessKey: ${AWS_ACCESS_KEY}
+        secretKey: ${AWS_SECRET_KEY}
+      region:
+        static: ${AWS_REGION}
+      s3:
+        bucket-name: ${AWS_S3_BUCKET_NAME}
+        folder-name: ${AWS_S3_FOLDER_NAME}
 
   flyway:
     enabled: false
@@ -57,16 +66,6 @@ management:
 server:
   port: ${PORT:8083}
   forward-headers-strategy: native
-cloud:
-  aws:
-    credentials:
-      accessKey: ${AWS_ACCESS_KEY}
-      secretKey: ${AWS_SECRET_KEY}
-    region:
-      static: ${AWS_REGION}
-    s3:
-      bucket-name: ${AWS_S3_BUCKET_NAME}
-      folder-name: ${AWS_S3_FOLDER_NAME}
 
 url:
   micro-servico-auth: ${URI_AUTH_SERVICE}
