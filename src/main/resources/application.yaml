@@ -108,6 +108,12 @@ gcp:
   credentials:
     json-content: ${GCP_CREDENTIALS_JSO_CONTENT}
 
+FootballData:
+  url: https://api.football-data.org/v4
+  API_TOKEN: ddaffc67601e45eabfb56b549d424fbd
+  dataInicio: 2025-12-28
+  dataFim: 2025-12-30
+
 app:
   queries:
     monthly-summary: "SELECT 
