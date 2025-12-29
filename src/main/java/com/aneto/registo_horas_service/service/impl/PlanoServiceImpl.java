@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -60,5 +61,15 @@ public class PlanoServiceImpl implements PlanoService {
 
         // Converte a página de Entidades para página de ResponseDTO (remove links e datas)
         return planos.map(mapper::toResponse);
+    }
+
+    @Override
+    public Optional<PlanoResponseDTO> findAtivoAndConcluidoByUsername(String username) {
+        // Aqui assume-se que o seu Repository tem esta consulta
+        return repository.findByNomeAlunoContainingAndEstadoPlanoAndEstadoPedido(
+                username,
+                "ATIVO",    // Ou o seu Enum correspondente
+                "FINALIZADO"  // Ou o seu Enum correspondente
+        ).map(mapper::toResponse); // Converta para DTO antes de retornar
     }
 }

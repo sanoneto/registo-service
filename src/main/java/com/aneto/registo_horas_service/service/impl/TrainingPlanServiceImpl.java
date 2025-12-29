@@ -194,22 +194,34 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
 
     // --- Métodos Auxiliares para Limpar o Fluxo Principal ---
     private String buscarChaveDoPlano(String planId, String username) {
-        // 1. Verifica se o planId não é nulo e não está em branco
+        // 1. Tentativa prioritária: Pelo UUID do plano (planId)
         if (planId != null && !planId.isBlank()) {
             try {
-                return Optional.ofNullable(planoService.getByPlanoById(UUID.fromString(planId)))
-                        .map(PlanoResponseDTO::link)
-                        .filter(link -> !link.isBlank())
-                        .orElse(gerarCaminhoPadrao(username));
+                PlanoResponseDTO plano = planoService.getByPlanoById(UUID.fromString(planId));
+                if (plano != null && isLinkValido(plano.link())) {
+                    return plano.link();
+                }
             } catch (IllegalArgumentException e) {
                 log.error("ID do plano inválido: {}", planId);
-                // Se o UUID for inválido, cai no fallback também
             }
         }
-        // 2. Fallback: Se planId for null ou der erro, gera o caminho padrão
-        return gerarCaminhoPadrao(username);
-    }
 
+        // 2. Validação na Base de Dados: Procurar plano existente por Username + Filtros
+        // O service deve buscar onde estado_plano = 'ACTIVO' e estado_pedido = 'CONCLUIDO'
+        log.info("Buscando plano ativo e concluído na base para o utilizador: {}", username);
+
+        return planoService.findAtivoAndConcluidoByUsername(username)
+                .map(PlanoResponseDTO::link)
+                .filter(this::isLinkValido)
+                // 3. Fallback Final: Se não encontrar nada válido, gera o caminho padrão
+                .orElseGet(() -> {
+                    log.info("Nenhum plano ativo encontrado para {}. Gerando fallback.", username);
+                    return gerarCaminhoPadrao(username);
+                });
+    }
+    private boolean isLinkValido(String link) {
+        return link != null && !link.isBlank();
+    }
     // Criado um método auxiliar para evitar repetição de código
     private String gerarCaminhoPadrao(String username) {
         // Define o formato: AnoMesDia_HoraMinutoSegundo

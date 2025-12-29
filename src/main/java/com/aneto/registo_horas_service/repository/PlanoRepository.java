@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Optional;
 import java.util.UUID;
 @Repository
 public interface PlanoRepository extends JpaRepository<Plano, UUID> {
@@ -15,5 +16,11 @@ public interface PlanoRepository extends JpaRepository<Plano, UUID> {
     // Esta query é mais segura para lidar com valores nulos ou vazios
     @Query("SELECT p FROM Plano p WHERE (:nome IS NULL OR :nome = '' OR LOWER(p.nomeAluno) LIKE LOWER(CONCAT('%', :nome, '%')))")
     Page<Plano> findByNomeCustom(@Param("nome") String nome, Pageable pageable);
+
+    Optional<Plano> findByNomeAlunoContainingAndEstadoPlanoAndEstadoPedido(
+            String nomeAluno,
+            String estadoPlano,
+            String estadoPedido
+    );
 }
 
