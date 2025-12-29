@@ -13,6 +13,7 @@ public interface TrainingPlanService {
     void saveToS3(String key, TrainingPlanResponse plan);
 
     TrainingPlanResponse getOrGeneratePlan(UserProfileRequest request, String username,String planId);
+    void updatePlan(TrainingPlanResponse plan , String username,String planId);
 
 
 }

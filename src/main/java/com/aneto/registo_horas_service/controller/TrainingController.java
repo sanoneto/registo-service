@@ -8,6 +8,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/training")
@@ -28,6 +30,19 @@ public class TrainingController {
         TrainingPlanResponse response = trainingPlanService.getOrGeneratePlan(request, username, planId);
 
         return ResponseEntity.ok(response);
+    }
+    @PutMapping("/plan")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('ESPECIALISTA') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
+    public ResponseEntity<?> updatePlan(
+            @RequestBody TrainingPlanResponse plan,
+            @RequestHeader(X_USER_ID) String username,
+            @RequestParam(value = "id", required = false) String planId) { // Adicionado o parâmetro id
+
+        // Passamos o request E o planId para o serviço decidir o que fazer
+        trainingPlanService.updatePlan(plan, username, planId);
+
+        // Opção 1: Retorna 200 OK com um mapa de mensagem (mais comum para APIs JS/React)
+        return ResponseEntity.ok(Map.of("message", "Plano atualizado com sucesso"));
     }
 
 }

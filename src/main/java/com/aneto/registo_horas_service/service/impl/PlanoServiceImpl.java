@@ -72,4 +72,27 @@ public class PlanoServiceImpl implements PlanoService {
                 "FINALIZADO"  // Ou o seu Enum correspondente
         ).map(mapper::toResponse); // Converta para DTO antes de retornar
     }
+
+    @Override
+    @Transactional
+    public void updatePlano(String uuid, PlanoRequestDTO requestDTO) {
+        // 1. Converter a String para UUID e procurar a entidade
+        UUID id = UUID.fromString(uuid);
+
+        // 2. Procurar o plano existente (lança exceção se não encontrar)
+        Plano plano = repository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Plano não encontrado com o ID: " + uuid));
+
+        // 3. Atualizar os campos da entidade com os dados do DTO
+        // Assumindo que a sua entidade 'Plano' tem estes setters:
+        plano.setNomeAluno(requestDTO.nomeAluno());
+        plano.setObjetivo(requestDTO.objetivo());
+        plano.setEspecialista(requestDTO.especialista());
+        plano.setEstadoPlano(requestDTO.estadoPlano());
+        plano.setEstadoPedido(requestDTO.estadoPedido());
+        plano.setLink(requestDTO.link());
+
+        // 4. Gravar as alterações
+        repository.save(plano);
+    }
 }

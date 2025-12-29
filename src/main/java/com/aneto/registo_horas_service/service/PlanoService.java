@@ -14,4 +14,5 @@ public interface PlanoService {
     void deletePlano(UUID id);
     Page<PlanoResponseDTO> listAllOrName(String nome, Pageable pageable);
     Optional<PlanoResponseDTO> findAtivoAndConcluidoByUsername(String username);
+    void updatePlano(String uuid, PlanoRequestDTO requestDTO);
 }

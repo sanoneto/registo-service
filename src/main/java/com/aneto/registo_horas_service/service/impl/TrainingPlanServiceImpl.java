@@ -28,7 +28,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -61,8 +60,16 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
         TrainingPlanResponse newPlan = generateTrainingPlan(request);
         configurarNovoPlano(newPlan, request);
         // 4. Persistência (Banco e S3)
-        salvarDadosDoPlano(username, request, key, newPlan);
+        salvarDadosDoPlano(username, request, key, newPlan, planId);
         return newPlan;
+    }
+
+    @Override
+    public void updatePlan(TrainingPlanResponse newPlan, String username, String planId) {
+        String key = buscarChaveDoPlano(planId, username);
+        configurarNovoPlano(newPlan, newPlan.getUserProfile());
+        // 4. Persistência (Banco e S3)
+        salvarDadosDoPlano(username, newPlan.getUserProfile(), key, newPlan, planId);
     }
 
     @Override
@@ -219,9 +226,11 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
                     return gerarCaminhoPadrao(username);
                 });
     }
+
     private boolean isLinkValido(String link) {
         return link != null && !link.isBlank();
     }
+
     // Criado um método auxiliar para evitar repetição de código
     private String gerarCaminhoPadrao(String username) {
         // Define o formato: AnoMesDia_HoraMinutoSegundo
@@ -230,6 +239,7 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
         // O caminho incluirá o username e o momento da criação
         return String.format("%s%s/plan/%s_%s.json", S3FOLDER, username, username, timestamp);
     }
+
     private boolean isRequestEmpty(UserProfileRequest request) {
         return request == null || (request.bodyType() == null && request.objective() == null);
     }
@@ -239,16 +249,45 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
         plan.setUserProfile(request);
     }
 
-    private void salvarDadosDoPlano(String username, UserProfileRequest request, String key, TrainingPlanResponse plan) {
-        PlanoRequestDTO dto = new PlanoRequestDTO(
-                username,
-                request.objective(),
-                request.objective(), // Assumindo que o especialista aqui seja o objetivo ou vice-versa
-                "ATIVO",
-                "PENDENTE",
-                key
-        );
-        planoService.createPlano(dto);
+    private void salvarDadosDoPlano(String username, UserProfileRequest request, String key, TrainingPlanResponse plan, String planId) {
+        PlanoRequestDTO dto;
+
+        if (planId == null || planId.isEmpty()) {
+            // Cenário 1: Novo Plano
+            dto = new PlanoRequestDTO(
+                    username,
+                    request.objective(),
+                    "sem Especialista",
+                    "ATIVO",
+                    "PENDENTE",
+                    key
+            );
+            planoService.createPlano(dto);
+        } else {
+            // Cenário 2: Atualizar Plano Existente
+            PlanoResponseDTO planoExistente = planoService.getByPlanoById(UUID.fromString(planId));
+
+            if (planoExistente == null) {
+                throw new RuntimeException("Plano não encontrado para o ID: " + planId);
+            }
+
+            // Criamos o DTO a partir dos dados existentes para evitar o NullPointerException
+            // E encadeamos os métodos .with para atualizar os campos necessários
+            dto = new PlanoRequestDTO(
+                    planoExistente.nomeAluno(),
+                    planoExistente.objetivo(),
+                    planoExistente.especialista(),
+                    planoExistente.estadoPlano(),
+                    planoExistente.estadoPedido(),
+                    planoExistente.link()
+            )
+                    .withEspecialista(username)     // Atualiza o especialista
+                    .withEstadoPedido("FINALIZADO") // Atualiza o estado
+                    .withLink(key);                 // Atualiza o link do S3 se necessário
+
+            planoService.updatePlano(planId, dto);
+        }
+        // Salva o JSON no S3 independentemente de ser novo ou update
         saveToS3(key, plan);
     }
 }
