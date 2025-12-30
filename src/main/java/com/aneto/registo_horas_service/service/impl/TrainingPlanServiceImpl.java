@@ -110,6 +110,7 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
                           "reps": "Repetições",
                           "rest": "Tempo de descanso",
                           "details": "Dica de segurança"
+                          "Notes": "adicinar notas como o peso que fez "
                         }
                       ]
                     }

@@ -26,7 +26,7 @@ public interface FootballMapper {
                 .toList();
 
         Map<String, List<JogosResponse>> agrupado = todosOsJogos.stream()
-                // Agora pegamos os primeiros 10 caracteres da data já formatada (yyyy-MM-dd)
+                // Agora obtemos os primeiros 10 caracteres da data já formatada (yyyy-MM-dd)
                 .collect(Collectors.groupingBy(j -> j.hora().substring(0, 10)));
 
         List<DiaDeJogoResponse> dias = agrupado.entrySet().stream()
@@ -45,6 +45,8 @@ public interface FootballMapper {
     @Mapping(target = "canal", constant = "Canal não informado")
     @Mapping(target = "iconHome", source = "homeTeam.crest")
     @Mapping(target = "iconAway", source = "awayTeam.crest")
+    @Mapping(target = "scoreHome", source = "score.fullTime.home")
+    @Mapping(target = "scoreAway", source = "score.fullTime.away")
     JogosResponse toMatchResponse(FootballData.Match match);
 
     // Método auxiliar para formatar a string da data

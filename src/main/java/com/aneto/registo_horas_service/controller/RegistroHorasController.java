@@ -42,7 +42,7 @@ public class RegistroHorasController {
             @ApiResponse(responseCode = "401", description = "Não autorizado")
     })
 
-    @PreAuthorize("hasRole('ADMIN') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('ESPECIALISTA') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
     @PostMapping
     public ResponseEntity<RegisterResponse> submeterHoras(
             @Valid @RequestBody RegisterRequest request,
@@ -59,7 +59,7 @@ public class RegistroHorasController {
             @ApiResponse(responseCode = "401", description = "Não autorizado")
     })
 
-    @PreAuthorize("hasRole('ADMIN') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('ESPECIALISTA') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
     @GetMapping
     public ResponseEntity<List<RegisterResponse>> buscarMeusRegistros(
             @RequestHeader(X_USER_ID) String username) {
@@ -69,7 +69,7 @@ public class RegistroHorasController {
     }
 
     @GetMapping("/{uuid}")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('ESTAGIARIO')")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('ESPECIALISTA') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
     public ResponseEntity<RegisterResponse> getRegisterById(@PathVariable UUID uuid) {
         // Usa o serviço existente que retorna todos os registros e filtra pelo publicId.
         // Evita a necessidade de adicionar novos métodos ao service/repository.
@@ -101,7 +101,7 @@ public class RegistroHorasController {
     }
 
     @Operation(summary = "Atualiza um registro existente")
-    @PreAuthorize("hasRole('ADMIN') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('ESPECIALISTA') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
     @PutMapping("/{publicId}")
     public ResponseEntity<RegisterResponse> updateRegister(
             @PathVariable UUID publicId,
@@ -122,7 +122,7 @@ public class RegistroHorasController {
 
     @Operation(summary = "Retorna o total de horas de um usuário")
     @GetMapping("/total_user")
-    @PreAuthorize("hasRole('ADMIN') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('ESPECIALISTA') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
     public ResponseEntity<Map<String, Object>> getTotalHoras(
             @RequestHeader(X_USER_ID) String username,
             Authentication authentication) {
@@ -138,7 +138,7 @@ public class RegistroHorasController {
 
     @Operation(summary = "Retorna o total de horas de um usuário")
     @GetMapping("/total-user-project")
-    @PreAuthorize("hasRole('ADMIN') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('ESPECIALISTA') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
     public ResponseEntity<Double> getTotalHorasPorUser(
             @RequestParam (defaultValue = "all") String username,
             @RequestParam(defaultValue = "all") String projectName,
@@ -149,7 +149,7 @@ public class RegistroHorasController {
 
     @Operation(summary = "Retorna o total de horas de um usuário")
     @GetMapping("/monthly-summary")
-    @PreAuthorize("hasRole('ADMIN') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('ESPECIALISTA') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
     public ResponseEntity<List<MonthlySummary>> findMonthlySummary(
             @RequestHeader(X_USER_ID) String username,
             Authentication authentication) {
@@ -159,7 +159,7 @@ public class RegistroHorasController {
 
     @Operation(summary = "Retorna o total de horas de um usuário")
     @GetMapping("/perfil")
-    @PreAuthorize("hasRole('ADMIN') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('ESPECIALISTA') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
     public ResponseEntity<List<PerfilResponse>> getPerfil(
             @RequestHeader(X_USER_ID) String username,
             Authentication authentication) {
@@ -176,7 +176,7 @@ public class RegistroHorasController {
             @ApiResponse(responseCode = "404", description = "Nenhum registro encontrado")
     })
     @GetMapping("/Pageable/list/{name}")
-    @PreAuthorize("hasRole('ADMIN') or (hasRole('ESTAGIARIO') and #name == authentication.name)")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('ESPECIALISTA') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
     public ResponseEntity<PageResponse<RegisterResponse>> getAllRegisterHorasUserPaginated(
             @PathVariable String name,
             @RequestParam (defaultValue = "all") String projectName,

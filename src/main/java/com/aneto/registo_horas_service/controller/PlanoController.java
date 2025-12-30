@@ -22,7 +22,7 @@ public class PlanoController {
 
     private final PlanoService planoService;
 
-    @PreAuthorize("hasRole('ADMIN') or (hasRole('ESTAGIARIO') and #name == authentication.name)")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('ESPECIALISTA') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
     @PostMapping
     public ResponseEntity<PlanoResponseDTO> create(@RequestBody @Valid PlanoRequestDTO request) {
         // Garantir que o Service tenha o método createPlano
@@ -30,7 +30,7 @@ public class PlanoController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @PreAuthorize("hasRole('ADMIN') or (hasRole('ESTAGIARIO') and #name == authentication.name)")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('ESPECIALISTA') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
     @GetMapping("/{id}")
     public ResponseEntity<PlanoResponseDTO> getPlanId(@PathVariable UUID id) {
         // Nome ajustado para bater com o Service

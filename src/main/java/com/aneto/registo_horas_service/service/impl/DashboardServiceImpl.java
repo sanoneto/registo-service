@@ -1,14 +1,9 @@
 package com.aneto.registo_horas_service.service.impl;
 
 import com.aneto.registo_horas_service.dto.response.ListJogosResponse;
-import com.aneto.registo_horas_service.models.JogoTV;
-import com.aneto.registo_horas_service.repository.JogoTVRepository;
-import com.aneto.registo_horas_service.repository.PlanoRepository;
 import com.aneto.registo_horas_service.service.DashboardService;
 import com.aneto.registo_horas_service.service.FootballService;
-import com.aneto.registo_horas_service.service.ProgramacaoTVService;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.cloud.vertexai.generativeai.GenerativeModel;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,7 +18,8 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.List;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.Optional;
 
 @Service
@@ -50,11 +46,19 @@ public class DashboardServiceImpl implements DashboardService {
 
     @Override
     public ListJogosResponse getListJogo(String username) {
-        String key = S3FOLDER + username + "/jogos/" + username + ".json";
-        // Tentar buscar plano existente se não foram enviados dados novos
+        String key = "jogos/" + "lista.json";
+        LocalDate hoje = LocalDate.now();
+        LocalDate daquiADoisDias = hoje.plusDays(2);
+
+        String dataPadrao = daquiADoisDias.toString();
+        String  hojePadrao = hoje.toString();
+
+        System.out.println("Agora:          " + hojePadrao);
+        System.out.println("Daqui a 2 dias: " + dataPadrao);
+
         Optional<ListJogosResponse> existingPlan = loadFromS3jogos(key);
 
-      // List<JogoTV> jogos= programacaoTVService.extrairJogos();
+        // List<JogoTV> jogos= programacaoTVService.extrairJogos();
         //List<JogoTV> jogos = jogoTVRepository.findAll();
 
 // Isto imprime linha a linha na consola do IntelliJ/Eclipse
@@ -69,12 +73,13 @@ public class DashboardServiceImpl implements DashboardService {
             return existingPlan.get();
         }
         // 2. Se não existir ou for antigo, gera novo
-        ListJogosResponse  newPlan = footballService.buscarJogosParaReact(dataInicio,dataFim).block();
+        ListJogosResponse newPlan = footballService.buscarJogosParaReact(hojePadrao, dataPadrao).block();
         //guarda os input e true é para depois o escrever que o plano ja existe
         saveToS3(key, newPlan);
 
         return newPlan;
     }
+
 
     @Override
     public Optional<ListJogosResponse> loadFromS3jogos(String key) {

@@ -12,6 +12,8 @@ public record JogosResponse(
         String hora,
         String canal,
         String iconHome,
-        String iconAway
+        String iconAway,
+        String scoreHome,
+        String scoreAway
 ) {
 }
