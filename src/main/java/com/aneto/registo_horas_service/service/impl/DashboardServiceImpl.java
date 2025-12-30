@@ -38,12 +38,6 @@ public class DashboardServiceImpl implements DashboardService {
     @Value("${spring.cloud.aws.s3.folder-name}")
     private String S3FOLDER;
 
-    @Value("${FootballData.dataInicio}")
-    private String dataInicio;
-
-    @Value("${FootballData.dataFim}")
-    private String dataFim;
-
     @Override
     public ListJogosResponse getListJogo(String username) {
         String key = "jogos/" + "lista.json";
