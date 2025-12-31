@@ -13,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -38,7 +39,6 @@ public class PlanoController {
         return ResponseEntity.ok(response);
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletePlan(@PathVariable UUID id) {
         planoService.deletePlano(id);
@@ -53,5 +53,24 @@ public class PlanoController {
 
         Page<PlanoResponseDTO> lista = planoService.listAllOrName(nomeAluno, pageable);
         return ResponseEntity.ok(lista);
+    }
+
+
+    @PatchMapping("/{id}/atualizar-status")
+    public ResponseEntity<?> updateStatusParaProcessando(
+            @RequestHeader("X-User-ID") String username,
+            @RequestBody @Valid String  estadoPedido,
+            @PathVariable String id) {
+        try {
+            // Chamamos o serviço para tratar a regra de negócio
+            planoService.changeOfProgress(id, username, estadoPedido);
+
+            return ResponseEntity.ok(Map.of(
+                    "message", "Plano atualizado para processamento",
+                    "status", estadoPedido
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
     }
 }

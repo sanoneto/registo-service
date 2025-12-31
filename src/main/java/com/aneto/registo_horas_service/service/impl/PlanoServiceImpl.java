@@ -95,4 +95,20 @@ public class PlanoServiceImpl implements PlanoService {
         // 4. Gravar as alterações
         repository.save(plano);
     }
+
+    @Override
+    public void changeOfProgress(String planId, String username, String newStatus) {
+        // 1. Busca o plano no banco
+        Plano plano = repository.findById(UUID.fromString(planId))
+                .orElseThrow(() -> new RuntimeException("Plano não encontrado"));
+
+        if ("PENDENTE".equalsIgnoreCase(plano.getEstadoPedido())) {
+            plano.setEstadoPedido(newStatus);
+
+            // Opcional: Registrar quem assumiu o plano
+            // plano.setEspecialistaResponsavel(username);
+
+            repository.save(plano);
+        }
+    }
 }

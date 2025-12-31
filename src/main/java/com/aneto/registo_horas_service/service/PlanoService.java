@@ -15,4 +15,5 @@ public interface PlanoService {
     Page<PlanoResponseDTO> listAllOrName(String nome, Pageable pageable);
     Optional<PlanoResponseDTO> findAtivoAndConcluidoByUsername(String username);
     void updatePlano(String uuid, PlanoRequestDTO requestDTO);
+    void changeOfProgress(String planId, String username,String newStatus);
 }

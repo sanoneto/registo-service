@@ -4,6 +4,7 @@ import com.aneto.registo_horas_service.dto.request.PlanoRequestDTO;
 import com.aneto.registo_horas_service.dto.request.UserProfileRequest;
 import com.aneto.registo_horas_service.dto.response.PlanoResponseDTO;
 import com.aneto.registo_horas_service.dto.response.TrainingPlanResponse;
+import com.aneto.registo_horas_service.models.Plano;
 import com.aneto.registo_horas_service.service.PlanoService;
 import com.aneto.registo_horas_service.service.TrainingPlanService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -71,6 +72,8 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
         // 4. Persistência (Banco e S3)
         salvarDadosDoPlano(username, newPlan.getUserProfile(), key, newPlan, planId);
     }
+
+
 
     @Override
     public TrainingPlanResponse generateTrainingPlan(UserProfileRequest userRequest) {

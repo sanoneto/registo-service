@@ -43,7 +43,7 @@ spring:
         static: ${AWS_REGION}
       s3:
         bucket-name: ${AWS_S3_BUCKET_NAME}
-        folder-name: ${AWS_S3_FOLDER_NAME}
+        folder-name: ${AWS_S3_FOLDER_NAME} # usava quando a ler gemini pa os jogos
 
   flyway:
     enabled: false
@@ -68,7 +68,7 @@ server:
 
 
 url:
-  micro-servico-auth: ${URI_AUTH_SERVICE}
+  micro_service_auth: ${URI_AUTH_SERVICE}
 
 springdoc:
   api-docs:
@@ -94,14 +94,10 @@ logging:
     name: logs/app.log
 # src/main/resources/application.yml
 
-FootballData:
-  url: https://api.football-data.org/v4
-  API_TOKEN: ddaffc67601e45eabfb56b549d424fbd
-  dataInicio: 2025-12-28
-  dataFim: 2025-12-30
-
-file:
-  upload-dir: ./uploads/profile_pics
+Football:
+  Data:
+    url: ${FOOTBALL_DATA_URL}
+    API_TOKEN: ${FOOTBALL_DATA_API_TOKEN}
 
 gcp:
   project:

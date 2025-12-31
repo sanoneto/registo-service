@@ -8,10 +8,10 @@ import org.springframework.web.reactive.function.client.WebClient;
 @Configuration
 public class FootballConfig {
 
-    @Value("${FootballData.API_TOKEN}")
+    @Value("${Football.Data.API_TOKEN}")
     private String API_TOKEN;
 
-    @Value("${FootballData.url}")
+    @Value("${Football.Data.url}")
     private String BASE_URL;
 
     @Bean

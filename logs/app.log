@@ -1,28 +1,21 @@
-2025-12-30T00:05:30.555Z  INFO 33532 --- [registo-horas-service] [http-nio-8083-exec-10] c.a.r.s.impl.RegistosHorasServiceImpl    : Encontrados 8 registros na página 0 de 3
-2025-12-30T00:05:30.576Z  INFO 33532 --- [registo-horas-service] [http-nio-8083-exec-1] c.a.r.s.impl.RegistosHorasServiceImpl    : Encontrados 8 registros na página 0 de 3
-2025-12-30T00:09:02.979Z  INFO 33532 --- [registo-horas-service] [SpringApplicationShutdownHook] o.s.b.w.e.tomcat.GracefulShutdown        : Commencing graceful shutdown. Waiting for active requests to complete
-2025-12-30T00:09:02.984Z  INFO 33532 --- [registo-horas-service] [tomcat-shutdown] o.s.b.w.e.tomcat.GracefulShutdown        : Graceful shutdown complete
-2025-12-30T00:09:05.013Z  INFO 33532 --- [registo-horas-service] [SpringApplicationShutdownHook] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'default'
-2025-12-30T00:09:05.016Z  INFO 33532 --- [registo-horas-service] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
-2025-12-30T00:09:05.018Z  INFO 33532 --- [registo-horas-service] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
-2025-12-30T00:11:19.538Z  INFO 38956 --- [registo-horas-service] [main] c.a.r.RegistoHorasServiceApplication     : Starting RegistoHorasServiceApplication using Java 23.0.1 with PID 38956 (D:\Exemplo projecto\microserviços\registo-horas-service\target\classes started by User in D:\Exemplo projecto\microserviços\registo-horas-service)
-2025-12-30T00:11:19.540Z  INFO 38956 --- [registo-horas-service] [main] c.a.r.RegistoHorasServiceApplication     : The following 1 profile is active: "dev"
-2025-12-30T00:11:20.486Z  INFO 38956 --- [registo-horas-service] [main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
-2025-12-30T00:11:20.608Z  INFO 38956 --- [registo-horas-service] [main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 114 ms. Found 5 JPA repository interfaces.
-2025-12-30T00:11:21.048Z  INFO 38956 --- [registo-horas-service] [main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8083 (http)
-2025-12-30T00:11:21.059Z  INFO 38956 --- [registo-horas-service] [main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
-2025-12-30T00:11:21.059Z  INFO 38956 --- [registo-horas-service] [main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.48]
-2025-12-30T00:11:21.117Z  INFO 38956 --- [registo-horas-service] [main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
-2025-12-30T00:11:21.117Z  INFO 38956 --- [registo-horas-service] [main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 1530 ms
-2025-12-30T00:11:21.833Z  INFO 38956 --- [registo-horas-service] [main] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
-2025-12-30T00:11:21.872Z  INFO 38956 --- [registo-horas-service] [main] org.hibernate.Version                    : HHH000412: Hibernate ORM core version 6.6.33.Final
-2025-12-30T00:11:21.910Z  INFO 38956 --- [registo-horas-service] [main] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
-2025-12-30T00:11:22.130Z  INFO 38956 --- [registo-horas-service] [main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
-2025-12-30T00:11:22.156Z  INFO 38956 --- [registo-horas-service] [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
-2025-12-30T00:11:22.264Z  INFO 38956 --- [registo-horas-service] [main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@32c114d9
-2025-12-30T00:11:22.265Z  INFO 38956 --- [registo-horas-service] [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
-2025-12-30T00:11:22.288Z  WARN 38956 --- [registo-horas-service] [main] org.hibernate.orm.deprecation            : HHH90000025: PostgreSQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
-2025-12-30T00:11:22.306Z  INFO 38956 --- [registo-horas-service] [main] org.hibernate.orm.connections.pooling    : HHH10001005: Database info:
+2025-12-31T00:26:10.117Z  INFO 10348 --- [registo-horas-service] [main] c.a.r.RegistoHorasServiceApplication     : Starting RegistoHorasServiceApplication using Java 23.0.1 with PID 10348 (D:\Exemplo projecto\microserviços\registo-horas-service\target\classes started by User in D:\Exemplo projecto\microserviços\registo-horas-service)
+2025-12-31T00:26:10.122Z  INFO 10348 --- [registo-horas-service] [main] c.a.r.RegistoHorasServiceApplication     : The following 1 profile is active: "dev"
+2025-12-31T00:26:11.029Z  INFO 10348 --- [registo-horas-service] [main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2025-12-31T00:26:11.136Z  INFO 10348 --- [registo-horas-service] [main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 100 ms. Found 5 JPA repository interfaces.
+2025-12-31T00:26:11.548Z  INFO 10348 --- [registo-horas-service] [main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8083 (http)
+2025-12-31T00:26:11.557Z  INFO 10348 --- [registo-horas-service] [main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2025-12-31T00:26:11.558Z  INFO 10348 --- [registo-horas-service] [main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.48]
+2025-12-31T00:26:11.608Z  INFO 10348 --- [registo-horas-service] [main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2025-12-31T00:26:11.609Z  INFO 10348 --- [registo-horas-service] [main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 1448 ms
+2025-12-31T00:26:12.268Z  INFO 10348 --- [registo-horas-service] [main] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+2025-12-31T00:26:12.303Z  INFO 10348 --- [registo-horas-service] [main] org.hibernate.Version                    : HHH000412: Hibernate ORM core version 6.6.33.Final
+2025-12-31T00:26:12.328Z  INFO 10348 --- [registo-horas-service] [main] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
+2025-12-31T00:26:12.516Z  INFO 10348 --- [registo-horas-service] [main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2025-12-31T00:26:12.537Z  INFO 10348 --- [registo-horas-service] [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2025-12-31T00:26:12.641Z  INFO 10348 --- [registo-horas-service] [main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@5b7d5eca
+2025-12-31T00:26:12.642Z  INFO 10348 --- [registo-horas-service] [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2025-12-31T00:26:12.664Z  WARN 10348 --- [registo-horas-service] [main] org.hibernate.orm.deprecation            : HHH90000025: PostgreSQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2025-12-31T00:26:12.679Z  INFO 10348 --- [registo-horas-service] [main] org.hibernate.orm.connections.pooling    : HHH10001005: Database info:
 	Database JDBC URL [Connecting through datasource 'HikariDataSource (HikariPool-1)']
 	Database driver: undefined/unknown
 	Database version: 15.15
@@ -30,54 +23,47 @@
 	Isolation level: undefined/unknown
 	Minimum pool size: undefined/unknown
 	Maximum pool size: undefined/unknown
-2025-12-30T00:11:23.051Z  INFO 38956 --- [registo-horas-service] [main] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
-2025-12-30T00:11:23.097Z  INFO 38956 --- [registo-horas-service] [main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
-2025-12-30T00:11:23.591Z  INFO 38956 --- [registo-horas-service] [main] o.s.d.j.r.query.QueryEnhancerFactory     : Hibernate is in classpath; If applicable, HQL parser will be used.
-2025-12-30T00:11:25.213Z  INFO 38956 --- [registo-horas-service] [main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 5 endpoints beneath base path '/actuator'
-2025-12-30T00:11:25.247Z  WARN 38956 --- [registo-horas-service] [main] .s.s.UserDetailsServiceAutoConfiguration : 
+2025-12-31T00:26:13.330Z  INFO 10348 --- [registo-horas-service] [main] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2025-12-31T00:26:13.378Z  INFO 10348 --- [registo-horas-service] [main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2025-12-31T00:26:13.804Z  INFO 10348 --- [registo-horas-service] [main] o.s.d.j.r.query.QueryEnhancerFactory     : Hibernate is in classpath; If applicable, HQL parser will be used.
+2025-12-31T00:26:15.289Z  INFO 10348 --- [registo-horas-service] [main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 5 endpoints beneath base path '/actuator'
+2025-12-31T00:26:15.320Z  WARN 10348 --- [registo-horas-service] [main] .s.s.UserDetailsServiceAutoConfiguration : 
 
-Using generated security password: 6b4b5361-e773-400b-aef9-9d7c6db75e97
+Using generated security password: fce2721b-7bc7-45dc-8c2e-bf88c9f60805
 
 This generated password is for development use only. Your security configuration must be updated before running your application in production.
 
-2025-12-30T00:11:25.253Z  INFO 38956 --- [registo-horas-service] [main] r$InitializeUserDetailsManagerConfigurer : Global AuthenticationManager configured with UserDetailsService bean with name inMemoryUserDetailsManager
-2025-12-30T00:11:25.761Z  INFO 38956 --- [registo-horas-service] [main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8083 (http) with context path '/'
-2025-12-30T00:11:25.772Z  INFO 38956 --- [registo-horas-service] [main] c.a.r.RegistoHorasServiceApplication     : Started RegistoHorasServiceApplication in 6.697 seconds (process running for 7.464)
-2025-12-30T00:11:26.119Z  INFO 38956 --- [registo-horas-service] [RMI TCP Connection(4)-172.29.128.1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
-2025-12-30T00:11:26.119Z  INFO 38956 --- [registo-horas-service] [RMI TCP Connection(4)-172.29.128.1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
-2025-12-30T00:11:26.121Z  INFO 38956 --- [registo-horas-service] [RMI TCP Connection(4)-172.29.128.1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 2 ms
-2025-12-30T00:11:26.121Z  INFO 38956 --- [registo-horas-service] [RMI TCP Connection(3)-172.29.128.1] o.s.a.r.c.CachingConnectionFactory       : Attempting to connect to: [localhost:5672]
-2025-12-30T00:11:26.179Z  INFO 38956 --- [registo-horas-service] [RMI TCP Connection(3)-172.29.128.1] o.s.a.r.c.CachingConnectionFactory       : Created new connection: rabbitConnectionFactory#5772a790:0/SimpleConnection@1c1c7f70 [delegate=amqp://guest@127.0.0.1:5672/, localPort=52119]
-2025-12-30T00:11:51.887Z  INFO 38956 --- [registo-horas-service] [http-nio-8083-exec-1] c.a.r.s.impl.RegistosHorasServiceImpl    : Encontrados 8 registros na página 0 de 3
-2025-12-30T00:11:51.933Z  INFO 38956 --- [registo-horas-service] [http-nio-8083-exec-2] c.a.r.s.impl.RegistosHorasServiceImpl    : Encontrados 8 registros na página 0 de 3
-2025-12-30T00:13:06.584Z  WARN 38956 --- [registo-horas-service] [HikariPool-1:housekeeper] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Thread starvation or clock leap detected (housekeeper delta=1m14s203ms445µs500ns).
-2025-12-30T00:14:12.344Z  INFO 38956 --- [registo-horas-service] [http-nio-8083-exec-5] c.a.r.s.impl.RegistosHorasServiceImpl    : Encontrados 8 registros na página 0 de 3
-2025-12-30T00:14:12.360Z  INFO 38956 --- [registo-horas-service] [http-nio-8083-exec-7] c.a.r.s.impl.RegistosHorasServiceImpl    : Encontrados 8 registros na página 0 de 3
-2025-12-30T00:16:30.678Z  WARN 38956 --- [registo-horas-service] [HikariPool-1:housekeeper] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Thread starvation or clock leap detected (housekeeper delta=2m12s685ms375µs).
-2025-12-30T00:16:30.697Z  INFO 38956 --- [registo-horas-service] [SpringApplicationShutdownHook] o.s.b.w.e.tomcat.GracefulShutdown        : Commencing graceful shutdown. Waiting for active requests to complete
-2025-12-30T00:17:00.718Z  INFO 38956 --- [registo-horas-service] [SpringApplicationShutdownHook] o.s.c.support.DefaultLifecycleProcessor  : Shutdown phase 2147482623 ends with 1 bean still running after timeout of 30000ms: [webServerGracefulShutdown]
-2025-12-30T00:17:00.731Z  INFO 38956 --- [registo-horas-service] [tomcat-shutdown] o.s.b.w.e.tomcat.GracefulShutdown        : Graceful shutdown aborted with one or more requests still active
-2025-12-30T00:17:07.800Z  INFO 38956 --- [registo-horas-service] [SpringApplicationShutdownHook] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'default'
-2025-12-30T00:17:07.802Z  INFO 38956 --- [registo-horas-service] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
-2025-12-30T00:17:07.807Z  INFO 38956 --- [registo-horas-service] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
-2025-12-30T00:21:31.324Z  INFO 19620 --- [registo-horas-service] [main] c.a.r.RegistoHorasServiceApplication     : Starting RegistoHorasServiceApplication using Java 23.0.1 with PID 19620 (D:\Exemplo projecto\microserviços\registo-horas-service\target\classes started by User in D:\Exemplo projecto\microserviços\registo-horas-service)
-2025-12-30T00:21:31.325Z  INFO 19620 --- [registo-horas-service] [main] c.a.r.RegistoHorasServiceApplication     : The following 1 profile is active: "dev"
-2025-12-30T00:21:32.271Z  INFO 19620 --- [registo-horas-service] [main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
-2025-12-30T00:21:32.394Z  INFO 19620 --- [registo-horas-service] [main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 114 ms. Found 5 JPA repository interfaces.
-2025-12-30T00:21:32.829Z  INFO 19620 --- [registo-horas-service] [main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8083 (http)
-2025-12-30T00:21:32.841Z  INFO 19620 --- [registo-horas-service] [main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
-2025-12-30T00:21:32.842Z  INFO 19620 --- [registo-horas-service] [main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.48]
-2025-12-30T00:21:32.896Z  INFO 19620 --- [registo-horas-service] [main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
-2025-12-30T00:21:32.896Z  INFO 19620 --- [registo-horas-service] [main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 1526 ms
-2025-12-30T00:21:33.610Z  INFO 19620 --- [registo-horas-service] [main] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
-2025-12-30T00:21:33.650Z  INFO 19620 --- [registo-horas-service] [main] org.hibernate.Version                    : HHH000412: Hibernate ORM core version 6.6.33.Final
-2025-12-30T00:21:33.687Z  INFO 19620 --- [registo-horas-service] [main] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
-2025-12-30T00:21:33.910Z  INFO 19620 --- [registo-horas-service] [main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
-2025-12-30T00:21:33.935Z  INFO 19620 --- [registo-horas-service] [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
-2025-12-30T00:21:34.044Z  INFO 19620 --- [registo-horas-service] [main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@2f143ea
-2025-12-30T00:21:34.045Z  INFO 19620 --- [registo-horas-service] [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
-2025-12-30T00:21:34.067Z  WARN 19620 --- [registo-horas-service] [main] org.hibernate.orm.deprecation            : HHH90000025: PostgreSQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
-2025-12-30T00:21:34.084Z  INFO 19620 --- [registo-horas-service] [main] org.hibernate.orm.connections.pooling    : HHH10001005: Database info:
+2025-12-31T00:26:15.325Z  INFO 10348 --- [registo-horas-service] [main] r$InitializeUserDetailsManagerConfigurer : Global AuthenticationManager configured with UserDetailsService bean with name inMemoryUserDetailsManager
+2025-12-31T00:26:15.799Z  INFO 10348 --- [registo-horas-service] [main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8083 (http) with context path '/'
+2025-12-31T00:26:15.809Z  INFO 10348 --- [registo-horas-service] [main] c.a.r.RegistoHorasServiceApplication     : Started RegistoHorasServiceApplication in 6.063 seconds (process running for 6.687)
+2025-12-31T00:26:15.912Z  INFO 10348 --- [registo-horas-service] [RMI TCP Connection(2)-172.29.128.1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+2025-12-31T00:26:15.913Z  INFO 10348 --- [registo-horas-service] [RMI TCP Connection(2)-172.29.128.1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+2025-12-31T00:26:15.913Z  INFO 10348 --- [registo-horas-service] [RMI TCP Connection(1)-172.29.128.1] o.s.a.r.c.CachingConnectionFactory       : Attempting to connect to: [localhost:5672]
+2025-12-31T00:26:15.914Z  INFO 10348 --- [registo-horas-service] [RMI TCP Connection(2)-172.29.128.1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 1 ms
+2025-12-31T00:26:15.962Z  INFO 10348 --- [registo-horas-service] [RMI TCP Connection(1)-172.29.128.1] o.s.a.r.c.CachingConnectionFactory       : Created new connection: rabbitConnectionFactory#1c097e3:0/SimpleConnection@61dc77f5 [delegate=amqp://guest@127.0.0.1:5672/, localPort=58873]
+2025-12-31T00:46:00.555Z  INFO 10348 --- [registo-horas-service] [SpringApplicationShutdownHook] o.s.b.w.e.tomcat.GracefulShutdown        : Commencing graceful shutdown. Waiting for active requests to complete
+2025-12-31T00:46:00.559Z  INFO 10348 --- [registo-horas-service] [tomcat-shutdown] o.s.b.w.e.tomcat.GracefulShutdown        : Graceful shutdown complete
+2025-12-31T00:46:02.643Z  INFO 10348 --- [registo-horas-service] [SpringApplicationShutdownHook] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'default'
+2025-12-31T00:46:02.645Z  INFO 10348 --- [registo-horas-service] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
+2025-12-31T00:46:02.647Z  INFO 10348 --- [registo-horas-service] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
+2025-12-31T00:46:05.043Z  INFO 48328 --- [registo-horas-service] [main] c.a.r.RegistoHorasServiceApplication     : Starting RegistoHorasServiceApplication using Java 23.0.1 with PID 48328 (D:\Exemplo projecto\microserviços\registo-horas-service\target\classes started by User in D:\Exemplo projecto\microserviços\registo-horas-service)
+2025-12-31T00:46:05.044Z  INFO 48328 --- [registo-horas-service] [main] c.a.r.RegistoHorasServiceApplication     : The following 1 profile is active: "dev"
+2025-12-31T00:46:05.904Z  INFO 48328 --- [registo-horas-service] [main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2025-12-31T00:46:06.009Z  INFO 48328 --- [registo-horas-service] [main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 100 ms. Found 5 JPA repository interfaces.
+2025-12-31T00:46:06.407Z  INFO 48328 --- [registo-horas-service] [main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8083 (http)
+2025-12-31T00:46:06.417Z  INFO 48328 --- [registo-horas-service] [main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2025-12-31T00:46:06.417Z  INFO 48328 --- [registo-horas-service] [main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.48]
+2025-12-31T00:46:06.466Z  INFO 48328 --- [registo-horas-service] [main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2025-12-31T00:46:06.467Z  INFO 48328 --- [registo-horas-service] [main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 1383 ms
+2025-12-31T00:46:07.099Z  INFO 48328 --- [registo-horas-service] [main] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+2025-12-31T00:46:07.135Z  INFO 48328 --- [registo-horas-service] [main] org.hibernate.Version                    : HHH000412: Hibernate ORM core version 6.6.33.Final
+2025-12-31T00:46:07.158Z  INFO 48328 --- [registo-horas-service] [main] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
+2025-12-31T00:46:07.349Z  INFO 48328 --- [registo-horas-service] [main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2025-12-31T00:46:07.369Z  INFO 48328 --- [registo-horas-service] [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2025-12-31T00:46:07.472Z  INFO 48328 --- [registo-horas-service] [main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@5d2bfc9f
+2025-12-31T00:46:07.474Z  INFO 48328 --- [registo-horas-service] [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2025-12-31T00:46:07.495Z  WARN 48328 --- [registo-horas-service] [main] org.hibernate.orm.deprecation            : HHH90000025: PostgreSQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2025-12-31T00:46:07.510Z  INFO 48328 --- [registo-horas-service] [main] org.hibernate.orm.connections.pooling    : HHH10001005: Database info:
 	Database JDBC URL [Connecting through datasource 'HikariDataSource (HikariPool-1)']
 	Database driver: undefined/unknown
 	Database version: 15.15
@@ -85,50 +71,47 @@ This generated password is for development use only. Your security configuration
 	Isolation level: undefined/unknown
 	Minimum pool size: undefined/unknown
 	Maximum pool size: undefined/unknown
-2025-12-30T00:21:34.839Z  INFO 19620 --- [registo-horas-service] [main] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
-2025-12-30T00:21:34.886Z  INFO 19620 --- [registo-horas-service] [main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
-2025-12-30T00:21:35.389Z  INFO 19620 --- [registo-horas-service] [main] o.s.d.j.r.query.QueryEnhancerFactory     : Hibernate is in classpath; If applicable, HQL parser will be used.
-2025-12-30T00:21:36.979Z  INFO 19620 --- [registo-horas-service] [main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 5 endpoints beneath base path '/actuator'
-2025-12-30T00:21:37.013Z  WARN 19620 --- [registo-horas-service] [main] .s.s.UserDetailsServiceAutoConfiguration : 
+2025-12-31T00:46:08.173Z  INFO 48328 --- [registo-horas-service] [main] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2025-12-31T00:46:08.217Z  INFO 48328 --- [registo-horas-service] [main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2025-12-31T00:46:08.649Z  INFO 48328 --- [registo-horas-service] [main] o.s.d.j.r.query.QueryEnhancerFactory     : Hibernate is in classpath; If applicable, HQL parser will be used.
+2025-12-31T00:46:10.150Z  INFO 48328 --- [registo-horas-service] [main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 5 endpoints beneath base path '/actuator'
+2025-12-31T00:46:10.182Z  WARN 48328 --- [registo-horas-service] [main] .s.s.UserDetailsServiceAutoConfiguration : 
 
-Using generated security password: 36714412-0218-4d06-987a-769599b144c1
+Using generated security password: a7640064-ef9b-4923-b927-05d84e86f5e8
 
 This generated password is for development use only. Your security configuration must be updated before running your application in production.
 
-2025-12-30T00:21:37.020Z  INFO 19620 --- [registo-horas-service] [main] r$InitializeUserDetailsManagerConfigurer : Global AuthenticationManager configured with UserDetailsService bean with name inMemoryUserDetailsManager
-2025-12-30T00:21:37.598Z  INFO 19620 --- [registo-horas-service] [main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8083 (http) with context path '/'
-2025-12-30T00:21:37.611Z  INFO 19620 --- [registo-horas-service] [main] c.a.r.RegistoHorasServiceApplication     : Started RegistoHorasServiceApplication in 6.726 seconds (process running for 7.519)
-2025-12-30T00:21:37.951Z  INFO 19620 --- [registo-horas-service] [RMI TCP Connection(4)-172.29.128.1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
-2025-12-30T00:21:37.951Z  INFO 19620 --- [registo-horas-service] [RMI TCP Connection(2)-172.29.128.1] o.s.a.r.c.CachingConnectionFactory       : Attempting to connect to: [localhost:5672]
-2025-12-30T00:21:37.951Z  INFO 19620 --- [registo-horas-service] [RMI TCP Connection(4)-172.29.128.1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
-2025-12-30T00:21:37.953Z  INFO 19620 --- [registo-horas-service] [RMI TCP Connection(4)-172.29.128.1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 2 ms
-2025-12-30T00:21:38.001Z  INFO 19620 --- [registo-horas-service] [RMI TCP Connection(2)-172.29.128.1] o.s.a.r.c.CachingConnectionFactory       : Created new connection: rabbitConnectionFactory#6038186d:0/SimpleConnection@6ebe7d16 [delegate=amqp://guest@127.0.0.1:5672/, localPort=49726]
-2025-12-30T00:22:16.256Z  INFO 19620 --- [registo-horas-service] [http-nio-8083-exec-1] c.a.r.s.impl.RegistosHorasServiceImpl    : Encontrados 8 registros na página 0 de 3
-2025-12-30T00:22:16.303Z  INFO 19620 --- [registo-horas-service] [http-nio-8083-exec-2] c.a.r.s.impl.RegistosHorasServiceImpl    : Encontrados 8 registros na página 0 de 3
-2025-12-30T00:22:58.841Z  WARN 19620 --- [registo-horas-service] [HikariPool-1:housekeeper] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Thread starvation or clock leap detected (housekeeper delta=54s685ms401µs200ns).
-2025-12-30T00:24:32.568Z  INFO 19620 --- [registo-horas-service] [SpringApplicationShutdownHook] o.s.b.w.e.tomcat.GracefulShutdown        : Commencing graceful shutdown. Waiting for active requests to complete
-2025-12-30T00:24:32.571Z  INFO 19620 --- [registo-horas-service] [tomcat-shutdown] o.s.b.w.e.tomcat.GracefulShutdown        : Graceful shutdown complete
-2025-12-30T00:24:34.658Z  INFO 19620 --- [registo-horas-service] [SpringApplicationShutdownHook] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'default'
-2025-12-30T00:24:34.662Z  INFO 19620 --- [registo-horas-service] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
-2025-12-30T00:24:34.664Z  INFO 19620 --- [registo-horas-service] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
-2025-12-30T00:24:40.338Z  INFO 32776 --- [registo-horas-service] [main] c.a.r.RegistoHorasServiceApplication     : Starting RegistoHorasServiceApplication using Java 23.0.1 with PID 32776 (D:\Exemplo projecto\microserviços\registo-horas-service\target\classes started by User in D:\Exemplo projecto\microserviços\registo-horas-service)
-2025-12-30T00:24:40.338Z  INFO 32776 --- [registo-horas-service] [main] c.a.r.RegistoHorasServiceApplication     : The following 1 profile is active: "dev"
-2025-12-30T00:24:41.200Z  INFO 32776 --- [registo-horas-service] [main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
-2025-12-30T00:24:41.305Z  INFO 32776 --- [registo-horas-service] [main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 98 ms. Found 5 JPA repository interfaces.
-2025-12-30T00:24:41.707Z  INFO 32776 --- [registo-horas-service] [main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8083 (http)
-2025-12-30T00:24:41.717Z  INFO 32776 --- [registo-horas-service] [main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
-2025-12-30T00:24:41.717Z  INFO 32776 --- [registo-horas-service] [main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.48]
-2025-12-30T00:24:41.770Z  INFO 32776 --- [registo-horas-service] [main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
-2025-12-30T00:24:41.770Z  INFO 32776 --- [registo-horas-service] [main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 1399 ms
-2025-12-30T00:24:42.412Z  INFO 32776 --- [registo-horas-service] [main] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
-2025-12-30T00:24:42.447Z  INFO 32776 --- [registo-horas-service] [main] org.hibernate.Version                    : HHH000412: Hibernate ORM core version 6.6.33.Final
-2025-12-30T00:24:42.473Z  INFO 32776 --- [registo-horas-service] [main] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
-2025-12-30T00:24:42.662Z  INFO 32776 --- [registo-horas-service] [main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
-2025-12-30T00:24:42.684Z  INFO 32776 --- [registo-horas-service] [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
-2025-12-30T00:24:42.786Z  INFO 32776 --- [registo-horas-service] [main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@71b6edfb
-2025-12-30T00:24:42.787Z  INFO 32776 --- [registo-horas-service] [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
-2025-12-30T00:24:42.809Z  WARN 32776 --- [registo-horas-service] [main] org.hibernate.orm.deprecation            : HHH90000025: PostgreSQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
-2025-12-30T00:24:42.825Z  INFO 32776 --- [registo-horas-service] [main] org.hibernate.orm.connections.pooling    : HHH10001005: Database info:
+2025-12-31T00:46:10.188Z  INFO 48328 --- [registo-horas-service] [main] r$InitializeUserDetailsManagerConfigurer : Global AuthenticationManager configured with UserDetailsService bean with name inMemoryUserDetailsManager
+2025-12-31T00:46:10.658Z  INFO 48328 --- [registo-horas-service] [main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8083 (http) with context path '/'
+2025-12-31T00:46:10.668Z  INFO 48328 --- [registo-horas-service] [main] c.a.r.RegistoHorasServiceApplication     : Started RegistoHorasServiceApplication in 6.004 seconds (process running for 6.575)
+2025-12-31T00:46:10.822Z  INFO 48328 --- [registo-horas-service] [RMI TCP Connection(2)-172.29.128.1] o.s.a.r.c.CachingConnectionFactory       : Attempting to connect to: [localhost:5672]
+2025-12-31T00:46:10.825Z  INFO 48328 --- [registo-horas-service] [RMI TCP Connection(3)-172.29.128.1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+2025-12-31T00:46:10.825Z  INFO 48328 --- [registo-horas-service] [RMI TCP Connection(3)-172.29.128.1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+2025-12-31T00:46:10.826Z  INFO 48328 --- [registo-horas-service] [RMI TCP Connection(3)-172.29.128.1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 1 ms
+2025-12-31T00:46:10.866Z  INFO 48328 --- [registo-horas-service] [RMI TCP Connection(2)-172.29.128.1] o.s.a.r.c.CachingConnectionFactory       : Created new connection: rabbitConnectionFactory#2a930ec6:0/SimpleConnection@cb1e30b [delegate=amqp://guest@127.0.0.1:5672/, localPort=49834]
+2025-12-31T01:09:33.818Z  INFO 48328 --- [registo-horas-service] [SpringApplicationShutdownHook] o.s.b.w.e.tomcat.GracefulShutdown        : Commencing graceful shutdown. Waiting for active requests to complete
+2025-12-31T01:09:33.822Z  INFO 48328 --- [registo-horas-service] [tomcat-shutdown] o.s.b.w.e.tomcat.GracefulShutdown        : Graceful shutdown complete
+2025-12-31T01:09:35.899Z  INFO 48328 --- [registo-horas-service] [SpringApplicationShutdownHook] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'default'
+2025-12-31T01:09:35.902Z  INFO 48328 --- [registo-horas-service] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
+2025-12-31T01:09:35.904Z  INFO 48328 --- [registo-horas-service] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
+2025-12-31T01:09:39.436Z  INFO 21980 --- [registo-horas-service] [main] c.a.r.RegistoHorasServiceApplication     : Starting RegistoHorasServiceApplication using Java 23.0.1 with PID 21980 (D:\Exemplo projecto\microserviços\registo-horas-service\target\classes started by User in D:\Exemplo projecto\microserviços\registo-horas-service)
+2025-12-31T01:09:39.438Z  INFO 21980 --- [registo-horas-service] [main] c.a.r.RegistoHorasServiceApplication     : The following 1 profile is active: "dev"
+2025-12-31T01:09:40.362Z  INFO 21980 --- [registo-horas-service] [main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2025-12-31T01:09:40.471Z  INFO 21980 --- [registo-horas-service] [main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 102 ms. Found 5 JPA repository interfaces.
+2025-12-31T01:09:40.881Z  INFO 21980 --- [registo-horas-service] [main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8083 (http)
+2025-12-31T01:09:40.892Z  INFO 21980 --- [registo-horas-service] [main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2025-12-31T01:09:40.893Z  INFO 21980 --- [registo-horas-service] [main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.48]
+2025-12-31T01:09:40.946Z  INFO 21980 --- [registo-horas-service] [main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2025-12-31T01:09:40.947Z  INFO 21980 --- [registo-horas-service] [main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 1466 ms
+2025-12-31T01:09:41.652Z  INFO 21980 --- [registo-horas-service] [main] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+2025-12-31T01:09:41.687Z  INFO 21980 --- [registo-horas-service] [main] org.hibernate.Version                    : HHH000412: Hibernate ORM core version 6.6.33.Final
+2025-12-31T01:09:41.710Z  INFO 21980 --- [registo-horas-service] [main] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
+2025-12-31T01:09:41.905Z  INFO 21980 --- [registo-horas-service] [main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2025-12-31T01:09:41.927Z  INFO 21980 --- [registo-horas-service] [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2025-12-31T01:09:42.046Z  INFO 21980 --- [registo-horas-service] [main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@7fb28ed
+2025-12-31T01:09:42.048Z  INFO 21980 --- [registo-horas-service] [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2025-12-31T01:09:42.070Z  WARN 21980 --- [registo-horas-service] [main] org.hibernate.orm.deprecation            : HHH90000025: PostgreSQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2025-12-31T01:09:42.087Z  INFO 21980 --- [registo-horas-service] [main] org.hibernate.orm.connections.pooling    : HHH10001005: Database info:
 	Database JDBC URL [Connecting through datasource 'HikariDataSource (HikariPool-1)']
 	Database driver: undefined/unknown
 	Database version: 15.15
@@ -136,61 +119,42 @@ This generated password is for development use only. Your security configuration
 	Isolation level: undefined/unknown
 	Minimum pool size: undefined/unknown
 	Maximum pool size: undefined/unknown
-2025-12-30T00:24:43.480Z  INFO 32776 --- [registo-horas-service] [main] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
-2025-12-30T00:24:43.528Z  INFO 32776 --- [registo-horas-service] [main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
-2025-12-30T00:24:43.967Z  INFO 32776 --- [registo-horas-service] [main] o.s.d.j.r.query.QueryEnhancerFactory     : Hibernate is in classpath; If applicable, HQL parser will be used.
-2025-12-30T00:24:45.438Z  INFO 32776 --- [registo-horas-service] [main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 5 endpoints beneath base path '/actuator'
-2025-12-30T00:24:45.468Z  WARN 32776 --- [registo-horas-service] [main] .s.s.UserDetailsServiceAutoConfiguration : 
+2025-12-31T01:09:42.769Z  INFO 21980 --- [registo-horas-service] [main] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2025-12-31T01:09:42.814Z  INFO 21980 --- [registo-horas-service] [main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2025-12-31T01:09:43.319Z  INFO 21980 --- [registo-horas-service] [main] o.s.d.j.r.query.QueryEnhancerFactory     : Hibernate is in classpath; If applicable, HQL parser will be used.
+2025-12-31T01:09:44.895Z  INFO 21980 --- [registo-horas-service] [main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 5 endpoints beneath base path '/actuator'
+2025-12-31T01:09:44.928Z  WARN 21980 --- [registo-horas-service] [main] .s.s.UserDetailsServiceAutoConfiguration : 
 
-Using generated security password: e3a0c4df-09ec-426e-9dd6-3d4c8ad68ba3
+Using generated security password: 6f70c2a3-a992-43fe-97f1-44c3f7e850f4
 
 This generated password is for development use only. Your security configuration must be updated before running your application in production.
 
-2025-12-30T00:24:45.475Z  INFO 32776 --- [registo-horas-service] [main] r$InitializeUserDetailsManagerConfigurer : Global AuthenticationManager configured with UserDetailsService bean with name inMemoryUserDetailsManager
-2025-12-30T00:24:45.946Z  INFO 32776 --- [registo-horas-service] [main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8083 (http) with context path '/'
-2025-12-30T00:24:45.957Z  INFO 32776 --- [registo-horas-service] [main] c.a.r.RegistoHorasServiceApplication     : Started RegistoHorasServiceApplication in 6.011 seconds (process running for 6.55)
-2025-12-30T00:24:46.115Z  INFO 32776 --- [registo-horas-service] [RMI TCP Connection(2)-172.29.128.1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
-2025-12-30T00:24:46.115Z  INFO 32776 --- [registo-horas-service] [RMI TCP Connection(2)-172.29.128.1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
-2025-12-30T00:24:46.116Z  INFO 32776 --- [registo-horas-service] [RMI TCP Connection(2)-172.29.128.1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 1 ms
-2025-12-30T00:24:46.117Z  INFO 32776 --- [registo-horas-service] [RMI TCP Connection(1)-172.29.128.1] o.s.a.r.c.CachingConnectionFactory       : Attempting to connect to: [localhost:5672]
-2025-12-30T00:24:46.167Z  INFO 32776 --- [registo-horas-service] [RMI TCP Connection(1)-172.29.128.1] o.s.a.r.c.CachingConnectionFactory       : Created new connection: rabbitConnectionFactory#26378a64:0/SimpleConnection@125ca89e [delegate=amqp://guest@127.0.0.1:5672/, localPort=63172]
-2025-12-30T00:24:54.970Z  INFO 32776 --- [registo-horas-service] [http-nio-8083-exec-1] c.a.r.s.impl.RegistosHorasServiceImpl    : Encontrados 8 registros na página 0 de 3
-2025-12-30T00:24:55.013Z  INFO 32776 --- [registo-horas-service] [http-nio-8083-exec-2] c.a.r.s.impl.RegistosHorasServiceImpl    : Encontrados 8 registros na página 0 de 3
-2025-12-30T00:29:16.821Z  INFO 32776 --- [registo-horas-service] [http-nio-8083-exec-6] c.a.r.s.impl.RegistosHorasServiceImpl    : Encontrados 8 registros na página 0 de 3
-2025-12-30T00:29:16.836Z  INFO 32776 --- [registo-horas-service] [http-nio-8083-exec-5] c.a.r.s.impl.RegistosHorasServiceImpl    : Encontrados 8 registros na página 0 de 3
-2025-12-30T00:38:36.624Z  INFO 32776 --- [registo-horas-service] [http-nio-8083-exec-9] c.a.r.s.impl.RegistosHorasServiceImpl    : Encontrados 8 registros na página 0 de 3
-2025-12-30T00:38:36.639Z  INFO 32776 --- [registo-horas-service] [http-nio-8083-exec-8] c.a.r.s.impl.RegistosHorasServiceImpl    : Encontrados 8 registros na página 0 de 3
-2025-12-30T00:38:40.546Z  INFO 32776 --- [registo-horas-service] [http-nio-8083-exec-1] c.a.r.s.impl.RegistosHorasServiceImpl    : Encontrados 8 registros na página 0 de 3
-2025-12-30T00:38:40.559Z  INFO 32776 --- [registo-horas-service] [http-nio-8083-exec-2] c.a.r.s.impl.RegistosHorasServiceImpl    : Encontrados 8 registros na página 0 de 3
-2025-12-30T00:39:39.094Z  INFO 32776 --- [registo-horas-service] [http-nio-8083-exec-7] c.a.r.s.impl.RegistosHorasServiceImpl    : Encontrados 8 registros na página 0 de 3
-2025-12-30T00:39:39.107Z  INFO 32776 --- [registo-horas-service] [http-nio-8083-exec-6] c.a.r.s.impl.RegistosHorasServiceImpl    : Encontrados 8 registros na página 0 de 3
-2025-12-30T00:53:32.457Z  INFO 32776 --- [registo-horas-service] [http-nio-8083-exec-10] c.a.r.s.impl.TrainingPlanServiceImpl     : Buscando plano ativo e concluído na base para o utilizador: adminhoras
-2025-12-30T00:53:32.457Z  INFO 32776 --- [registo-horas-service] [http-nio-8083-exec-5] c.a.r.s.impl.TrainingPlanServiceImpl     : Buscando plano ativo e concluído na base para o utilizador: adminhoras
-2025-12-30T01:07:25.398Z ERROR 32776 --- [registo-horas-service] [http-nio-8083-exec-9] c.a.r.exception.GlobalExceptionHandler   : Acesso negado: Access Denied
-2025-12-30T01:07:25.409Z ERROR 32776 --- [registo-horas-service] [http-nio-8083-exec-8] c.a.r.exception.GlobalExceptionHandler   : Acesso negado: Access Denied
-2025-12-30T02:51:05.416Z  INFO 32776 --- [registo-horas-service] [SpringApplicationShutdownHook] o.s.b.w.e.tomcat.GracefulShutdown        : Commencing graceful shutdown. Waiting for active requests to complete
-2025-12-30T02:51:05.425Z  INFO 32776 --- [registo-horas-service] [tomcat-shutdown] o.s.b.w.e.tomcat.GracefulShutdown        : Graceful shutdown complete
-2025-12-30T02:51:07.543Z  INFO 32776 --- [registo-horas-service] [SpringApplicationShutdownHook] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'default'
-2025-12-30T02:51:07.549Z  INFO 32776 --- [registo-horas-service] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
-2025-12-30T02:51:07.552Z  INFO 32776 --- [registo-horas-service] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
-2025-12-30T02:51:11.276Z  INFO 29164 --- [registo-horas-service] [main] c.a.r.RegistoHorasServiceApplication     : Starting RegistoHorasServiceApplication using Java 23.0.1 with PID 29164 (D:\Exemplo projecto\microserviços\registo-horas-service\target\classes started by User in D:\Exemplo projecto\microserviços\registo-horas-service)
-2025-12-30T02:51:11.277Z  INFO 29164 --- [registo-horas-service] [main] c.a.r.RegistoHorasServiceApplication     : The following 1 profile is active: "dev"
-2025-12-30T02:51:12.158Z  INFO 29164 --- [registo-horas-service] [main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
-2025-12-30T02:51:12.264Z  INFO 29164 --- [registo-horas-service] [main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 100 ms. Found 5 JPA repository interfaces.
-2025-12-30T02:51:12.678Z  INFO 29164 --- [registo-horas-service] [main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8083 (http)
-2025-12-30T02:51:12.688Z  INFO 29164 --- [registo-horas-service] [main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
-2025-12-30T02:51:12.688Z  INFO 29164 --- [registo-horas-service] [main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.48]
-2025-12-30T02:51:12.740Z  INFO 29164 --- [registo-horas-service] [main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
-2025-12-30T02:51:12.740Z  INFO 29164 --- [registo-horas-service] [main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 1425 ms
-2025-12-30T02:51:13.375Z  INFO 29164 --- [registo-horas-service] [main] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
-2025-12-30T02:51:13.412Z  INFO 29164 --- [registo-horas-service] [main] org.hibernate.Version                    : HHH000412: Hibernate ORM core version 6.6.33.Final
-2025-12-30T02:51:13.435Z  INFO 29164 --- [registo-horas-service] [main] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
-2025-12-30T02:51:13.628Z  INFO 29164 --- [registo-horas-service] [main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
-2025-12-30T02:51:13.650Z  INFO 29164 --- [registo-horas-service] [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
-2025-12-30T02:51:13.754Z  INFO 29164 --- [registo-horas-service] [main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@6d7a343f
-2025-12-30T02:51:13.755Z  INFO 29164 --- [registo-horas-service] [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
-2025-12-30T02:51:13.786Z  WARN 29164 --- [registo-horas-service] [main] org.hibernate.orm.deprecation            : HHH90000025: PostgreSQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
-2025-12-30T02:51:13.804Z  INFO 29164 --- [registo-horas-service] [main] org.hibernate.orm.connections.pooling    : HHH10001005: Database info:
+2025-12-31T01:09:44.933Z  INFO 21980 --- [registo-horas-service] [main] r$InitializeUserDetailsManagerConfigurer : Global AuthenticationManager configured with UserDetailsService bean with name inMemoryUserDetailsManager
+2025-12-31T01:09:45.390Z  INFO 21980 --- [registo-horas-service] [main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8083 (http) with context path '/'
+2025-12-31T01:09:45.399Z  INFO 21980 --- [registo-horas-service] [main] c.a.r.RegistoHorasServiceApplication     : Started RegistoHorasServiceApplication in 6.364 seconds (process running for 6.948)
+2025-12-31T01:09:45.401Z  INFO 21980 --- [registo-horas-service] [SpringApplicationShutdownHook] o.s.b.w.e.tomcat.GracefulShutdown        : Commencing graceful shutdown. Waiting for active requests to complete
+2025-12-31T01:09:45.405Z  INFO 21980 --- [registo-horas-service] [tomcat-shutdown] o.s.b.w.e.tomcat.GracefulShutdown        : Graceful shutdown complete
+2025-12-31T01:09:47.488Z  INFO 21980 --- [registo-horas-service] [SpringApplicationShutdownHook] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'default'
+2025-12-31T01:09:47.491Z  INFO 21980 --- [registo-horas-service] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
+2025-12-31T01:09:47.496Z  INFO 21980 --- [registo-horas-service] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
+2025-12-31T01:10:40.567Z  INFO 51756 --- [registo-horas-service] [main] c.a.r.RegistoHorasServiceApplication     : Starting RegistoHorasServiceApplication using Java 23.0.1 with PID 51756 (D:\Exemplo projecto\microserviços\registo-horas-service\target\classes started by User in D:\Exemplo projecto\microserviços\registo-horas-service)
+2025-12-31T01:10:40.569Z  INFO 51756 --- [registo-horas-service] [main] c.a.r.RegistoHorasServiceApplication     : The following 1 profile is active: "dev"
+2025-12-31T01:10:41.543Z  INFO 51756 --- [registo-horas-service] [main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2025-12-31T01:10:41.663Z  INFO 51756 --- [registo-horas-service] [main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 112 ms. Found 5 JPA repository interfaces.
+2025-12-31T01:10:42.093Z  INFO 51756 --- [registo-horas-service] [main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8083 (http)
+2025-12-31T01:10:42.104Z  INFO 51756 --- [registo-horas-service] [main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2025-12-31T01:10:42.105Z  INFO 51756 --- [registo-horas-service] [main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.48]
+2025-12-31T01:10:42.161Z  INFO 51756 --- [registo-horas-service] [main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2025-12-31T01:10:42.161Z  INFO 51756 --- [registo-horas-service] [main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 1553 ms
+2025-12-31T01:10:42.820Z  INFO 51756 --- [registo-horas-service] [main] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+2025-12-31T01:10:42.855Z  INFO 51756 --- [registo-horas-service] [main] org.hibernate.Version                    : HHH000412: Hibernate ORM core version 6.6.33.Final
+2025-12-31T01:10:42.877Z  INFO 51756 --- [registo-horas-service] [main] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
+2025-12-31T01:10:43.087Z  INFO 51756 --- [registo-horas-service] [main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2025-12-31T01:10:43.118Z  INFO 51756 --- [registo-horas-service] [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2025-12-31T01:10:43.222Z  INFO 51756 --- [registo-horas-service] [main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@1784fcab
+2025-12-31T01:10:43.224Z  INFO 51756 --- [registo-horas-service] [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2025-12-31T01:10:43.246Z  WARN 51756 --- [registo-horas-service] [main] org.hibernate.orm.deprecation            : HHH90000025: PostgreSQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2025-12-31T01:10:43.263Z  INFO 51756 --- [registo-horas-service] [main] org.hibernate.orm.connections.pooling    : HHH10001005: Database info:
 	Database JDBC URL [Connecting through datasource 'HikariDataSource (HikariPool-1)']
 	Database driver: undefined/unknown
 	Database version: 15.15
@@ -198,71 +162,26 @@ This generated password is for development use only. Your security configuration
 	Isolation level: undefined/unknown
 	Minimum pool size: undefined/unknown
 	Maximum pool size: undefined/unknown
-2025-12-30T02:51:14.513Z  INFO 29164 --- [registo-horas-service] [main] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
-2025-12-30T02:51:14.572Z  INFO 29164 --- [registo-horas-service] [main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
-2025-12-30T02:51:15.019Z  INFO 29164 --- [registo-horas-service] [main] o.s.d.j.r.query.QueryEnhancerFactory     : Hibernate is in classpath; If applicable, HQL parser will be used.
-2025-12-30T02:51:16.521Z  INFO 29164 --- [registo-horas-service] [main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 5 endpoints beneath base path '/actuator'
-2025-12-30T02:51:16.553Z  WARN 29164 --- [registo-horas-service] [main] .s.s.UserDetailsServiceAutoConfiguration : 
+2025-12-31T01:10:43.947Z  INFO 51756 --- [registo-horas-service] [main] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2025-12-31T01:10:43.991Z  INFO 51756 --- [registo-horas-service] [main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2025-12-31T01:10:44.427Z  INFO 51756 --- [registo-horas-service] [main] o.s.d.j.r.query.QueryEnhancerFactory     : Hibernate is in classpath; If applicable, HQL parser will be used.
+2025-12-31T01:10:45.894Z  INFO 51756 --- [registo-horas-service] [main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 5 endpoints beneath base path '/actuator'
+2025-12-31T01:10:45.924Z  WARN 51756 --- [registo-horas-service] [main] .s.s.UserDetailsServiceAutoConfiguration : 
 
-Using generated security password: 197b218f-1b26-4ba1-bcfc-375f19d52338
-
-This generated password is for development use only. Your security configuration must be updated before running your application in production.
-
-2025-12-30T02:51:16.559Z  INFO 29164 --- [registo-horas-service] [main] r$InitializeUserDetailsManagerConfigurer : Global AuthenticationManager configured with UserDetailsService bean with name inMemoryUserDetailsManager
-2025-12-30T02:51:17.037Z  INFO 29164 --- [registo-horas-service] [main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8083 (http) with context path '/'
-2025-12-30T02:51:17.047Z  INFO 29164 --- [registo-horas-service] [main] c.a.r.RegistoHorasServiceApplication     : Started RegistoHorasServiceApplication in 6.152 seconds (process running for 6.71)
-2025-12-30T02:51:17.596Z  INFO 29164 --- [registo-horas-service] [RMI TCP Connection(2)-172.29.128.1] o.s.a.r.c.CachingConnectionFactory       : Attempting to connect to: [localhost:5672]
-2025-12-30T02:51:17.598Z  INFO 29164 --- [registo-horas-service] [RMI TCP Connection(3)-172.29.128.1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
-2025-12-30T02:51:17.599Z  INFO 29164 --- [registo-horas-service] [RMI TCP Connection(3)-172.29.128.1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
-2025-12-30T02:51:17.599Z  INFO 29164 --- [registo-horas-service] [RMI TCP Connection(3)-172.29.128.1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 0 ms
-2025-12-30T02:51:17.648Z  INFO 29164 --- [registo-horas-service] [RMI TCP Connection(2)-172.29.128.1] o.s.a.r.c.CachingConnectionFactory       : Created new connection: rabbitConnectionFactory#20f9e8e5:0/SimpleConnection@418c62fa [delegate=amqp://guest@127.0.0.1:5672/, localPort=62392]
-2025-12-30T03:36:35.452Z  INFO 29164 --- [registo-horas-service] [http-nio-8083-exec-2] c.a.r.s.impl.RegistosHorasServiceImpl    : Encontrados 8 registros na página 0 de 3
-2025-12-30T03:36:35.478Z  INFO 29164 --- [registo-horas-service] [http-nio-8083-exec-4] c.a.r.s.impl.RegistosHorasServiceImpl    : Encontrados 8 registros na página 0 de 3
-2025-12-30T04:50:23.464Z  INFO 29164 --- [registo-horas-service] [SpringApplicationShutdownHook] o.s.b.w.e.tomcat.GracefulShutdown        : Commencing graceful shutdown. Waiting for active requests to complete
-2025-12-30T04:50:23.472Z  INFO 29164 --- [registo-horas-service] [tomcat-shutdown] o.s.b.w.e.tomcat.GracefulShutdown        : Graceful shutdown complete
-2025-12-30T04:50:25.605Z  INFO 29164 --- [registo-horas-service] [SpringApplicationShutdownHook] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'default'
-2025-12-30T04:50:25.612Z  INFO 29164 --- [registo-horas-service] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
-2025-12-30T04:50:25.616Z  INFO 29164 --- [registo-horas-service] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
-2025-12-30T04:53:17.608Z  INFO 43872 --- [registo-horas-service] [main] c.a.r.RegistoHorasServiceApplication     : Starting RegistoHorasServiceApplication using Java 23.0.1 with PID 43872 (D:\Exemplo projecto\microserviços\registo-horas-service\target\classes started by User in D:\Exemplo projecto\microserviços\registo-horas-service)
-2025-12-30T04:53:17.608Z  INFO 43872 --- [registo-horas-service] [main] c.a.r.RegistoHorasServiceApplication     : The following 1 profile is active: "dev"
-2025-12-30T04:53:18.628Z  INFO 43872 --- [registo-horas-service] [main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
-2025-12-30T04:53:18.743Z  INFO 43872 --- [registo-horas-service] [main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 108 ms. Found 5 JPA repository interfaces.
-2025-12-30T04:53:19.181Z  INFO 43872 --- [registo-horas-service] [main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8083 (http)
-2025-12-30T04:53:19.201Z  INFO 43872 --- [registo-horas-service] [main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
-2025-12-30T04:53:19.202Z  INFO 43872 --- [registo-horas-service] [main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.48]
-2025-12-30T04:53:19.286Z  INFO 43872 --- [registo-horas-service] [main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
-2025-12-30T04:53:19.287Z  INFO 43872 --- [registo-horas-service] [main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 1629 ms
-2025-12-30T04:53:19.963Z  INFO 43872 --- [registo-horas-service] [main] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
-2025-12-30T04:53:20.003Z  INFO 43872 --- [registo-horas-service] [main] org.hibernate.Version                    : HHH000412: Hibernate ORM core version 6.6.33.Final
-2025-12-30T04:53:20.033Z  INFO 43872 --- [registo-horas-service] [main] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
-2025-12-30T04:53:20.289Z  INFO 43872 --- [registo-horas-service] [main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
-2025-12-30T04:53:20.317Z  INFO 43872 --- [registo-horas-service] [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
-2025-12-30T04:53:20.440Z  INFO 43872 --- [registo-horas-service] [main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@1784fcab
-2025-12-30T04:53:20.442Z  INFO 43872 --- [registo-horas-service] [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
-2025-12-30T04:53:20.471Z  WARN 43872 --- [registo-horas-service] [main] org.hibernate.orm.deprecation            : HHH90000025: PostgreSQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
-2025-12-30T04:53:20.488Z  INFO 43872 --- [registo-horas-service] [main] org.hibernate.orm.connections.pooling    : HHH10001005: Database info:
-	Database JDBC URL [Connecting through datasource 'HikariDataSource (HikariPool-1)']
-	Database driver: undefined/unknown
-	Database version: 15.15
-	Autocommit mode: undefined/unknown
-	Isolation level: undefined/unknown
-	Minimum pool size: undefined/unknown
-	Maximum pool size: undefined/unknown
-2025-12-30T04:53:21.402Z  INFO 43872 --- [registo-horas-service] [main] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
-2025-12-30T04:53:21.457Z  INFO 43872 --- [registo-horas-service] [main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
-2025-12-30T04:53:22.025Z  INFO 43872 --- [registo-horas-service] [main] o.s.d.j.r.query.QueryEnhancerFactory     : Hibernate is in classpath; If applicable, HQL parser will be used.
-2025-12-30T04:53:23.873Z  INFO 43872 --- [registo-horas-service] [main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 5 endpoints beneath base path '/actuator'
-2025-12-30T04:53:23.916Z  WARN 43872 --- [registo-horas-service] [main] .s.s.UserDetailsServiceAutoConfiguration : 
-
-Using generated security password: 70114a70-d1d2-4985-bbdb-53cd695e4ee0
+Using generated security password: 303425a1-7563-4f49-88b4-acb8e44d9fe2
 
 This generated password is for development use only. Your security configuration must be updated before running your application in production.
 
-2025-12-30T04:53:23.927Z  INFO 43872 --- [registo-horas-service] [main] r$InitializeUserDetailsManagerConfigurer : Global AuthenticationManager configured with UserDetailsService bean with name inMemoryUserDetailsManager
-2025-12-30T04:53:24.600Z  INFO 43872 --- [registo-horas-service] [main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8083 (http) with context path '/'
-2025-12-30T04:53:24.614Z  INFO 43872 --- [registo-horas-service] [main] c.a.r.RegistoHorasServiceApplication     : Started RegistoHorasServiceApplication in 7.438 seconds (process running for 8.003)
-2025-12-30T04:53:24.939Z  INFO 43872 --- [registo-horas-service] [RMI TCP Connection(3)-172.29.128.1] o.s.a.r.c.CachingConnectionFactory       : Attempting to connect to: [localhost:5672]
-2025-12-30T04:53:24.939Z  INFO 43872 --- [registo-horas-service] [RMI TCP Connection(2)-172.29.128.1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
-2025-12-30T04:53:24.939Z  INFO 43872 --- [registo-horas-service] [RMI TCP Connection(2)-172.29.128.1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
-2025-12-30T04:53:24.941Z  INFO 43872 --- [registo-horas-service] [RMI TCP Connection(2)-172.29.128.1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 2 ms
-2025-12-30T04:53:25.000Z  INFO 43872 --- [registo-horas-service] [RMI TCP Connection(3)-172.29.128.1] o.s.a.r.c.CachingConnectionFactory       : Created new connection: rabbitConnectionFactory#6331b2d:0/SimpleConnection@4213caf2 [delegate=amqp://guest@127.0.0.1:5672/, localPort=56384]
+2025-12-31T01:10:45.932Z  INFO 51756 --- [registo-horas-service] [main] r$InitializeUserDetailsManagerConfigurer : Global AuthenticationManager configured with UserDetailsService bean with name inMemoryUserDetailsManager
+2025-12-31T01:10:46.392Z  INFO 51756 --- [registo-horas-service] [main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8083 (http) with context path '/'
+2025-12-31T01:10:46.404Z  INFO 51756 --- [registo-horas-service] [main] c.a.r.RegistoHorasServiceApplication     : Started RegistoHorasServiceApplication in 6.228 seconds (process running for 6.77)
+2025-12-31T01:10:46.868Z  INFO 51756 --- [registo-horas-service] [RMI TCP Connection(2)-172.29.128.1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+2025-12-31T01:10:46.869Z  INFO 51756 --- [registo-horas-service] [RMI TCP Connection(2)-172.29.128.1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+2025-12-31T01:10:46.869Z  INFO 51756 --- [registo-horas-service] [RMI TCP Connection(4)-172.29.128.1] o.s.a.r.c.CachingConnectionFactory       : Attempting to connect to: [localhost:5672]
+2025-12-31T01:10:46.870Z  INFO 51756 --- [registo-horas-service] [RMI TCP Connection(2)-172.29.128.1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 1 ms
+2025-12-31T01:10:46.915Z  INFO 51756 --- [registo-horas-service] [RMI TCP Connection(4)-172.29.128.1] o.s.a.r.c.CachingConnectionFactory       : Created new connection: rabbitConnectionFactory#6331b2d:0/SimpleConnection@30ac6751 [delegate=amqp://guest@127.0.0.1:5672/, localPort=60506]
+2025-12-31T01:19:08.459Z  INFO 51756 --- [registo-horas-service] [SpringApplicationShutdownHook] o.s.b.w.e.tomcat.GracefulShutdown        : Commencing graceful shutdown. Waiting for active requests to complete
+2025-12-31T01:19:08.459Z  INFO 51756 --- [registo-horas-service] [tomcat-shutdown] o.s.b.w.e.tomcat.GracefulShutdown        : Graceful shutdown complete
+2025-12-31T01:19:10.543Z  INFO 51756 --- [registo-horas-service] [SpringApplicationShutdownHook] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'default'
+2025-12-31T01:19:10.545Z  INFO 51756 --- [registo-horas-service] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
+2025-12-31T01:19:10.548Z  INFO 51756 --- [registo-horas-service] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.

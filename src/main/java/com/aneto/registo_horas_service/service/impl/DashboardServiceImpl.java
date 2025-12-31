@@ -19,7 +19,6 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.Optional;
 
 @Service
@@ -35,9 +34,6 @@ public class DashboardServiceImpl implements DashboardService {
     @Value("${spring.cloud.aws.s3.bucket-name}")
     private String bucketName;
 
-    @Value("${spring.cloud.aws.s3.folder-name}")
-    private String S3FOLDER;
-
     @Override
     public ListJogosResponse getListJogo(String username) {
         String key = "jogos/" + "lista.json";
@@ -45,10 +41,7 @@ public class DashboardServiceImpl implements DashboardService {
         LocalDate daquiADoisDias = hoje.plusDays(2);
 
         String dataPadrao = daquiADoisDias.toString();
-        String  hojePadrao = hoje.toString();
-
-        System.out.println("Agora:          " + hojePadrao);
-        System.out.println("Daqui a 2 dias: " + dataPadrao);
+        String hojePadrao = hoje.toString();
 
         Optional<ListJogosResponse> existingPlan = loadFromS3jogos(key);
 
@@ -83,7 +76,7 @@ public class DashboardServiceImpl implements DashboardService {
 
             // Verifica se o plano tem menos de 7 dias (opcional)
             Instant lastModified = s3Object.response().lastModified();
-            if (Duration.between(lastModified, Instant.now()).toDays() > 1) {
+            if (Duration.between(lastModified, Instant.now()).toHours() >= 2) {
                 return Optional.empty();
             }
             return Optional.of(objectMapper.readValue(s3Object, ListJogosResponse.class));
