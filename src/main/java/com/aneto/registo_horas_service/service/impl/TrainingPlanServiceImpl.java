@@ -174,9 +174,9 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
 
             // Verifica se o plano tem menos de 7 dias (opcional)
             Instant lastModified = s3Object.response().lastModified();
-            if (Duration.between(lastModified, Instant.now()).toDays() > 7) {
-                return Optional.empty();
-            }
+          //  if (Duration.between(lastModified, Instant.now()).toDays() > 7) {
+             //   return Optional.empty();
+         //  }
             return Optional.of(objectMapper.readValue(s3Object, TrainingPlanResponse.class));
         } catch (Exception e) {
             return Optional.empty(); // Arquivo não existe ou erro na leitura

@@ -5,6 +5,6 @@ public record TrainingExercise(String name,
                                String reps,
                                String rest,
                                String details,
-                               String Notas) {
+                               String notas) {
 
 }
