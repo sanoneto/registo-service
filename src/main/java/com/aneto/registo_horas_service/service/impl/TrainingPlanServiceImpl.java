@@ -4,7 +4,6 @@ import com.aneto.registo_horas_service.dto.request.PlanoRequestDTO;
 import com.aneto.registo_horas_service.dto.request.UserProfileRequest;
 import com.aneto.registo_horas_service.dto.response.PlanoResponseDTO;
 import com.aneto.registo_horas_service.dto.response.TrainingPlanResponse;
-import com.aneto.registo_horas_service.models.Plano;
 import com.aneto.registo_horas_service.service.PlanoService;
 import com.aneto.registo_horas_service.service.TrainingPlanService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -25,7 +24,6 @@ import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -51,7 +49,7 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
     @Override
     public TrainingPlanResponse getOrGeneratePlan(UserProfileRequest request, String username, String planId) {
         // 1. Determina a chave (prioriza a existente no banco, senão usa o padrão)
-        String key = buscarChaveDoPlano(planId, username);
+        String key = buscarChaveDoPlano(planId, username, request);
         // 2. Se o request for insuficiente para gerar algo novo, tenta carregar do S3
         if (isRequestEmpty(request)) {
             return loadFromS3(key)
@@ -67,12 +65,11 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
 
     @Override
     public void updatePlan(TrainingPlanResponse newPlan, String username, String planId) {
-        String key = buscarChaveDoPlano(planId, username);
+        String key = buscarChaveDoPlano(planId, username, null);
         configurarNovoPlano(newPlan, newPlan.getUserProfile());
         // 4. Persistência (Banco e S3)
         salvarDadosDoPlano(username, newPlan.getUserProfile(), key, newPlan, planId);
     }
-
 
 
     @Override
@@ -174,9 +171,9 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
 
             // Verifica se o plano tem menos de 7 dias (opcional)
             Instant lastModified = s3Object.response().lastModified();
-          //  if (Duration.between(lastModified, Instant.now()).toDays() > 7) {
-             //   return Optional.empty();
-         //  }
+            //  if (Duration.between(lastModified, Instant.now()).toDays() > 7) {
+            //   return Optional.empty();
+            //  }
             return Optional.of(objectMapper.readValue(s3Object, TrainingPlanResponse.class));
         } catch (Exception e) {
             return Optional.empty(); // Arquivo não existe ou erro na leitura
@@ -204,7 +201,7 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
     }
 
     // --- Métodos Auxiliares para Limpar o Fluxo Principal ---
-    private String buscarChaveDoPlano(String planId, String username) {
+    private String buscarChaveDoPlano(String planId, String username, UserProfileRequest request) {
         // 1. Tentativa prioritária: Pelo UUID do plano (planId)
         if (planId != null && !planId.isBlank()) {
             try {
@@ -218,17 +215,20 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
         }
 
         // 2. Validação na Base de Dados: Procurar plano existente por Username + Filtros
-        // O service deve buscar onde estado_plano = 'ACTIVO' e estado_pedido = 'CONCLUIDO'
-        log.info("Buscando plano ativo e concluído na base para o utilizador: {}", username);
-
-        return planoService.findAtivoAndConcluidoByUsername(username)
-                .map(PlanoResponseDTO::link)
-                .filter(this::isLinkValido)
-                // 3. Fallback Final: Se não encontrar nada válido, gera o caminho padrão
-                .orElseGet(() -> {
-                    log.info("Nenhum plano ativo encontrado para {}. Gerando fallback.", username);
-                    return gerarCaminhoPadrao(username);
-                });
+        // O service deve buscar onde estado_plano = 'ATIVO' e estado_pedido = 'FINALIZADO'
+        log.info(" Aprocura plano ativo e concluído na base para o utilizador: {}", username);
+        if (request == null) {
+            return planoService.findAtivoAndConcluidoByUsername(username)
+                    .map(PlanoResponseDTO::link)
+                    .filter(this::isLinkValido)
+                    // 3. Fallback Final: Se não encontrar nada válido, gera o caminho padrão
+                    .orElseGet(() -> {
+                        log.info("Nenhum plano ativo encontrado para {}. Gerando fallback.", username);
+                        return gerarCaminhoPadrao(username);
+                    });
+        } else {
+            return gerarCaminhoPadrao(username);
+        }
     }
 
     private boolean isLinkValido(String link) {

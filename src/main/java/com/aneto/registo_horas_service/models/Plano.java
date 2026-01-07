@@ -31,10 +31,12 @@ public class Plano {
     private String especialista;
 
     @Column(name = "estado_plano")
-    private String estadoPlano;
+    @Enumerated(EnumType.STRING)
+    private EstadoPlano estadoPlano;
 
     @Column(name = "estado_pedido")
-    private String estadoPedido;
+    @Enumerated(EnumType.STRING)
+    private EstadoPedido estadoPedido;
 
     private String link;
 

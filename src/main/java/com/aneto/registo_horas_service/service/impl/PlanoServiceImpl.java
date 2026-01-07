@@ -3,6 +3,8 @@ package com.aneto.registo_horas_service.service.impl;
 import com.aneto.registo_horas_service.dto.request.PlanoRequestDTO;
 import com.aneto.registo_horas_service.dto.response.PlanoResponseDTO;
 import com.aneto.registo_horas_service.mapper.PlanoMapper;
+import com.aneto.registo_horas_service.models.EstadoPedido;
+import com.aneto.registo_horas_service.models.EstadoPlano;
 import com.aneto.registo_horas_service.models.Plano;
 import com.aneto.registo_horas_service.repository.PlanoRepository;
 import com.aneto.registo_horas_service.service.PlanoService;
@@ -68,8 +70,8 @@ public class PlanoServiceImpl implements PlanoService {
         // Aqui assume-se que o seu Repository tem esta consulta
         return repository.findByNomeAlunoContainingAndEstadoPlanoAndEstadoPedido(
                 username,
-                "ATIVO",    // Ou o seu Enum correspondente
-                "FINALIZADO"  // Ou o seu Enum correspondente
+                EstadoPlano.ATIVO,        // Uso do Enum
+                EstadoPedido.FINALIZADO   // Uso do Enum
         ).map(mapper::toResponse); // Converta para DTO antes de retornar
     }
 
@@ -88,8 +90,8 @@ public class PlanoServiceImpl implements PlanoService {
         plano.setNomeAluno(requestDTO.nomeAluno());
         plano.setObjetivo(requestDTO.objetivo());
         plano.setEspecialista(requestDTO.especialista());
-        plano.setEstadoPlano(requestDTO.estadoPlano());
-        plano.setEstadoPedido(requestDTO.estadoPedido());
+        plano.setEstadoPlano(EstadoPlano.valueOf(requestDTO.estadoPlano()));
+        plano.setEstadoPedido(EstadoPedido.valueOf(requestDTO.estadoPedido()));
         plano.setLink(requestDTO.link());
 
         // 4. Gravar as alterações
@@ -102,12 +104,9 @@ public class PlanoServiceImpl implements PlanoService {
         Plano plano = repository.findById(UUID.fromString(planId))
                 .orElseThrow(() -> new RuntimeException("Plano não encontrado"));
 
-        if ("PENDENTE".equalsIgnoreCase(plano.getEstadoPedido())) {
-            plano.setEstadoPedido(newStatus);
-
-            // Opcional: Registrar quem assumiu o plano
-            // plano.setEspecialistaResponsavel(username);
-
+        if (plano.getEstadoPedido() == EstadoPedido.PENDENTE) {
+            // 2. Atribuição direta (newStatus deve vir como o Enum EstadoPedido)
+            plano.setEstadoPedido(EstadoPedido.valueOf(newStatus.toUpperCase()));
             repository.save(plano);
         }
     }

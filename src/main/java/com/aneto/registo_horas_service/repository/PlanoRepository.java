@@ -1,5 +1,7 @@
 package com.aneto.registo_horas_service.repository;
 
+import com.aneto.registo_horas_service.models.EstadoPedido;
+import com.aneto.registo_horas_service.models.EstadoPlano;
 import com.aneto.registo_horas_service.models.Plano;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -19,8 +21,8 @@ public interface PlanoRepository extends JpaRepository<Plano, UUID> {
 
     Optional<Plano> findByNomeAlunoContainingAndEstadoPlanoAndEstadoPedido(
             String nomeAluno,
-            String estadoPlano,
-            String estadoPedido
+            EstadoPlano estadoPlano,
+            EstadoPedido estadoPedido
     );
 }
 
