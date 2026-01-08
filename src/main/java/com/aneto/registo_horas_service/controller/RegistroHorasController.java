@@ -176,7 +176,7 @@ public class RegistroHorasController {
             @ApiResponse(responseCode = "404", description = "Nenhum registro encontrado")
     })
     @GetMapping("/Pageable/list/{name}")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('ESPECIALISTA') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('ESPECIALISTA') or (hasRole('ESTAGIARIO') and #name == authentication.name)")
     public ResponseEntity<PageResponse<RegisterResponse>> getAllRegisterHorasUserPaginated(
             @PathVariable String name,
             @RequestParam (defaultValue = "all") String projectName,
