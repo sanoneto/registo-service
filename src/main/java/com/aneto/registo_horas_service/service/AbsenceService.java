@@ -9,9 +9,12 @@ import org.springframework.data.domain.Pageable;
 import java.util.Optional;
 
 public interface AbsenceService {
-     Absence registerAbsence(AbsenceRequest absenceRequest);
-     Page<Absence> getAbsencesPage(String userName, AbsenceStatus status, Pageable pageable);
-     void deleteByPublicId(String publicId);
-     Optional<Absence> updateAbsenceStatus(String publicId, AbsenceStatus newStatus);
+    Absence registerAbsence(AbsenceRequest absenceRequest);
+
+    Page<Absence> getAbsencesPage(String userName, AbsenceStatus status, Pageable pageable);
+
+    void deleteByPublicId(String publicId);
+
+    Optional<Absence> updateAbsenceStatus(String publicId, AbsenceStatus newStatus);
 
 }

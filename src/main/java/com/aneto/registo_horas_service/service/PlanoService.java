@@ -10,10 +10,16 @@ import java.util.UUID;
 
 public interface PlanoService {
     PlanoResponseDTO createPlano(PlanoRequestDTO request);
-     PlanoResponseDTO getByPlanoById (UUID id);
+
+    PlanoResponseDTO getByPlanoById(UUID id);
+
     void deletePlano(UUID id);
+
     Page<PlanoResponseDTO> listAllOrName(String nome, Pageable pageable);
+
     Optional<PlanoResponseDTO> findAtivoAndConcluidoByUsername(String username);
+
     void updatePlano(String uuid, PlanoRequestDTO requestDTO);
-    void changeOfProgress(String planId, String username,String newStatus);
+
+    void changeOfProgress(String planId, String username, String newStatus);
 }

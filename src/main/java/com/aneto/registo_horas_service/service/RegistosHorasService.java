@@ -25,19 +25,20 @@ public interface RegistosHorasService {
     List<RegisterResponse> buscarRegistrosPorUsuario(String username);
 
     // Atualiza um registro existente
-    RegisterResponse atualizarRegistro(UUID publicId, RegisterRequest request,String username)throws Exception;
+    RegisterResponse atualizarRegistro(UUID publicId, RegisterRequest request, String username) throws Exception;
 
     // Deleta um registro
     void deleteRegistry(UUID publicId);
 
-    double getTotalHorasPorUsuarioProjrct(String username , String project_name);
+    double getTotalHorasPorUsuarioProjrct(String username, String project_name);
 
-    List<PerfilResponse>  findTotalHoursAndRequiredHoursByUserName(@Param("username") String name );
+    List<PerfilResponse> findTotalHoursAndRequiredHoursByUserName(@Param("username") String name);
 
-    List<MonthlySummary> findMonthlySummary(@Param("username") String name );
+    List<MonthlySummary> findMonthlySummary(@Param("username") String name);
 
-    PageResponse<RegisterResponse> findAllRegisteredHoursUserProjectName(String name,String projectName, Pageable pageable);
-    PageResponse<RegisterResponse> findAllRegisteredHoursPageProjectName(String projectName,Pageable pageable);
+    PageResponse<RegisterResponse> findAllRegisteredHoursUserProjectName(String name, String projectName, Pageable pageable);
+
+    PageResponse<RegisterResponse> findAllRegisteredHoursPageProjectName(String projectName, Pageable pageable);
 
 
 }
