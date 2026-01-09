@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/eventos")
@@ -25,5 +26,15 @@ public class EventoController {
     @GetMapping
     public List<EventsResponse> listarTodos() {
         return eventsService.listAll();
+    }
+
+
+    // Adiciona o CrossOrigin para a Gateway/React não bloquear
+    @CrossOrigin(origins = "*")
+    @PostMapping("/{id}/confirmar-alerta") // Alterado para coincidir com o JS
+    public ResponseEntity<Void> confirmarAlerta(@PathVariable UUID id) {
+        System.out.println(">>> RECEBIDO PEDIDO DE CONFIRMAÇÃO PARA ID: " + id);
+        eventsService.confirmarAlerta(id);
+        return ResponseEntity.ok().build();
     }
 }

@@ -106,6 +106,12 @@ gcp:
   credentials:
     json-content: ${GCP_CREDENTIALS_JSO_CONTENT}
 
+vapid:
+  public:
+    key: BCdApFNVR0ILbs8QlkeWguLd3WGkGTp7VlVwL4JUqAgZbOerAkKMkR3Is-nVHrYjwVGSnN2Pp47WSeZwyGFgMhg
+  private:
+    key: AM5y44h9EiVWtvnQwaRkJ3m3ESHhe8MQuRk-rsuQd32I
+  subject:  mailto:sanoneto@hotmail.com
 app:
   queries:
     monthly-summary: "SELECT 

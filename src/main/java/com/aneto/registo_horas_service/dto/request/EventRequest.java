@@ -24,6 +24,6 @@ public record EventRequest(
         @Column(columnDefinition = "TEXT")
         String notes,
         boolean sendAlert,
-        Object notificationSubscription // Adicionado para receber os dados do React
+        PushSubscriptionDTO notificationSubscription // Adicionado para receber os dados do React
 ) {
 }

@@ -36,4 +36,7 @@ public class Evento {
     private String notes;
 
     private boolean sendAlert;
+
+    @Column(name = "alert_confirmed", columnDefinition = "boolean default false")
+    private boolean alertConfirmed = false;
 }
