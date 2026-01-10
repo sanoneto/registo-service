@@ -37,4 +37,23 @@ public class EventoController {
         eventsService.confirmarAlerta(id);
         return ResponseEntity.ok().build();
     }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> eliminarEvento(@PathVariable UUID id) {
+        System.out.println(">>> PEDIDO PARA ELIMINAR EVENTO ID: " + id);
+        eventsService.deleteById(id);
+        return ResponseEntity.noContent().build(); // Retorna 204 No Content após remoção bem-sucedida
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<EventsResponse> buscarPorId(@PathVariable UUID id) {
+        return ResponseEntity.ok(eventsService.findById(id));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<EventsResponse> atualizarEvento(
+            @PathVariable UUID id,
+            @RequestBody EventRequest request) {
+        return ResponseEntity.ok(eventsService.update(id, request));
+    }
 }

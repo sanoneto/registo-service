@@ -13,4 +13,7 @@ public interface EventsService {
      void agendarAlerta(EventRequest request);
     void enviarNotificacaoPush(PushSubscriptionDTO sub, String msg);
     void confirmarAlerta(UUID id);
+    void deleteById(UUID id);
+    EventsResponse findById(UUID id);
+    EventsResponse update(UUID id, EventRequest request);
 }

@@ -10,6 +10,8 @@ import com.aneto.registo_horas_service.service.EventsService;
 import com.aneto.registo_horas_service.service.NotificationService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.stereotype.Service;
 
@@ -25,7 +27,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class EventsServiceImpl implements EventsService {
-
+    private static final Logger log = LoggerFactory.getLogger(EventsServiceImpl.class);
     private final EventoRepository repository;
     private final EventsMapper mapper;
     private final TaskScheduler taskScheduler; // Adicionado final
@@ -65,19 +67,67 @@ public class EventsServiceImpl implements EventsService {
             enviarNotificacaoPush(request.notificationSubscription(), request.title());
         }, momentoAlerta);
     }
+
     @Override
     public void enviarNotificacaoPush(PushSubscriptionDTO sub, String titulo) {
         // Em vez de escrever todo o JSON aqui de novo,
         // chamamos o outro método passando 'null' no lugar do ID.
         enviarNotificacaoPushComId(sub, titulo, null);
     }
+
     @Override
     public void confirmarAlerta(UUID id) {
         repository.findById(id).ifPresent(evento -> {
             evento.setAlertConfirmed(true);
             repository.save(evento);
-            System.out.println("Evento " + id + " marcado como confirmado. Repetições encerradas.");
+            log.info("Evento {} marcado como confirmado. Repetições encerradas.", id);
         });
+    }
+
+    @Override
+    public void deleteById(UUID id) {
+        repository.findById(id)
+                .ifPresentOrElse(
+                        evento -> {
+                            repository.delete(evento);
+                            log.info(">>> Evento com ID {} foi eliminado com sucesso.", id);
+                        },
+                        () -> log.info(">>> Tentativa de eliminar evento inexistente: {}", id)
+                );
+    }
+
+    @Override
+    public EventsResponse findById(UUID id) {
+        return repository.findById(id)
+                .map(mapper::toResponse)
+                .orElseThrow(() -> new RuntimeException("Evento não encontrado com o ID: " + id));
+    }
+
+    @Override
+    public EventsResponse update(UUID id, EventRequest request) {
+        return repository.findById(id).map(eventoExistente -> {
+
+            // 1. Detectar mudança de horário ANTES de mapear os novos dados
+            boolean horarioMudou = !eventoExistente.getStartTime().equals(request.startTime()) ||
+                    !eventoExistente.getReferenceDate().equals(request.referenceDate());
+
+            // 2. Mapeamento Automático (Substitui todos aqueles setters manuais)
+            mapper.updateEntityFromDto(request, eventoExistente);
+
+            // 3. Lógica de Alerta: Se mudou o horário, resetamos a confirmação
+            if (horarioMudou) {
+                log.info("Horário alterado para o evento {}. Reiniciando ciclo de alertas.", id);
+                eventoExistente.setAlertConfirmed(false);
+            }
+
+            Evento atualizado = repository.save(eventoExistente);
+
+            // 4. Reagendar se necessário
+            if (request.sendAlert() && request.notificationSubscription() != null && horarioMudou) {
+                agendarAlertaComRepeticao(atualizado.getId(), request);
+            }
+            return mapper.toResponse(atualizado);
+        }).orElseThrow(() -> new RuntimeException("Evento não encontrado com ID: " + id));
     }
 
     @Override
@@ -91,7 +141,6 @@ public class EventsServiceImpl implements EventsService {
                 .collect(Collectors.toList());
     }
 
-
     private void agendarAlertaComRepeticao(UUID eventoId, EventRequest request) {
         LocalDateTime dataHoraEvento = LocalDateTime.of(request.referenceDate(), request.startTime());
         Instant momentoAlerta = dataHoraEvento.atZone(ZoneId.systemDefault()).toInstant();
@@ -102,6 +151,7 @@ public class EventsServiceImpl implements EventsService {
 
         taskScheduler.schedule(() -> dispararFluxoRepeticao(eventoId, request), momentoAlerta);
     }
+
     private void dispararFluxoRepeticao(UUID eventoId, EventRequest request) {
         repository.findById(eventoId).ifPresent(evento -> {
 
@@ -110,17 +160,18 @@ public class EventsServiceImpl implements EventsService {
 
                 enviarNotificacaoPushComId(request.notificationSubscription(), request.title(), eventoId);
 
-                System.out.println("Alerta enviado para o evento " + eventoId + ". Repetindo em 1 minuto...");
+                log.info("Alerta enviado para o evento {}. Repetindo em 1 minuto...", eventoId);
 
                 taskScheduler.schedule(
                         () -> dispararFluxoRepeticao(eventoId, request),
                         Instant.now().plus(1, ChronoUnit.MINUTES)
                 );
             } else {
-                System.out.println("O utilizador confirmou o evento " + eventoId + ". Parando alertas.");
+                log.info("O utilizador confirmou o evento {}. Parando alertas.", eventoId);
             }
         });
     }
+
     private void enviarNotificacaoPushComId(PushSubscriptionDTO sub, String titulo, UUID eventoId) {
         try {
             Map<String, Object> payloadMap = Map.of(
