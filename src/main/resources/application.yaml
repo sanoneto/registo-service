@@ -111,6 +111,12 @@ Football:
     url: ${FOOTBALL_DATA_URL}
     API_TOKEN: ${FOOTBALL_DATA_API_TOKEN}
 
+vapid:
+  public:
+    key: ${VAPID_PUBLIC_KEY}
+  private:
+    key: ${VAPID_PRIVATE_KEY}
+  subject:  ${VAPID_SUBJECT}
 
 app:
   queries:

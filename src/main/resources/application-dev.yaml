@@ -108,10 +108,11 @@ gcp:
 
 vapid:
   public:
-    key: BCdApFNVR0ILbs8QlkeWguLd3WGkGTp7VlVwL4JUqAgZbOerAkKMkR3Is-nVHrYjwVGSnN2Pp47WSeZwyGFgMhg
+    key: ${VAPID_PUBLIC_KEY}
   private:
-    key: AM5y44h9EiVWtvnQwaRkJ3m3ESHhe8MQuRk-rsuQd32I
-  subject:  mailto:sanoneto@hotmail.com
+    key: ${VAPID_PRIVATE_KEY}
+  subject:  ${VAPID_SUBJECT}
+
 app:
   queries:
     monthly-summary: "SELECT 
