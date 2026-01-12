@@ -24,5 +24,14 @@ public interface PlanoRepository extends JpaRepository<Plano, UUID> {
             EstadoPlano estadoPlano,
             EstadoPedido estadoPedido
     );
+    Page<Plano> findByNomeAlunoContainingIgnoreCase(String nomeAluno, Pageable pageable);
+
+    // Para o Especialista (Seu nome OR nulo)
+    @Query("SELECT p FROM Plano p WHERE (p.especialista = :nome OR p.especialista IS NULL OR p.especialista = '' OR p.especialista='sem Especialista')")
+    Page<Plano> findForEspecialista(@Param("nome") String nome, Pageable pageable);
+
+    // Para o Estagiário (Apenas seu nome)
+    @Query("SELECT p FROM Plano p WHERE p.nomeAluno = :nome")
+    Page<Plano> findForEstagiario(@Param("nome") String nome, Pageable pageable);
 }
 

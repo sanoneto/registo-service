@@ -24,6 +24,8 @@ public record PlanoRequestDTO(
         String estadoPedido,
 
         @NotBlank(message = "O link é obrigatório")
-        String link
+        String link,
+
+        String recommended
 ) {
 }

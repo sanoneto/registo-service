@@ -47,4 +47,5 @@ public class Plano {
     @UpdateTimestamp
     @Column(name = "data_update")
     private LocalDate dataUpdate;
+    private String recommended;
 }

@@ -260,8 +260,9 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
             // Cenário 1: Novo Plano
             dto = new PlanoRequestDTO(
                     username,
+                    request.recommended(),
                     request.objective(),
-                    "sem Especialista",
+                    "Sem Especialista",
                     "ATIVO",
                     "PENDENTE",
                     key
@@ -279,6 +280,7 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
             // E encadeamos os métodos .with para atualizar os campos necessários
             dto = new PlanoRequestDTO(
                     planoExistente.nomeAluno(),
+                    planoExistente.recommended(),
                     planoExistente.objetivo(),
                     planoExistente.especialista(),
                     planoExistente.estadoPlano(),

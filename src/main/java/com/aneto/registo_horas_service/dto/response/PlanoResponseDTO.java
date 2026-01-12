@@ -8,6 +8,7 @@ import java.util.UUID;
 public record PlanoResponseDTO(
         UUID id,
         String nomeAluno,
+        String recommended,
         String objetivo,
         String especialista,
         String estadoPlano,

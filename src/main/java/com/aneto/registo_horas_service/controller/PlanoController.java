@@ -11,8 +11,11 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -49,9 +52,15 @@ public class PlanoController {
     @GetMapping
     public ResponseEntity<Page<PlanoResponseDTO>> listarPlanos(
             @RequestParam(required = false) String nomeAluno,
-            @PageableDefault(size = 8, sort = "nomeAluno") Pageable pageable) {
+            @PageableDefault(size = 8, sort = "nomeAluno") Pageable pageable,
+            Authentication authentication) {
 
-        Page<PlanoResponseDTO> lista = planoService.listAllOrName(nomeAluno, pageable);
+        List<String> roles = authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .toList();
+        String username = authentication.getName();
+
+        Page<PlanoResponseDTO> lista = planoService.listAllOrName(nomeAluno, pageable, roles,username);
         return ResponseEntity.ok(lista);
     }
 

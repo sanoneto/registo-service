@@ -14,6 +14,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.UUID;
@@ -57,12 +58,29 @@ public class PlanoServiceImpl implements PlanoService {
     }
 
     @Transactional(readOnly = true)
-    public Page<PlanoResponseDTO> listAllOrName(String nome, Pageable pageable) {
-        // Se o nome for uma string vazia, a query nativa tratará como "trazer tudo"
-        Page<Plano> planos = repository.findByNomeCustom(nome, pageable);
+    public Page<PlanoResponseDTO> listAllOrName(String nomeAluno, Pageable pageable, List<String> roles, String usernameLogado) {
 
-        // Converte a página de Entidades para página de ResponseDTO (remove links e datas)
-        return planos.map(mapper::toResponse);
+        // 1. ADMIN: Vê tudo (Pode filtrar por nome de aluno se quiser)
+        if (roles.contains("ROLE_ADMIN")) {
+            if (nomeAluno != null && !nomeAluno.isEmpty()) {
+                return repository.findByNomeAlunoContainingIgnoreCase(nomeAluno, pageable).map(mapper::toResponse);
+            }
+            return repository.findAll(pageable).map(mapper::toResponse);
+        }
+
+        // 2. ESPECIALISTA: Vê os seus + os que não têm dono
+        if (roles.contains("ROLE_ESPECIALISTA")) {
+            return repository.findForEspecialista(usernameLogado, pageable)
+                    .map(mapper::toResponse);
+        }
+
+        // 3. ESTAGIÁRIO: Vê estritamente apenas os seus
+        if (roles.contains("ROLE_ESTAGIARIO")) {
+            return repository.findForEstagiario(usernameLogado, pageable)
+                    .map(mapper::toResponse);
+        }
+
+        return Page.empty(); // Se não tiver role, retorna vazio
     }
 
     @Override
@@ -107,6 +125,7 @@ public class PlanoServiceImpl implements PlanoService {
         if (plano.getEstadoPedido() == EstadoPedido.PENDENTE) {
             // 2. Atribuição direta (newStatus deve vir como o Enum EstadoPedido)
             plano.setEstadoPedido(EstadoPedido.valueOf(newStatus.toUpperCase()));
+            plano.setEspecialista(username);
             repository.save(plano);
         }
     }

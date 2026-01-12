@@ -15,6 +15,7 @@ public record UserProfileRequest(String bodyType,
                                  Integer frequencyPerWeek,
                                  String objective,
                                  String country,
-                                 String location ) {
+                                 String location,
+                                 String recommended) {
 
 }
