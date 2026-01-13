@@ -4,6 +4,8 @@ import com.aneto.registo_horas_service.dto.request.PlanoRequestDTO;
 import com.aneto.registo_horas_service.dto.request.UserProfileRequest;
 import com.aneto.registo_horas_service.dto.response.PlanoResponseDTO;
 import com.aneto.registo_horas_service.dto.response.TrainingPlanResponse;
+import com.aneto.registo_horas_service.models.EstadoPedido;
+import com.aneto.registo_horas_service.models.EstadoPlano;
 import com.aneto.registo_horas_service.service.PlanoService;
 import com.aneto.registo_horas_service.service.TrainingPlanService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -59,7 +61,7 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
         TrainingPlanResponse newPlan = generateTrainingPlan(request);
         configurarNovoPlano(newPlan, request);
         // 4. Persistência (Banco e S3)
-        salvarDadosDoPlano(username, request, key, newPlan, planId);
+        salvarDadosDoPlano(username, request, key, newPlan, planId, false);
         return newPlan;
     }
 
@@ -68,7 +70,7 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
         String key = buscarChaveDoPlano(planId, username, null);
         configurarNovoPlano(newPlan, newPlan.getUserProfile());
         // 4. Persistência (Banco e S3)
-        salvarDadosDoPlano(username, newPlan.getUserProfile(), key, newPlan, planId);
+        salvarDadosDoPlano(username, newPlan.getUserProfile(), key, newPlan, planId, true);
     }
 
 
@@ -253,19 +255,25 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
         plan.setUserProfile(request);
     }
 
-    private void salvarDadosDoPlano(String username, UserProfileRequest request, String key, TrainingPlanResponse plan, String planId) {
+    private void salvarDadosDoPlano(String username, UserProfileRequest request, String key, TrainingPlanResponse plan, String planId, boolean update) {
         PlanoRequestDTO dto;
 
+        // 1. Independentemente de ser novo ou update,
+        // precisamos garantir que outros planos fiquem inativos.
+        if (update) { // se for update a plano
+            planoService.prepararNovoPlanoAtivo(username);
+        }
+
         if (planId == null || planId.isEmpty()) {
-            // Cenário 1: Novo Plano
+            // Cenário 1: Novo Plano (já nasce ATIVO)
             dto = new PlanoRequestDTO(
                     username,
-                    request.recommended(),
                     request.objective(),
                     "Sem Especialista",
-                    "ATIVO",
-                    "PENDENTE",
-                    key
+                    EstadoPlano.ATIVO,
+                    EstadoPedido.PENDENTE,
+                    key,
+                    request.recommended()
             );
             planoService.createPlano(dto);
         } else {
@@ -276,24 +284,18 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
                 throw new RuntimeException("Plano não encontrado para o ID: " + planId);
             }
 
-            // Criamos o DTO a partir dos dados existentes para evitar o NullPointerException
-            // E encadeamos os métodos .with para atualizar os campos necessários
             dto = new PlanoRequestDTO(
-                    planoExistente.nomeAluno(),
-                    planoExistente.recommended(),
-                    planoExistente.objetivo(),
-                    planoExistente.especialista(),
-                    planoExistente.estadoPlano(),
-                    planoExistente.estadoPedido(),
-                    planoExistente.link()
-            )
-                    .withEspecialista(username)     // Atualiza o especialista
-                    .withEstadoPedido("FINALIZADO") // Atualiza o estado
-                    .withLink(key);                 // Atualiza o link do S3 se necessário
-
+                    planoExistente.nomeAluno(),   // 1. nomeAluno
+                    planoExistente.objetivo(),    // 2. objetivo
+                    username,                     // 3. especialista (quem está salvando)
+                    EstadoPlano.ATIVO,            // 4. estadoPlano (Tipo Enum)
+                    EstadoPedido.FINALIZADO,      // 5. estadoPedido (Tipo Enum)
+                    key,                          // 6. link
+                    planoExistente.recommended()  // 7. recommended
+            );
             planoService.updatePlano(planId, dto);
         }
-        // Salva o JSON no S3 independentemente de ser novo ou update
+
         saveToS3(key, plan);
     }
 }

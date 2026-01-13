@@ -67,11 +67,19 @@ public class PlanoController {
 
     @PatchMapping("/{id}/atualizar-status")
     public ResponseEntity<?> updateStatusParaProcessando(
-            @RequestHeader("X-User-ID") String username,
-            @RequestBody @Valid String  estadoPedido,
-            @PathVariable String id) {
+            @RequestHeader(value = "Authorization", required = false) String token,
+            @RequestBody Map<String, String> body,        // Recebe o JSON como um Mapa
+            @PathVariable String id,
+            Authentication authentication) {
         try {
-            // Chamamos o serviço para tratar a regra de negócio
+            String estadoPedido = body.get("estadoPedido");
+
+            List<String> roles = authentication.getAuthorities().stream()
+                    .map(GrantedAuthority::getAuthority)
+                    .toList();
+            String username = authentication.getName();
+
+
             planoService.changeOfProgress(id, username, estadoPedido);
 
             return ResponseEntity.ok(Map.of(

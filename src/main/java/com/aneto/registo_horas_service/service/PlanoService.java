@@ -23,4 +23,6 @@ public interface PlanoService {
     void updatePlano(String uuid, PlanoRequestDTO requestDTO);
 
     void changeOfProgress(String planId, String username, String newStatus);
+
+    void prepararNovoPlanoAtivo(String username);
 }

@@ -1,5 +1,7 @@
 package com.aneto.registo_horas_service.dto.request;
 
+import com.aneto.registo_horas_service.models.EstadoPedido;
+import com.aneto.registo_horas_service.models.EstadoPlano;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.With;
@@ -18,10 +20,10 @@ public record PlanoRequestDTO(
         String especialista,
 
         @NotBlank(message = "O estado do plano é obrigatório")
-        String estadoPlano,
+        EstadoPlano estadoPlano,
 
         @NotBlank(message = "O estado do pedido é obrigatório")
-        String estadoPedido,
+         EstadoPedido estadoPedido,
 
         @NotBlank(message = "O link é obrigatório")
         String link,

@@ -108,8 +108,8 @@ public class PlanoServiceImpl implements PlanoService {
         plano.setNomeAluno(requestDTO.nomeAluno());
         plano.setObjetivo(requestDTO.objetivo());
         plano.setEspecialista(requestDTO.especialista());
-        plano.setEstadoPlano(EstadoPlano.valueOf(requestDTO.estadoPlano()));
-        plano.setEstadoPedido(EstadoPedido.valueOf(requestDTO.estadoPedido()));
+        plano.setEstadoPlano(requestDTO.estadoPlano());
+        plano.setEstadoPedido(requestDTO.estadoPedido());
         plano.setLink(requestDTO.link());
 
         // 4. Gravar as alterações
@@ -117,16 +117,30 @@ public class PlanoServiceImpl implements PlanoService {
     }
 
     @Override
+    @Transactional
     public void changeOfProgress(String planId, String username, String newStatus) {
-        // 1. Busca o plano no banco
+        // 1. Busca o plano
         Plano plano = repository.findById(UUID.fromString(planId))
                 .orElseThrow(() -> new RuntimeException("Plano não encontrado"));
 
+        // 2. Só altera se estiver PENDENTE
         if (plano.getEstadoPedido() == EstadoPedido.PENDENTE) {
-            // 2. Atribuição direta (newStatus deve vir como o Enum EstadoPedido)
-            plano.setEstadoPedido(EstadoPedido.valueOf(newStatus.toUpperCase()));
+
+            EstadoPedido proximoEstado = EstadoPedido.fromDescricao(newStatus);
+            plano.setEstadoPedido(proximoEstado);
             plano.setEspecialista(username);
             repository.save(plano);
         }
+    }
+
+    @Override
+    @Transactional
+    public void prepararNovoPlanoAtivo(String username) {
+        repository.inativarPlanosAtivosPorAluno(username);
+    }
+
+    private EstadoPedido converterParaEnum(String status) {
+        String formatado = status.toUpperCase().replace(" ", "_");
+        return EstadoPedido.valueOf(formatado);
     }
 }
