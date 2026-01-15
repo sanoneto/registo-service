@@ -16,4 +16,5 @@ public interface EventsService {
     void deleteById(UUID id);
     EventsResponse findById(UUID id);
     EventsResponse update(UUID id, EventRequest request);
+    List<EventsResponse> syncFromGoogle(String googleToken);
 }

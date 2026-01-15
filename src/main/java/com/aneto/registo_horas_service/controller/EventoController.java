@@ -67,4 +67,14 @@ public class EventoController {
             @RequestBody EventRequest request) {
         return ResponseEntity.ok(eventsService.update(id, request));
     }
+
+    @GetMapping("/eventos/sync-from-google")
+    public ResponseEntity<List<EventsResponse>> syncFromGoogle(
+            @RequestHeader("Authorization") String token,
+            @RequestHeader("X-Google-Token") String googleToken) {
+
+        // Chamamos o serviço para buscar no Google e salvar o que for novo
+        List<EventsResponse> novosEventos = eventsService.syncFromGoogle(googleToken);
+        return ResponseEntity.ok(novosEventos);
+    }
 }

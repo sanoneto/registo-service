@@ -15,7 +15,6 @@ import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.client.util.DateTime;
 import com.google.api.services.calendar.Calendar;
-import com.google.api.services.calendar.model.Event;
 import com.google.api.services.calendar.model.EventDateTime;
 import com.google.api.services.calendar.model.EventReminder;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +27,7 @@ import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
@@ -48,16 +48,16 @@ public class EventsServiceImpl implements EventsService {
 
     @Override
     public EventsResponse create(EventRequest request, String googleToken) {
-        // 1. Guarda na base de dados local
+        // 1. Guarda localmente primeiro
         Evento novoEvento = mapper.toEntity(request);
         novoEvento = repository.save(novoEvento);
 
-        // 2. Lógica de Push Notification Local (Sua lógica atual)
+        // 2. Alerta Push Local
         if (request.sendAlert() && request.notificationSubscription() != null) {
             agendarAlertaComRepeticao(novoEvento.getId(), request);
         }
 
-        // 3. Sincronização Google Calendar + Notificação Push Google
+        // 3. Google Calendar
         if (googleToken != null && !googleToken.isEmpty()) {
             try {
                 Calendar service = getCalendarService(googleToken);
@@ -66,28 +66,32 @@ public class EventsServiceImpl implements EventsService {
                         .setSummary(request.title())
                         .setDescription(request.notes() + "\nProjeto: " + request.project());
 
-                // Configuração de horários
+                // Start: ISO 8601
                 DateTime startDateTime = new DateTime(request.referenceDate().toString() + "T" + request.startTime() + ":00Z");
                 googleEvent.setStart(new EventDateTime().setDateTime(startDateTime));
-                googleEvent.setEnd(new EventDateTime().setDateTime(startDateTime)); // Recomendado: adicionar +1h aqui
 
-                // --- NOVO: Lógica de Lembretes (Pop-up no Telemóvel) ---
+                // End: +1 hora para evitar erro de evento sem duração
+                DateTime endDateTime = new DateTime(startDateTime.getValue() + 3600000);
+                googleEvent.setEnd(new EventDateTime().setDateTime(endDateTime));
+
                 if (request.sendAlert()) {
-                    EventReminder[] reminderOverrides = new EventReminder[] {
-                            // "popup" ativa a notificação visual e sonora no Android/iOS
-                            new EventReminder().setMethod("popup").setMinutes(10), // 10 min antes
-                            new EventReminder().setMethod("popup").setMinutes(0)   // No momento exato
+                    EventReminder[] reminderOverrides = new EventReminder[]{
+                            new EventReminder().setMethod("popup").setMinutes(10),
+                            new EventReminder().setMethod("popup").setMinutes(0)
                     };
-
-                    com.google.api.services.calendar.model.Event.Reminders reminders = new com.google.api.services.calendar.model.Event.Reminders()
-                            .setUseDefault(false) // Ignora as definições padrão do utilizador
-                            .setOverrides(Arrays.asList(reminderOverrides));
-
-                    googleEvent.setReminders(reminders);
+                    googleEvent.setReminders(new com.google.api.services.calendar.model.Event.Reminders()
+                            .setUseDefault(false)
+                            .setOverrides(Arrays.asList(reminderOverrides)));
                 }
 
-                service.events().insert("primary", googleEvent).execute();
-                log.info("Evento com alertas Google sincronizado para: {}", request.username());
+                // Executa e recupera o ID gerado pelo Google
+                com.google.api.services.calendar.model.Event executedEvent = service.events().insert("primary", googleEvent).execute();
+
+                // IMPORTANTE: Guarda o ID do Google na nossa entidade para evitar duplicatas no futuro
+                novoEvento.setGoogleEventId(executedEvent.getId());
+                repository.save(novoEvento);
+
+                log.info("Sincronizado com Google Calendar. ID: {}", executedEvent.getId());
 
             } catch (Exception e) {
                 log.error("Falha na sincronização Google: {}", e.getMessage());
@@ -96,154 +100,174 @@ public class EventsServiceImpl implements EventsService {
 
         return mapper.toResponse(novoEvento);
     }
-    private Calendar getCalendarService(String accessToken) throws GeneralSecurityException, IOException {
-        Credential credential = new Credential(BearerToken.authorizationHeaderAccessMethod())
-                .setAccessToken(accessToken);
+    @Override
+    public List<EventsResponse> syncFromGoogle(String googleToken) {
+        try {
+            Calendar service = getCalendarService(googleToken);
+            DateTime now = new DateTime(System.currentTimeMillis());
 
-        return new Calendar.Builder(
-                GoogleNetHttpTransport.newTrustedTransport(),
-                GsonFactory.getDefaultInstance(),
-                credential)
-                .setApplicationName("Aneto-Registo-Horas") // Nome da sua app
+            com.google.api.services.calendar.model.Events events = service.events().list("primary")
+                    .setTimeMin(now)
+                    .setMaxResults(50)
+                    .setOrderBy("startTime")
+                    .setSingleEvents(true)
+                    .execute();
+
+            List<com.google.api.services.calendar.model.Event> items = events.getItems();
+            List<Evento> eventosNovos = new java.util.ArrayList<>();
+
+            for (com.google.api.services.calendar.model.Event gEvent : items) {
+                // VERIFICAÇÃO POR ID (Resolve o erro do seu repositório)
+                if (!repository.existsByGoogleEventId(gEvent.getId())) {
+                    Evento novo = new Evento();
+                    novo.setGoogleEventId(gEvent.getId());
+                    novo.setTitle(gEvent.getSummary());
+                    novo.setNotes(gEvent.getDescription() != null ? gEvent.getDescription() : "Importado do Google");
+
+                    DateTime start = gEvent.getStart().getDateTime();
+                    if (start != null) {
+                        LocalDateTime ldt = LocalDateTime.ofInstant(Instant.ofEpochMilli(start.getValue()), ZoneId.systemDefault());
+                        novo.setReferenceDate(ldt.toLocalDate());
+                        novo.setStartTime(ldt.toLocalTime().truncatedTo(ChronoUnit.MINUTES));
+                    }
+                    eventosNovos.add(repository.save(novo));
+                }
+            }
+            return eventosNovos.stream().map(mapper::toResponse).collect(Collectors.toList());
+
+        } catch (Exception e) {
+            log.error("Erro na sincronização: {}", e.getMessage());
+            throw new RuntimeException("Falha ao ler agenda do Google");
+        }
+    }
+
+    private Calendar getCalendarService(String accessToken) throws GeneralSecurityException, IOException {
+        Credential credential = new Credential(BearerToken.authorizationHeaderAccessMethod()).setAccessToken(accessToken);
+        return new Calendar.Builder(GoogleNetHttpTransport.newTrustedTransport(), GsonFactory.getDefaultInstance(), credential)
+                .setApplicationName("Aneto-Registo-Horas")
                 .build();
     }
-
-@Override
-public void agendarAlerta(EventRequest request) {
-    LocalDateTime dataHoraEvento = LocalDateTime.of(request.referenceDate(), request.startTime());
-
-    Instant momentoAlerta = dataHoraEvento
-            .atZone(ZoneId.systemDefault())
-            .toInstant()
-            .minus(0, ChronoUnit.MINUTES);
-
-    // Se o agendamento for feito para menos de 15 min a partir de agora, envia logo
-    if (momentoAlerta.isBefore(Instant.now())) {
-        momentoAlerta = Instant.now().plusSeconds(1);
+    @Override
+    public void confirmarAlerta(UUID id) {
+        repository.findById(id).ifPresent(evento -> {
+            evento.setAlertConfirmed(true);
+            repository.save(evento);
+            log.info("Evento {} marcado como confirmado. Repetições encerradas.", id);
+        });
     }
 
-    taskScheduler.schedule(() -> {
-        enviarNotificacaoPush(request.notificationSubscription(), request.title());
-    }, momentoAlerta);
-}
+    @Override
+    public void agendarAlerta(EventRequest request) {
+        LocalDateTime dataHoraEvento = LocalDateTime.of(request.referenceDate(), request.startTime());
 
-@Override
-public void enviarNotificacaoPush(PushSubscriptionDTO sub, String titulo) {
-    // Em vez de escrever todo o JSON aqui de novo,
-    // chamamos o outro método passando 'null' no lugar do ID.
-    enviarNotificacaoPushComId(sub, titulo, null);
-}
+        Instant momentoAlerta = dataHoraEvento
+                .atZone(ZoneId.systemDefault())
+                .toInstant()
+                .minus(0, ChronoUnit.MINUTES);
 
-@Override
-public void confirmarAlerta(UUID id) {
-    repository.findById(id).ifPresent(evento -> {
-        evento.setAlertConfirmed(true);
-        repository.save(evento);
-        log.info("Evento {} marcado como confirmado. Repetições encerradas.", id);
-    });
-}
+        // Se o agendamento for feito para menos de 15 min a partir de agora, envia logo
+        if (momentoAlerta.isBefore(Instant.now())) {
+            momentoAlerta = Instant.now().plusSeconds(1);
+        }
 
-@Override
-public void deleteById(UUID id) {
-    repository.findById(id)
-            .ifPresentOrElse(
-                    evento -> {
-                        repository.delete(evento);
-                        log.info(">>> Evento com ID {} foi eliminado com sucesso.", id);
-                    },
-                    () -> log.info(">>> Tentativa de eliminar evento inexistente: {}", id)
+        taskScheduler.schedule(() -> {
+            enviarNotificacaoPush(request.notificationSubscription(), request.title());
+        }, momentoAlerta);
+    }
+
+    @Override
+    public void enviarNotificacaoPush(PushSubscriptionDTO sub, String titulo) {
+        // Em vez de escrever todo o JSON aqui de novo,
+        // chamamos o outro método passando 'null' no lugar do ID.
+        enviarNotificacaoPushComId(sub, titulo, null);
+    }
+
+    @Override
+    public void deleteById(UUID id) {
+        repository.findById(id)
+                .ifPresentOrElse(
+                        evento -> {
+                            repository.delete(evento);
+                            log.info(">>> Evento com ID {} foi eliminado com sucesso.", id);
+                        },
+                        () -> log.info(">>> Tentativa de eliminar evento inexistente: {}", id)
+                );
+    }
+
+    @Override
+    public EventsResponse findById(UUID id) {
+        return repository.findById(id)
+                .map(mapper::toResponse)
+                .orElseThrow(() -> new RuntimeException("Evento não encontrado com o ID: " + id));
+    }
+    @Override
+    public EventsResponse update(UUID id, EventRequest request) {
+        return repository.findById(id).map(existente -> {
+            boolean horarioMudou = !existente.getStartTime().equals(request.startTime()) ||
+                    !existente.getReferenceDate().equals(request.referenceDate());
+
+            mapper.updateEntityFromDto(request, existente);
+            if (horarioMudou) existente.setAlertConfirmed(false);
+
+            Evento salvo = repository.save(existente);
+            if (request.sendAlert() && horarioMudou) agendarAlertaComRepeticao(salvo.getId(), request);
+
+            return mapper.toResponse(salvo);
+        }).orElseThrow();
+    }
+
+    @Override
+    public List<EventsResponse> listAll() {
+        // 1. Vai buscar todas as entidades ao banco de dados
+        List<Evento> eventos = repository.findAll();
+
+        // 2. Transforma a lista de entidades em lista de DTOs usando o mapper
+        return eventos.stream()
+                .map(mapper::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    private void agendarAlertaComRepeticao(UUID eventoId, EventRequest request) {
+        LocalDateTime dataHora = LocalDateTime.of(request.referenceDate(), request.startTime());
+        Instant momento = dataHora.atZone(ZoneId.systemDefault()).toInstant();
+        if (momento.isBefore(Instant.now())) momento = Instant.now().plusSeconds(2);
+
+        taskScheduler.schedule(() -> dispararFluxoRepeticao(eventoId, request), momento);
+    }
+
+    private void dispararFluxoRepeticao(UUID eventoId, EventRequest request) {
+        repository.findById(eventoId).ifPresent(evento -> {
+
+            // CORREÇÃO: alertConfirmed com C maiúsculo
+            if (!evento.isAlertConfirmed()) {
+
+                enviarNotificacaoPushComId(request.notificationSubscription(), request.title(), eventoId);
+
+                log.info("Alerta enviado para o evento {}. Repetindo em 1 minuto...", eventoId);
+
+                taskScheduler.schedule(
+                        () -> dispararFluxoRepeticao(eventoId, request),
+                        Instant.now().plus(1, ChronoUnit.MINUTES)
+                );
+            } else {
+                log.info("O utilizador confirmou o evento {}. Parando alertas.", eventoId);
+            }
+        });
+    }
+
+    private void enviarNotificacaoPushComId(PushSubscriptionDTO sub, String titulo, UUID eventoId) {
+        try {
+            Map<String, Object> payloadMap = Map.of(
+                    "title", "ALERTA: " + titulo,
+                    "body", "Clique aqui para confirmar que viu este alerta!",
+                    "url", "/Lista-agenda",
+                    "eventoId", eventoId // ID crucial aqui
             );
-}
 
-@Override
-public EventsResponse findById(UUID id) {
-    return repository.findById(id)
-            .map(mapper::toResponse)
-            .orElseThrow(() -> new RuntimeException("Evento não encontrado com o ID: " + id));
-}
-
-@Override
-public EventsResponse update(UUID id, EventRequest request) {
-    return repository.findById(id).map(eventoExistente -> {
-
-        // 1. Detectar mudança de horário ANTES de mapear os novos dados
-        boolean horarioMudou = !eventoExistente.getStartTime().equals(request.startTime()) ||
-                !eventoExistente.getReferenceDate().equals(request.referenceDate());
-
-        // 2. Mapeamento Automático (Substitui todos aqueles setters manuais)
-        mapper.updateEntityFromDto(request, eventoExistente);
-
-        // 3. Lógica de Alerta: Se mudou o horário, resetamos a confirmação
-        if (horarioMudou) {
-            log.info("Horário alterado para o evento {}. Reiniciando ciclo de alertas.", id);
-            eventoExistente.setAlertConfirmed(false);
+            String jsonPayload = objectMapper.writeValueAsString(payloadMap);
+            notificationService.sendPushNotification(sub, jsonPayload);
+        } catch (Exception e) {
+            log.error("Erro ao enviar push: {}", e.getMessage());
         }
-
-        Evento atualizado = repository.save(eventoExistente);
-
-        // 4. Reagendar se necessário
-        if (request.sendAlert() && request.notificationSubscription() != null && horarioMudou) {
-            agendarAlertaComRepeticao(atualizado.getId(), request);
-        }
-        return mapper.toResponse(atualizado);
-    }).orElseThrow(() -> new RuntimeException("Evento não encontrado com ID: " + id));
-}
-
-@Override
-public List<EventsResponse> listAll() {
-    // 1. Vai buscar todas as entidades ao banco de dados
-    List<Evento> eventos = repository.findAll();
-
-    // 2. Transforma a lista de entidades em lista de DTOs usando o mapper
-    return eventos.stream()
-            .map(mapper::toResponse)
-            .collect(Collectors.toList());
-}
-
-private void agendarAlertaComRepeticao(UUID eventoId, EventRequest request) {
-    LocalDateTime dataHoraEvento = LocalDateTime.of(request.referenceDate(), request.startTime());
-    Instant momentoAlerta = dataHoraEvento.atZone(ZoneId.systemDefault()).toInstant();
-
-    if (momentoAlerta.isBefore(Instant.now())) {
-        momentoAlerta = Instant.now().plusSeconds(1);
     }
-
-    taskScheduler.schedule(() -> dispararFluxoRepeticao(eventoId, request), momentoAlerta);
-}
-
-private void dispararFluxoRepeticao(UUID eventoId, EventRequest request) {
-    repository.findById(eventoId).ifPresent(evento -> {
-
-        // CORREÇÃO: alertConfirmed com C maiúsculo
-        if (!evento.isAlertConfirmed()) {
-
-            enviarNotificacaoPushComId(request.notificationSubscription(), request.title(), eventoId);
-
-            log.info("Alerta enviado para o evento {}. Repetindo em 1 minuto...", eventoId);
-
-            taskScheduler.schedule(
-                    () -> dispararFluxoRepeticao(eventoId, request),
-                    Instant.now().plus(1, ChronoUnit.MINUTES)
-            );
-        } else {
-            log.info("O utilizador confirmou o evento {}. Parando alertas.", eventoId);
-        }
-    });
-}
-
-private void enviarNotificacaoPushComId(PushSubscriptionDTO sub, String titulo, UUID eventoId) {
-    try {
-        Map<String, Object> payloadMap = Map.of(
-                "title", "ALERTA: " + titulo,
-                "body", "Clique aqui para confirmar que viu este alerta!",
-                "url", "/Lista-agenda",
-                "eventoId", eventoId // ID crucial aqui
-        );
-
-        String jsonPayload = objectMapper.writeValueAsString(payloadMap);
-        notificationService.sendPushNotification(sub, jsonPayload);
-    } catch (Exception e) {
-        System.err.println("Erro: " + e.getMessage());
-    }
-}
 }

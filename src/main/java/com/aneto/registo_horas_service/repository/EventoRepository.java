@@ -10,4 +10,9 @@ import java.util.UUID;
 @Repository
 public interface EventoRepository extends JpaRepository<Evento, UUID> {
     Optional<Evento> findById(UUID eventoId);
+    // O método que estava faltando
+    boolean existsByTitle(String title);
+
+    // Melhor alternativa: evitar duplicatas pelo ID único do Google
+    boolean existsByGoogleEventId(String googleEventId);
 }

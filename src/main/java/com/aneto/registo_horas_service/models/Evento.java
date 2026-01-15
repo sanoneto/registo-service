@@ -37,6 +37,8 @@ public class Evento {
 
     private boolean sendAlert;
 
+    private String googleEventId;
+
     @Column(name = "alert_confirmed", columnDefinition = "boolean default false")
     private boolean alertConfirmed = false;
 }
