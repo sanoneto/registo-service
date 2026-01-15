@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.UUID;
 
 public interface EventsService {
-    EventsResponse criarEvento (EventRequest request);
+    EventsResponse create(EventRequest request, String googleToken);
     List<EventsResponse> listAll ();
      void agendarAlerta(EventRequest request);
     void enviarNotificacaoPush(PushSubscriptionDTO sub, String msg);
