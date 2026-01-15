@@ -50,10 +50,14 @@ public class EventoController {
     }
 
     @DeleteMapping("/eventos/{id}")
-    public ResponseEntity<Void> eliminarEvento(@PathVariable UUID id) {
-        System.out.println(">>> PEDIDO PARA ELIMINAR EVENTO ID: " + id);
-        eventsService.deleteById(id);
-        return ResponseEntity.noContent().build(); // Retorna 204 No Content após remoção bem-sucedida
+    public ResponseEntity<Void> eliminarEvento(
+            @PathVariable UUID id,
+            @RequestHeader("Authorization") String systemToken,
+            @RequestHeader(value = "X-Google-Token", required = false) String googleToken
+    ) {
+        // Passamos ambos para o service
+        eventsService.deleteById(id, googleToken);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/eventos/{id}")

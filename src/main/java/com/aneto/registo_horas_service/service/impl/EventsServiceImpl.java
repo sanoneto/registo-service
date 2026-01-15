@@ -17,6 +17,7 @@ import com.google.api.client.util.DateTime;
 import com.google.api.services.calendar.Calendar;
 import com.google.api.services.calendar.model.EventDateTime;
 import com.google.api.services.calendar.model.EventReminder;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -182,7 +183,7 @@ public class EventsServiceImpl implements EventsService {
         enviarNotificacaoPushComId(sub, titulo, null);
     }
 
-    @Override
+   /* @Override
     public void deleteById(UUID id) {
         repository.findById(id)
                 .ifPresentOrElse(
@@ -192,6 +193,31 @@ public class EventsServiceImpl implements EventsService {
                         },
                         () -> log.info(">>> Tentativa de eliminar evento inexistente: {}", id)
                 );
+    }*/
+   @Override
+    @Transactional
+    public void deleteById(UUID id, String googleToken) {
+        repository.findById(id).ifPresentOrElse(
+                evento -> {
+                    // 1. Tenta apagar no Google Agenda primeiro (ou guarda o ID para apagar depois)
+                    if (evento.getGoogleEventId() != null) {
+                        try {
+                            Calendar service = getCalendarService(googleToken);
+                            // O método delete do Google pede o ID da agenda (primary) e o ID do evento
+                            service.events().delete("primary", evento.getGoogleEventId()).execute();
+                            log.info(">>> Evento removido do Google Agenda: {}", evento.getGoogleEventId());
+                        } catch (Exception e) {
+                            log.error(">>> Erro ao apagar no Google: {}. O evento local será mantido ou removido?", e.getMessage());
+                            // Opcional: lançar exceção aqui se não quiser apagar localmente caso falhe no Google
+                        }
+                    }
+
+                    // 2. Apaga no seu banco de dados local
+                    repository.delete(evento);
+                    log.info(">>> Evento com ID {} foi eliminado da base de dados local.", id);
+                },
+                () -> log.warn(">>> Tentativa de eliminar evento inexistente: {}", id)
+        );
     }
 
     @Override

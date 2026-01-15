@@ -13,7 +13,8 @@ public interface EventsService {
      void agendarAlerta(EventRequest request);
     void enviarNotificacaoPush(PushSubscriptionDTO sub, String msg);
     void confirmarAlerta(UUID id);
-    void deleteById(UUID id);
+    //void deleteById(UUID id);
+    void deleteById(UUID id, String googleToken);
     EventsResponse findById(UUID id);
     EventsResponse update(UUID id, EventRequest request);
     List<EventsResponse> syncFromGoogle(String googleToken);
