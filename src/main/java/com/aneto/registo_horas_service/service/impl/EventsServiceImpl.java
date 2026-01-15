@@ -48,39 +48,49 @@ public class EventsServiceImpl implements EventsService {
 
     @Override
     public EventsResponse create(EventRequest request, String googleToken) {
-        // 1. Guarda na base de dados local (comportamento padrão)
+        // 1. Guarda na base de dados local
         Evento novoEvento = mapper.toEntity(request);
         novoEvento = repository.save(novoEvento);
 
-        // 2. Lógica de Push Notification (as funções que você postou)
+        // 2. Lógica de Push Notification Local (Sua lógica atual)
         if (request.sendAlert() && request.notificationSubscription() != null) {
             agendarAlertaComRepeticao(novoEvento.getId(), request);
         }
 
-        // 3. NOVO: Sincronização com Google Calendar
+        // 3. Sincronização Google Calendar + Notificação Push Google
         if (googleToken != null && !googleToken.isEmpty()) {
             try {
                 Calendar service = getCalendarService(googleToken);
 
-                // Criar o objeto de evento da Google
                 com.google.api.services.calendar.model.Event googleEvent = new com.google.api.services.calendar.model.Event()
                         .setSummary(request.title())
                         .setDescription(request.notes() + "\nProjeto: " + request.project());
 
-                // Configurar horários
+                // Configuração de horários
                 DateTime startDateTime = new DateTime(request.referenceDate().toString() + "T" + request.startTime() + ":00Z");
                 googleEvent.setStart(new EventDateTime().setDateTime(startDateTime));
+                googleEvent.setEnd(new EventDateTime().setDateTime(startDateTime)); // Recomendado: adicionar +1h aqui
 
-                // Definir fim (ex: 1h depois se não houver endTime)
-                googleEvent.setEnd(new EventDateTime().setDateTime(startDateTime));
+                // --- NOVO: Lógica de Lembretes (Pop-up no Telemóvel) ---
+                if (request.sendAlert()) {
+                    EventReminder[] reminderOverrides = new EventReminder[] {
+                            // "popup" ativa a notificação visual e sonora no Android/iOS
+                            new EventReminder().setMethod("popup").setMinutes(10), // 10 min antes
+                            new EventReminder().setMethod("popup").setMinutes(0)   // No momento exato
+                    };
 
-                // Inserir na agenda principal do utilizador
+                    com.google.api.services.calendar.model.Event.Reminders reminders = new com.google.api.services.calendar.model.Event.Reminders()
+                            .setUseDefault(false) // Ignora as definições padrão do utilizador
+                            .setOverrides(Arrays.asList(reminderOverrides));
+
+                    googleEvent.setReminders(reminders);
+                }
+
                 service.events().insert("primary", googleEvent).execute();
-                log.info("Evento sincronizado com Google Calendar para o utilizador {}", request.username());
+                log.info("Evento com alertas Google sincronizado para: {}", request.username());
 
             } catch (Exception e) {
                 log.error("Falha na sincronização Google: {}", e.getMessage());
-                // Não travamos o processo se o Google falhar, o evento local já existe
             }
         }
 
