@@ -25,13 +25,13 @@ public class TargetServiceClientImpl implements TargetServiceClient {
     public void updateProfilePicUrl(String username, String publicUrl) {
         log.info("A iniciar chamada PUT para o micro-serviço de Auth para atualizar a URL para: {}", publicUrl);
 
-        final String API_PATH = "/";
+        final String API_PATH = "/updateProfile";
         try {
             targetServiceWebClient.put() // CORREÇÃO 1: Deve ser PUT (conforme a API remota)
 
                     // CORREÇÃO 2: Constrói a URI com os parâmetros de consulta
                     .uri(uriBuilder -> uriBuilder
-                            .path(API_PATH) // O caminho base é "/"
+                            .path(API_PATH) // O caminho base é "/updateProfile"
                             .queryParam("username", username) // Adiciona username como ?username=...
                             .queryParam("publicUrl", publicUrl) // Adiciona publicUrl como &publicUrl=...
                             .build()
