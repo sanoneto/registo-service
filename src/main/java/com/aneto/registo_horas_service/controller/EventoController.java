@@ -42,7 +42,7 @@ public class EventoController {
 
 
     // Adiciona o CrossOrigin para a Gateway/React não bloquear
-    @CrossOrigin(origins = "*")
+    @CrossOrigin(origins = "*", allowedHeaders = "*")
     @PostMapping("/eventos/{id}/confirmar-alerta") // Alterado para coincidir com o JS
     public ResponseEntity<Void> confirmarAlerta(@PathVariable UUID id) {
         System.out.println(">>> RECEBIDO PEDIDO DE CONFIRMAÇÃO PARA ID: " + id);
