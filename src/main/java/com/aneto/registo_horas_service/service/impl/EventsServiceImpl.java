@@ -28,13 +28,9 @@ import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -101,6 +97,7 @@ public class EventsServiceImpl implements EventsService {
 
         return mapper.toResponse(novoEvento);
     }
+
     @Override
     public List<EventsResponse> syncFromGoogle(String googleToken) {
         try {
@@ -148,6 +145,7 @@ public class EventsServiceImpl implements EventsService {
                 .setApplicationName("Aneto-Registo-Horas")
                 .build();
     }
+
     @Override
     public void confirmarAlerta(UUID id) {
         repository.findById(id).ifPresent(evento -> {
@@ -183,40 +181,45 @@ public class EventsServiceImpl implements EventsService {
         enviarNotificacaoPushComId(sub, titulo, null);
     }
 
-   /* @Override
-    public void deleteById(UUID id) {
-        repository.findById(id)
-                .ifPresentOrElse(
-                        evento -> {
-                            repository.delete(evento);
-                            log.info(">>> Evento com ID {} foi eliminado com sucesso.", id);
-                        },
-                        () -> log.info(">>> Tentativa de eliminar evento inexistente: {}", id)
-                );
-    }*/
-   @Override
+    /* @Override
+     public void deleteById(UUID id) {
+         repository.findById(id)
+                 .ifPresentOrElse(
+                         evento -> {
+                             repository.delete(evento);
+                             log.info(">>> Evento com ID {} foi eliminado com sucesso.", id);
+                         },
+                         () -> log.info(">>> Tentativa de eliminar evento inexistente: {}", id)
+                 );
+     }*/
+    @Override
     @Transactional
     public void deleteById(UUID id, String googleToken) {
         repository.findById(id).ifPresentOrElse(
                 evento -> {
-                    // 1. Tenta apagar no Google Agenda primeiro (ou guarda o ID para apagar depois)
-                    if (evento.getGoogleEventId() != null) {
+                    // 1. Tenta apagar no Google Agenda apenas se tivermos o ID e o Token
+                    if (evento.getGoogleEventId() != null && googleToken != null && !googleToken.isBlank()) {
                         try {
+                            // Movemos o getCalendarService para dentro do try
                             Calendar service = getCalendarService(googleToken);
-                            // O método delete do Google pede o ID da agenda (primary) e o ID do evento
                             service.events().delete("primary", evento.getGoogleEventId()).execute();
                             log.info(">>> Evento removido do Google Agenda: {}", evento.getGoogleEventId());
                         } catch (Exception e) {
-                            log.error(">>> Erro ao apagar no Google: {}. O evento local será mantido ou removido?", e.getMessage());
-                            // Opcional: lançar exceção aqui se não quiser apagar localmente caso falhe no Google
+                            // Importante: Logar o erro mas permitir que o delete local continue
+                            log.error(">>> Erro ao apagar no Google (O evento pode já não existir lá): {}", e.getMessage());
                         }
                     }
 
                     // 2. Apaga no seu banco de dados local
+                    // Isso deve estar FORA do try do Google para garantir que o registro local suma
                     repository.delete(evento);
-                    log.info(">>> Evento com ID {} foi eliminado da base de dados local.", id);
+                    log.info(">>> Evento com ID {} eliminado localmente.", id);
                 },
-                () -> log.warn(">>> Tentativa de eliminar evento inexistente: {}", id)
+                () -> {
+                    log.warn(">>> Tentativa de eliminar evento inexistente: {}", id);
+                    // Opcional: lançar uma exceção específica para o Spring retornar 404 em vez de 500
+                    throw new NoSuchElementException("Evento não encontrado com o ID: " + id);
+                }
         );
     }
 
@@ -226,6 +229,7 @@ public class EventsServiceImpl implements EventsService {
                 .map(mapper::toResponse)
                 .orElseThrow(() -> new RuntimeException("Evento não encontrado com o ID: " + id));
     }
+
     @Override
     public EventsResponse update(UUID id, EventRequest request) {
         return repository.findById(id).map(existente -> {

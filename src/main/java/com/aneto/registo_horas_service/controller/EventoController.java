@@ -5,6 +5,7 @@ import com.aneto.registo_horas_service.dto.response.EventsResponse;
 import com.aneto.registo_horas_service.service.EventsService;
 import com.aneto.registo_horas_service.service.impl.EventsServiceImpl;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -16,8 +17,8 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1")
 @RequiredArgsConstructor
+@Slf4j
 public class EventoController {
-    private static final Logger log = LoggerFactory.getLogger(EventoController.class);
     private final EventsService eventsService;
 
     @PostMapping("/eventos")
@@ -52,10 +53,13 @@ public class EventoController {
     @DeleteMapping("/eventos/{id}")
     public ResponseEntity<Void> eliminarEvento(
             @PathVariable UUID id,
-            @RequestHeader("Authorization") String systemToken,
+            @RequestHeader(value = "Authorization", required = false) String systemToken,
             @RequestHeader(value = "X-Google-Token", required = false) String googleToken
     ) {
-        // Passamos ambos para o service
+        // Log para debugar se os tokens estão a chegar
+        log.info(">>> System Token presente: {}", systemToken != null);
+        log.info(">>> Google Token presente: {}", googleToken != null);
+
         eventsService.deleteById(id, googleToken);
         return ResponseEntity.noContent().build();
     }
