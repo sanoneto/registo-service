@@ -75,10 +75,10 @@ public class EventsServiceImpl implements EventsService {
             }
         }
         // 2. Alerta Push Local
-        if (request.sendAlert() && request.notificationSubscription() != null) {
+        if (request.sendAlert()) {
+            log.info("📢 Agendando fluxo de alertas para o evento...");
             agendarAlertaComRepeticao(novoEvento.getId(), request);
         }
-
         // 3. Google Calendar
         if (googleToken != null && !googleToken.isEmpty()) {
             try {
@@ -289,21 +289,17 @@ public class EventsServiceImpl implements EventsService {
 
     private void dispararFluxoRepeticao(UUID eventoId) {
         repository.findById(eventoId).ifPresentOrElse(evento -> {
-
             if (!evento.isAlertConfirmed()) {
-                log.info("📢 [AlertaThread] Disparando alerta para: {}", evento.getTitle());
+                log.info("📢 [AlertaThread] Disparando repetição para: {}", evento.getTitle());
 
-                // Aqui usamos os dados da ENTIDADE (evento), não do request
-                // Se não tiver isMobile na entidade, pode forçar true ou adicionar o campo na DB
+                // Forçamos o envio para o Telegram se for mobile ou se não houver subscrição web
                 enviarViaTelegram(evento.getTitle(), eventoId);
 
-                // Reagenda a si mesmo usando apenas o ID
+                // Reagenda
                 taskScheduler.schedule(
                         () -> dispararFluxoRepeticao(eventoId),
                         Instant.now().plus(1, ChronoUnit.MINUTES)
                 );
-            } else {
-                log.info("✅ Evento {} já confirmado. Parando repetições.", eventoId);
             }
         }, () -> log.warn("⚠️ Evento {} não encontrado para repetição.", eventoId));
     }
