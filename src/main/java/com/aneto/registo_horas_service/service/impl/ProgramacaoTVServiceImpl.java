@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 @Service
 @Slf4j // Se usares Lombok, ou usa o logger manual que criaste
@@ -26,53 +27,67 @@ public class ProgramacaoTVServiceImpl implements ProgramacaoTVService {
     }
 
     // 1. O CICLO (O "Círculo" que automatiza tudo)
-    @Scheduled(fixedRate = 7200000) // Roda a cada 2 horas
+    @Scheduled(fixedRate = 7200000)
     public void updateJob() {
-        log.info("Iniciando tarefa agendada: Atualizando Base de Dados de Jogos TV");
+        log.info("Iniciando atualização da programação de TV...");
 
-        // Chamamos a função que faz o scraping
         List<JogoTV> novosJogos = extrairJogos();
 
-        if (!novosJogos.isEmpty()) {
-            repository.deleteAll(); // Remove jogos antigos
-            repository.saveAll(novosJogos); // Guarda os novos na tabela
-            log.info("Base de dados atualizada com {} novos jogos.", novosJogos.size());
+        // SÓ APAGA SE TIVERMOS DADOS NOVOS (Fallback de Segurança)
+        if (novosJogos != null && !novosJogos.isEmpty()) {
+            repository.deleteAll();
+            repository.saveAll(novosJogos);
+            log.info("Base de dados atualizada com sucesso.");
         } else {
-            log.warn("A extração não retornou jogos. A base de dados não foi alterada.");
+            log.error("Não foi possível obter novos dados. Mantendo os dados anteriores para evitar blackout.");
         }
     }
 
-    // 2. A LÓGICA DE SCRAPING (A tua função atual)
     @Override
     public List<JogoTV> extrairJogos() {
         List<JogoTV> listaJogos = new ArrayList<>();
-        String url = "https://www.zerozero.pt/agenda.php";
+        // URL específica de TV
+        String url = "https://www.zerozero.pt/tv.php";
 
         try {
             Document doc = Jsoup.connect(url)
-                    .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                    .timeout(10000)
+                    .userAgent(getRandomUserAgent()) // Disfarce variável
+                    .header("Accept-Language", "pt-PT,pt;q=0.9")
+                    .timeout(20000) // Mais tempo para responder
                     .get();
 
-            Elements blocosJogos = doc.select(".zz-agenda-item");
+            // O seletor para a página /tv.php costuma ser as linhas da tabela de jogos
+            Elements linhas = doc.select(".box.agenda-tv table tr");
 
-            for (Element bloco : blocosJogos) {
-                String equipas = bloco.select(".teams").text();
-                String canal = bloco.select(".channel img").attr("title");
-                String hora = bloco.select(".time").text();
+            for (Element linha : linhas) {
+                String canal = linha.select(".canal img").attr("title").toUpperCase();
 
-                if (!equipas.isEmpty()) {
-                    // Criamos o objeto da entidade
-                    JogoTV jogo = new JogoTV();
-                    jogo.setEquipas(equipas);
-                    jogo.setCanal(canal);
-                    jogo.setHora(hora);
-                    listaJogos.add(jogo);
+                // Filtro direto para o que pediste
+                if (canal.contains("SPORT TV") || canal.contains("BENFICA TV") || canal.contains("DAZN")) {
+                    String equipas = linha.select(".home, .away").text(); // Captura as duas equipas
+                    String hora = linha.select(".hora").text();
+
+                    if (!equipas.isEmpty()) {
+                        JogoTV jogo = new JogoTV();
+                        jogo.setEquipas(equipas.replace(" ", " vs "));
+                        jogo.setCanal(canal);
+                        jogo.setHora(hora);
+                        listaJogos.add(jogo);
+                    }
                 }
             }
-        } catch (IOException e) {
-            log.error("Erro no scraping: {}", e.getMessage());
+        } catch (Exception e) {
+            log.error("Erro crítico no scraping: {}", e.getMessage());
         }
         return listaJogos;
+    }
+
+    private String getRandomUserAgent() {
+        String[] agents = {
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0",
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Safari/13.1.3",
+                "Mozilla/5.0 (X11; Linux x86_64) Firefox/121.0"
+        };
+        return agents[new Random().nextInt(agents.length)];
     }
 }
