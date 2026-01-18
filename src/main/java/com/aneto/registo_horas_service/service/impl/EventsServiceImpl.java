@@ -19,10 +19,13 @@ import com.google.api.services.calendar.model.EventDateTime;
 import com.google.api.services.calendar.model.EventReminder;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
 import java.io.IOException;
 import java.security.GeneralSecurityException;
@@ -41,7 +44,17 @@ public class EventsServiceImpl implements EventsService {
     private final EventsMapper mapper;
     private final TaskScheduler taskScheduler; // Adicionado final
     private final NotificationService notificationService; // Injetado aqui
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
+    private final RestTemplate restTemplate;
+
+    @Value("${telegram.botToken}")
+    private String botToken;
+
+    @Value("${telegram.chatId}")
+    private String chatId;
+
+    @Value("${telegram.telegramUrl}")
+    private String telegramUrl;
 
     @Override
     public EventsResponse create(EventRequest request, String googleToken) {
@@ -170,28 +183,16 @@ public class EventsServiceImpl implements EventsService {
         }
 
         taskScheduler.schedule(() -> {
-            enviarNotificacaoPush(request.notificationSubscription(), request.title());
+            enviarNotificacaoPush(request.notificationSubscription(), request.title(),request.isMobile());
         }, momentoAlerta);
     }
 
     @Override
-    public void enviarNotificacaoPush(PushSubscriptionDTO sub, String titulo) {
+    public void enviarNotificacaoPush(PushSubscriptionDTO sub, String titulo, boolean isMobile) {
         // Em vez de escrever todo o JSON aqui de novo,
         // chamamos o outro método passando 'null' no lugar do ID.
-        enviarNotificacaoPushComId(sub, titulo, null);
+        enviarNotificacaoPushComId(sub, titulo, null,isMobile);
     }
-
-    /* @Override
-     public void deleteById(UUID id) {
-         repository.findById(id)
-                 .ifPresentOrElse(
-                         evento -> {
-                             repository.delete(evento);
-                             log.info(">>> Evento com ID {} foi eliminado com sucesso.", id);
-                         },
-                         () -> log.info(">>> Tentativa de eliminar evento inexistente: {}", id)
-                 );
-     }*/
     @Override
     @Transactional
     public void deleteById(UUID id, String googleToken) {
@@ -271,7 +272,7 @@ public class EventsServiceImpl implements EventsService {
             // CORREÇÃO: alertConfirmed com C maiúsculo
             if (!evento.isAlertConfirmed()) {
 
-                enviarNotificacaoPushComId(request.notificationSubscription(), request.title(), eventoId);
+                enviarNotificacaoPushComId(request.notificationSubscription(), request.title(), eventoId, request.isMobile());
 
                 log.info("Alerta enviado para o evento {}. Repetindo em 1 minuto...", eventoId);
 
@@ -285,19 +286,64 @@ public class EventsServiceImpl implements EventsService {
         });
     }
 
-    private void enviarNotificacaoPushComId(PushSubscriptionDTO sub, String titulo, UUID eventoId) {
+    private void enviarNotificacaoPushComId(PushSubscriptionDTO sub, String titulo, UUID eventoId, boolean isMobile) {
+        if (isMobile) {
+            log.info("📱 Detectado Mobile: Enviando via Telegram para o evento {}", eventoId);
+            enviarViaTelegram(titulo, eventoId);
+        } else {
+            log.info("💻 Detectado Desktop: Enviando via Web Push para o evento {}", eventoId);
+            enviarViaWebPush(sub, titulo, eventoId);
+        }
+    }
+
+    private void enviarViaTelegram(String titulo, UUID eventoId) {
+        try {
+            String vTelegramUrl = telegramUrl + botToken + "/sendMessage";
+
+            // URL que o botão vai chamar para confirmar e parar o loop no seu backend
+            Map<String, Object> body = getStringObjectMap(titulo, eventoId, chatId);
+
+            restTemplate.postForEntity(vTelegramUrl, body, String.class);
+        } catch (Exception e) {
+            log.error("❌ Erro ao enviar Telegram: {}", e.getMessage());
+        }
+    }
+
+    @NotNull
+    private static Map<String, Object> getStringObjectMap(String titulo, UUID eventoId, String chatId) {
+        String urlConfirmar = "https://treg-aneto.com/api/v1/eventos/" + eventoId + "/confirmar-alerta";
+
+        Map<String, Object> body = Map.of(
+                "chat_id", chatId,
+                "text", "🚨 *ALERTA TREG*\n\nEvento: " + titulo + "\n_Clique no botão abaixo para confirmar._",
+                "parse_mode", "Markdown",
+                "reply_markup", Map.of(
+                        "inline_keyboard", List.of(
+                                List.of(Map.of("text", "Confirmar ✅", "url", urlConfirmar))
+                        )
+                )
+        );
+        return body;
+    }
+
+    private void enviarViaWebPush(PushSubscriptionDTO sub, String titulo, UUID eventoId) {
+        if (sub == null || sub.getEndpoint() == null) {
+            log.warn("⚠️ Tentativa de Web Push sem subscrição válida.");
+            return;
+        }
         try {
             Map<String, Object> payloadMap = Map.of(
                     "title", "ALERTA: " + titulo,
-                    "body", "Clique aqui para confirmar que viu este alerta!",
+                    "body", "Clique para confirmar!",
                     "url", "/Lista-agenda",
-                    "eventoId", eventoId // ID crucial aqui
+                    "eventoId", eventoId
             );
 
             String jsonPayload = objectMapper.writeValueAsString(payloadMap);
             notificationService.sendPushNotification(sub, jsonPayload);
         } catch (Exception e) {
-            log.error("Erro ao enviar push: {}", e.getMessage());
+            log.error("❌ Erro ao enviar Web Push: {}", e.getMessage());
         }
     }
 }
+

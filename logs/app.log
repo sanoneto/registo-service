@@ -1,6 +1,25 @@
-2026-01-17T00:05:15.189Z  INFO 30272 --- [registo-horas-service] [http-nio-8083-exec-5] c.a.r.s.impl.RegistosHorasServiceImpl    : Encontrados 8 registros na página 0 de 3
-2026-01-17T00:05:15.215Z  INFO 30272 --- [registo-horas-service] [http-nio-8083-exec-10] c.a.r.s.impl.RegistosHorasServiceImpl    : Encontrados 8 registros na página 0 de 3
-2026-01-17T00:05:17.390Z  INFO 30272 --- [registo-horas-service] [http-nio-8083-exec-7] c.a.r.s.impl.RegistosHorasServiceImpl    : Encontrados 8 registros na página 1 de 3
-2026-01-17T00:05:21.553Z  INFO 30272 --- [registo-horas-service] [http-nio-8083-exec-6] c.a.r.s.impl.RegistosHorasServiceImpl    : Encontrados 6 registros na página 2 de 3
-2026-01-17T00:05:24.105Z  INFO 30272 --- [registo-horas-service] [http-nio-8083-exec-1] c.a.r.s.impl.RegistosHorasServiceImpl    : Encontrados 8 registros na página 1 de 3
-2026-01-17T00:05:26.292Z  INFO 30272 --- [registo-horas-service] [http-nio-8083-exec-9] c.a.r.s.impl.RegistosHorasServiceImpl    : Encontrados 8 registros na página 0 de 3
+2026-01-18T00:26:41.848Z ERROR 51528 --- [registo-horas-service] [http-nio-8083-exec-7] c.a.r.exception.GlobalExceptionHandler   : Acesso negado: Access Denied
+2026-01-18T00:26:41.884Z ERROR 51528 --- [registo-horas-service] [http-nio-8083-exec-8] c.a.r.exception.GlobalExceptionHandler   : Acesso negado: Access Denied
+2026-01-18T00:26:41.922Z ERROR 51528 --- [registo-horas-service] [http-nio-8083-exec-9] c.a.r.exception.GlobalExceptionHandler   : Acesso negado: Access Denied
+2026-01-18T00:26:41.935Z ERROR 51528 --- [registo-horas-service] [http-nio-8083-exec-10] c.a.r.exception.GlobalExceptionHandler   : Acesso negado: Access Denied
+2026-01-18T00:36:53.949Z ERROR 51528 --- [registo-horas-service] [http-nio-8083-exec-2] c.a.r.exception.GlobalExceptionHandler   : Acesso negado: Access Denied
+2026-01-18T00:36:53.960Z ERROR 51528 --- [registo-horas-service] [http-nio-8083-exec-4] c.a.r.exception.GlobalExceptionHandler   : Acesso negado: Access Denied
+2026-01-18T00:36:53.979Z ERROR 51528 --- [registo-horas-service] [http-nio-8083-exec-5] c.a.r.exception.GlobalExceptionHandler   : Acesso negado: Access Denied
+2026-01-18T00:36:53.991Z ERROR 51528 --- [registo-horas-service] [http-nio-8083-exec-3] c.a.r.exception.GlobalExceptionHandler   : Acesso negado: Access Denied
+2026-01-18T00:37:20.945Z ERROR 51528 --- [registo-horas-service] [http-nio-8083-exec-6] c.a.r.exception.GlobalExceptionHandler   : Acesso negado: Access Denied
+2026-01-18T00:37:20.960Z ERROR 51528 --- [registo-horas-service] [http-nio-8083-exec-7] c.a.r.exception.GlobalExceptionHandler   : Acesso negado: Access Denied
+2026-01-18T00:37:35.824Z ERROR 51528 --- [registo-horas-service] [http-nio-8083-exec-8] c.a.r.exception.GlobalExceptionHandler   : Acesso negado: Access Denied
+2026-01-18T00:37:35.836Z ERROR 51528 --- [registo-horas-service] [http-nio-8083-exec-9] c.a.r.exception.GlobalExceptionHandler   : Acesso negado: Access Denied
+2026-01-18T00:40:41.860Z ERROR 51528 --- [registo-horas-service] [http-nio-8083-exec-1] c.a.r.exception.GlobalExceptionHandler   : Acesso negado: Access Denied
+2026-01-18T00:40:41.870Z ERROR 51528 --- [registo-horas-service] [http-nio-8083-exec-2] c.a.r.exception.GlobalExceptionHandler   : Acesso negado: Access Denied
+2026-01-18T01:43:59.381Z ERROR 51528 --- [registo-horas-service] [http-nio-8083-exec-5] c.a.r.exception.GlobalExceptionHandler   : Acesso negado: Access Denied
+2026-01-18T01:43:59.398Z ERROR 51528 --- [registo-horas-service] [http-nio-8083-exec-3] c.a.r.exception.GlobalExceptionHandler   : Acesso negado: Access Denied
+2026-01-18T01:43:59.430Z ERROR 51528 --- [registo-horas-service] [http-nio-8083-exec-6] c.a.r.exception.GlobalExceptionHandler   : Acesso negado: Access Denied
+2026-01-18T01:43:59.445Z ERROR 51528 --- [registo-horas-service] [http-nio-8083-exec-7] c.a.r.exception.GlobalExceptionHandler   : Acesso negado: Access Denied
+2026-01-18T01:53:33.309Z  INFO 51528 --- [registo-horas-service] [AlertaThread-10] c.a.r.s.impl.ProgramacaoTVServiceImpl    : Iniciando tarefa agendada: Atualizando Base de Dados de Jogos TV
+2026-01-18T01:53:34.839Z  WARN 51528 --- [registo-horas-service] [AlertaThread-10] c.a.r.s.impl.ProgramacaoTVServiceImpl    : A extração não retornou jogos. A base de dados não foi alterada.
+2026-01-18T03:08:42.091Z  INFO 51528 --- [registo-horas-service] [SpringApplicationShutdownHook] o.s.b.w.e.tomcat.GracefulShutdown        : Commencing graceful shutdown. Waiting for active requests to complete
+2026-01-18T03:08:42.102Z  INFO 51528 --- [registo-horas-service] [tomcat-shutdown] o.s.b.w.e.tomcat.GracefulShutdown        : Graceful shutdown complete
+2026-01-18T03:08:44.242Z  INFO 51528 --- [registo-horas-service] [SpringApplicationShutdownHook] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'default'
+2026-01-18T03:08:44.258Z  INFO 51528 --- [registo-horas-service] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
+2026-01-18T03:08:44.261Z  INFO 51528 --- [registo-horas-service] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.

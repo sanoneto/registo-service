@@ -113,6 +113,12 @@ vapid:
     key: ${VAPID_PRIVATE_KEY}
   subject:  ${VAPID_SUBJECT}
 
+telegram:
+  botToken: ${TELEGRAM_BOT_TOKEN}
+  chatId: ${TELEGRAM_CHAT_ID}
+  telegramUrl: ${TELEGRAM_URL}
+
+
 app:
   queries:
     monthly-summary: "SELECT 
