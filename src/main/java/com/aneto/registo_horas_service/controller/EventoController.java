@@ -5,9 +5,11 @@ import com.aneto.registo_horas_service.dto.response.EventsResponse;
 import com.aneto.registo_horas_service.service.EventsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.URI;
 import java.util.List;
 import java.util.UUID;
 
@@ -39,11 +41,18 @@ public class EventoController {
 
 
     // Adiciona o CrossOrigin para a Gateway/React não bloquear
-    @PostMapping("/eventos/{id}/confirmar-alerta") // Alterado para coincidir com o JS
+    // Aceita tanto GET (Telegram) como POST (Service Worker)
+    @GetMapping("/eventos/{id}/confirmar-alerta")
     public ResponseEntity<Void> confirmarAlerta(@PathVariable UUID id) {
-        System.out.println(">>> RECEBIDO PEDIDO DE CONFIRMAÇÃO PARA ID: " + id);
+        log.info(">>> PROCESSANDO CONFIRMAÇÃO PARA ID: {}", id);
+
+        // 1. Executa a lógica de parar o alerta no banco de dados
         eventsService.confirmarAlerta(id);
-        return ResponseEntity.ok().build();
+
+        // Podes criar uma rota no teu React chamada /sucesso ou mandar para a Home
+        return ResponseEntity.status(HttpStatus.FOUND)
+                .location(URI.create("https://www.sanoneto.com/Lista-agenda?confirmado=true"))
+                .build();
     }
 
     @DeleteMapping("/eventos/{id}")
