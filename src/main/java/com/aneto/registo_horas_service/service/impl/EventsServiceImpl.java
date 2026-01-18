@@ -23,6 +23,7 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -299,18 +300,21 @@ public class EventsServiceImpl implements EventsService {
     private void enviarViaTelegram(String titulo, UUID eventoId) {
         try {
             String vTelegramUrl = telegramUrl + botToken + "/sendMessage";
-
-            // URL que o botão vai chamar para confirmar e parar o loop no seu backend
             Map<String, Object> body = getStringObjectMap(titulo, eventoId, chatId);
 
-            restTemplate.postForEntity(vTelegramUrl, body, String.class);
+            log.info("Enviando requisição para o Telegram: {}", vTelegramUrl);
+            ResponseEntity<String> response = restTemplate.postForEntity(vTelegramUrl, body, String.class);
+            log.info("Resposta da API do Telegram: {}", response.getStatusCode());
+
+        } catch (org.springframework.web.client.HttpStatusCodeException e) {
+            // Erros retornados pela API (ex: 401 Unauthorized, 400 Bad Request)
+            log.error("❌ Telegram API Error: {} - {}", e.getStatusCode(), e.getResponseBodyAsString());
         } catch (Exception e) {
-            log.error("❌ Erro ao enviar Telegram: {}", e.getMessage());
+            // Erros de conexão ou timeout
+            log.error("❌ Erro de conectividade ao enviar Telegram: ", e);
         }
     }
-
-    @NotNull
-    private static Map<String, Object> getStringObjectMap(String titulo, UUID eventoId, String chatId) {
+    private  Map<String, Object> getStringObjectMap(String titulo, UUID eventoId, String chatId) {
         String urlConfirmar = "https://treg-aneto.com/api/v1/eventos/" + eventoId + "/confirmar-alerta";
 
         Map<String, Object> body = Map.of(
