@@ -271,15 +271,10 @@ public class EventsServiceImpl implements EventsService {
     }
 
     private void agendarAlertaComRepeticao(UUID eventoId, EventRequest request) {
-        // 1. Forçar a Timezone de Portugal para o cálculo
         ZoneId zoneLisboa = ZoneId.of("Europe/Lisbon");
-
         LocalDateTime dataHora = LocalDateTime.of(request.referenceDate(), request.startTime());
-
-        // Converter o tempo local de Lisboa para um Instante global (UTC)
         Instant momentoInicio = dataHora.atZone(zoneLisboa).toInstant();
 
-        // 2. Se o momento calculado for no passado (ou agora), damos 5 segundos de margem
         if (momentoInicio.isBefore(Instant.now())) {
             momentoInicio = Instant.now().plusSeconds(5);
             log.info("⚠️ O evento já passou ou é agora. Agendando disparo imediato para {}", eventoId);
@@ -288,19 +283,23 @@ public class EventsServiceImpl implements EventsService {
         log.info("⏰ [AGENDADO] Evento: {} | Hora Lisboa: {} | Instant Global: {}",
                 request.title(), dataHora, momentoInicio);
 
-        taskScheduler.schedule(() -> dispararFluxoRepeticao(eventoId, request), momentoInicio);
+        // IMPORTANTE: Passamos apenas o ID para a frente
+        taskScheduler.schedule(() -> dispararFluxoRepeticao(eventoId), momentoInicio);
     }
-    private void dispararFluxoRepeticao(UUID eventoId, EventRequest request) {
+
+    private void dispararFluxoRepeticao(UUID eventoId) {
         repository.findById(eventoId).ifPresentOrElse(evento -> {
-            // Se ainda não foi confirmado, envia e agenda o próximo para daqui a 1 min
+
             if (!evento.isAlertConfirmed()) {
-                log.info("📢 Disparando alerta repetitivo para: {}", evento.getTitle());
+                log.info("📢 [AlertaThread] Disparando alerta para: {}", evento.getTitle());
 
-                enviarNotificacaoPushComId(request.notificationSubscription(), request.title(), eventoId, request.isMobile());
+                // Aqui usamos os dados da ENTIDADE (evento), não do request
+                // Se não tiver isMobile na entidade, pode forçar true ou adicionar o campo na DB
+                enviarViaTelegram(evento.getTitle(), eventoId);
 
-                // Reagenda a si mesmo para daqui a 60 segundos
+                // Reagenda a si mesmo usando apenas o ID
                 taskScheduler.schedule(
-                        () -> dispararFluxoRepeticao(eventoId, request),
+                        () -> dispararFluxoRepeticao(eventoId),
                         Instant.now().plus(1, ChronoUnit.MINUTES)
                 );
             } else {
@@ -337,7 +336,7 @@ public class EventsServiceImpl implements EventsService {
         }
     }
     private  Map<String, Object> getStringObjectMap(String titulo, UUID eventoId, String chatId) {
-        String urlConfirmar = "https://treg-aneto.com/api/v1/eventos/" + eventoId + "/confirmar-alerta";
+        String urlConfirmar = "https://www.sanoneto.com/api/v1/eventos/" + eventoId + "/confirmar-alerta";
 
         Map<String, Object> body = Map.of(
                 "chat_id", chatId,

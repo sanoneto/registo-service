@@ -2434,3 +2434,10 @@ This generated password is for development use only. Your security configuration
 2026-01-18T10:54:58.858Z  INFO 39660 --- [registo-horas-service] [RMI TCP Connection(1)-172.29.128.1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 1 ms
 2026-01-18T10:54:58.902Z  INFO 39660 --- [registo-horas-service] [RMI TCP Connection(2)-172.29.128.1] o.s.a.r.c.CachingConnectionFactory       : Created new connection: rabbitConnectionFactory#66c3c813:0/SimpleConnection@5fe4a75e [delegate=amqp://guest@127.0.0.1:5672/, localPort=64064]
 2026-01-18T10:55:02.352Z  WARN 39660 --- [registo-horas-service] [AlertaThread-1] c.a.r.s.impl.ProgramacaoTVServiceImpl    : A extração não retornou jogos. A base de dados não foi alterada.
+2026-01-18T12:54:58.536Z  INFO 39660 --- [registo-horas-service] [AlertaThread-1] c.a.r.s.impl.ProgramacaoTVServiceImpl    : Iniciando tarefa agendada: Atualizando Base de Dados de Jogos TV
+2026-01-18T12:55:00.272Z  WARN 39660 --- [registo-horas-service] [AlertaThread-1] c.a.r.s.impl.ProgramacaoTVServiceImpl    : A extração não retornou jogos. A base de dados não foi alterada.
+2026-01-18T14:45:31.064Z  INFO 39660 --- [registo-horas-service] [SpringApplicationShutdownHook] o.s.b.w.e.tomcat.GracefulShutdown        : Commencing graceful shutdown. Waiting for active requests to complete
+2026-01-18T14:45:31.070Z  INFO 39660 --- [registo-horas-service] [tomcat-shutdown] o.s.b.w.e.tomcat.GracefulShutdown        : Graceful shutdown complete
+2026-01-18T14:45:33.193Z  INFO 39660 --- [registo-horas-service] [SpringApplicationShutdownHook] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'default'
+2026-01-18T14:45:33.197Z  INFO 39660 --- [registo-horas-service] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
+2026-01-18T14:45:33.200Z  INFO 39660 --- [registo-horas-service] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
