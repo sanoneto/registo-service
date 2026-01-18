@@ -1,10 +1,12 @@
 package com.aneto.registo_horas_service.dto.request;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.Column;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 public record EventRequest(
         String username,
 
@@ -25,6 +27,7 @@ public record EventRequest(
         String notes,
         boolean sendAlert,
         boolean isMobile,
+        String endDate,
         PushSubscriptionDTO notificationSubscription // Adicionado para receber os dados do React
 ) {
 }
