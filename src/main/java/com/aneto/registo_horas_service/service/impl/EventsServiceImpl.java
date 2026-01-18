@@ -271,21 +271,25 @@ public class EventsServiceImpl implements EventsService {
     }
 
     private void agendarAlertaComRepeticao(UUID eventoId, EventRequest request) {
-        // 1. Calcula o momento exato do início do evento
-        LocalDateTime dataHora = LocalDateTime.of(request.referenceDate(), request.startTime());
-        Instant momentoInicio = dataHora.atZone(ZoneId.systemDefault()).toInstant();
+        // 1. Forçar a Timezone de Portugal para o cálculo
+        ZoneId zoneLisboa = ZoneId.of("Europe/Lisbon");
 
-        // 2. Se o evento já passou ou é agora, agendamos para daqui a 5 segundos
+        LocalDateTime dataHora = LocalDateTime.of(request.referenceDate(), request.startTime());
+
+        // Converter o tempo local de Lisboa para um Instante global (UTC)
+        Instant momentoInicio = dataHora.atZone(zoneLisboa).toInstant();
+
+        // 2. Se o momento calculado for no passado (ou agora), damos 5 segundos de margem
         if (momentoInicio.isBefore(Instant.now())) {
-            momentoInicio = Instant.now().plusSeconds(2);
+            momentoInicio = Instant.now().plusSeconds(5);
+            log.info("⚠️ O evento já passou ou é agora. Agendando disparo imediato para {}", eventoId);
         }
 
-        log.info("⏰ Agendamento persistente criado para o evento {} às {}", eventoId, momentoInicio);
+        log.info("⏰ [AGENDADO] Evento: {} | Hora Lisboa: {} | Instant Global: {}",
+                request.title(), dataHora, momentoInicio);
 
-        // 3. Agenda a primeira execução do fluxo de repetição
         taskScheduler.schedule(() -> dispararFluxoRepeticao(eventoId, request), momentoInicio);
     }
-
     private void dispararFluxoRepeticao(UUID eventoId, EventRequest request) {
         repository.findById(eventoId).ifPresentOrElse(evento -> {
             // Se ainda não foi confirmado, envia e agenda o próximo para daqui a 1 min
