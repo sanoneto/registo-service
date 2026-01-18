@@ -271,31 +271,38 @@ public class EventsServiceImpl implements EventsService {
     }
 
     private void agendarAlertaComRepeticao(UUID eventoId, EventRequest request) {
+        // 1. Calcula o momento exato do início do evento
         LocalDateTime dataHora = LocalDateTime.of(request.referenceDate(), request.startTime());
-        Instant momento = dataHora.atZone(ZoneId.systemDefault()).toInstant();
-        if (momento.isBefore(Instant.now())) momento = Instant.now().plusSeconds(2);
+        Instant momentoInicio = dataHora.atZone(ZoneId.systemDefault()).toInstant();
 
-        taskScheduler.schedule(() -> dispararFluxoRepeticao(eventoId, request), momento);
+        // 2. Se o evento já passou ou é agora, agendamos para daqui a 5 segundos
+        if (momentoInicio.isBefore(Instant.now())) {
+            momentoInicio = Instant.now().plusSeconds(2);
+        }
+
+        log.info("⏰ Agendamento persistente criado para o evento {} às {}", eventoId, momentoInicio);
+
+        // 3. Agenda a primeira execução do fluxo de repetição
+        taskScheduler.schedule(() -> dispararFluxoRepeticao(eventoId, request), momentoInicio);
     }
 
     private void dispararFluxoRepeticao(UUID eventoId, EventRequest request) {
-        repository.findById(eventoId).ifPresent(evento -> {
-
-            // CORREÇÃO: alertConfirmed com C maiúsculo
+        repository.findById(eventoId).ifPresentOrElse(evento -> {
+            // Se ainda não foi confirmado, envia e agenda o próximo para daqui a 1 min
             if (!evento.isAlertConfirmed()) {
+                log.info("📢 Disparando alerta repetitivo para: {}", evento.getTitle());
 
                 enviarNotificacaoPushComId(request.notificationSubscription(), request.title(), eventoId, request.isMobile());
 
-                log.info("Alerta enviado para o evento {}. Repetindo em 1 minuto...", eventoId);
-
+                // Reagenda a si mesmo para daqui a 60 segundos
                 taskScheduler.schedule(
                         () -> dispararFluxoRepeticao(eventoId, request),
                         Instant.now().plus(1, ChronoUnit.MINUTES)
                 );
             } else {
-                log.info("O utilizador confirmou o evento {}. Parando alertas.", eventoId);
+                log.info("✅ Evento {} já confirmado. Parando repetições.", eventoId);
             }
-        });
+        }, () -> log.warn("⚠️ Evento {} não encontrado para repetição.", eventoId));
     }
 
     private void enviarNotificacaoPushComId(PushSubscriptionDTO sub, String titulo, UUID eventoId, boolean isMobile) {
