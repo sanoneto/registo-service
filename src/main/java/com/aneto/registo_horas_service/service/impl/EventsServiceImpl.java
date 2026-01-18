@@ -59,10 +59,21 @@ public class EventsServiceImpl implements EventsService {
 
     @Override
     public EventsResponse create(EventRequest request, String googleToken) {
+        log.info("### CAMADA SERVICE: Iniciando criação do evento: {}", request.title());
+        log.info("### IS MOBILE? {}", request.isMobile());
         // 1. Guarda localmente primeiro
         Evento novoEvento = mapper.toEntity(request);
         novoEvento = repository.save(novoEvento);
 
+        if (request.isMobile()) {
+            log.info("📱 Detetado Mobile no Service: Enviando via Telegram...");
+            try {
+                // Chame o seu método de envio (garanta que ele usa as @Value corrigidas)
+                enviarViaTelegram(request.title(), novoEvento.getId());
+            } catch (Exception e) {
+                log.error("❌ Erro ao disparar Telegram: {}", e.getMessage());
+            }
+        }
         // 2. Alerta Push Local
         if (request.sendAlert() && request.notificationSubscription() != null) {
             agendarAlertaComRepeticao(novoEvento.getId(), request);
