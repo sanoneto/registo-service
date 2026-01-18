@@ -3,11 +3,8 @@ package com.aneto.registo_horas_service.controller;
 import com.aneto.registo_horas_service.dto.request.EventRequest;
 import com.aneto.registo_horas_service.dto.response.EventsResponse;
 import com.aneto.registo_horas_service.service.EventsService;
-import com.aneto.registo_horas_service.service.impl.EventsServiceImpl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -42,7 +39,6 @@ public class EventoController {
 
 
     // Adiciona o CrossOrigin para a Gateway/React não bloquear
-    @CrossOrigin(origins = "*", allowedHeaders = "*")
     @PostMapping("/eventos/{id}/confirmar-alerta") // Alterado para coincidir com o JS
     public ResponseEntity<Void> confirmarAlerta(@PathVariable UUID id) {
         System.out.println(">>> RECEBIDO PEDIDO DE CONFIRMAÇÃO PARA ID: " + id);
