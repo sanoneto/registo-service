@@ -311,7 +311,7 @@ public class EventsServiceImpl implements EventsService {
 
     private Map<String, Object> getStringObjectMap(String titulo, UUID eventoId, String chatId) {
         // Agora a URL é construída dinamicamente com base no ambiente
-        String urlConfirmar = baseUrl + "/api/v1/eventos/" + eventoId + "/confirmar-alerta";
+        String urlConfirmar = "https://www.sanoneto.com/api/v1/eventos/" + eventoId + "/confirmar-alerta";
 
         Map<String, Object> body = Map.of(
                 "chat_id", chatId,
