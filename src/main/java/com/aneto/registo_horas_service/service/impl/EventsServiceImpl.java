@@ -149,11 +149,11 @@ public class EventsServiceImpl implements EventsService {
 
     @Override
     public void confirmarAlerta(UUID id) {
-        repository.findById(id).ifPresent(evento -> {
+        repository.findById(id).ifPresentOrElse(evento -> {
             evento.setAlertConfirmed(true);
             repository.save(evento);
-            log.info("Evento {} marcado como confirmado. Repetições encerradas.", id);
-        });
+            log.info("✅ Sucesso: Evento {} confirmado pelo utilizador {}.", id, evento.getUsername());
+        }, () -> log.error("❌ Erro: Tentativa de confirmar evento inexistente ID: {}", id));
     }
 
     @Override
@@ -348,13 +348,13 @@ public class EventsServiceImpl implements EventsService {
     private String buscarTelegramChatIdRemoto(String username) {
         try {
             return targetServiceWebClient.get()
-                    // REMOVE o prefixo que já está na baseUrl
                     .uri("/telegram-id/{username}", username)
                     .retrieve()
                     .bodyToMono(String.class)
+                    .timeout(java.time.Duration.ofSeconds(5)) // Evita bloqueio infinito
                     .block();
         } catch (Exception e) {
-            log.error("❌ Falha ao obter Telegram ID: {}", e.getMessage());
+            log.error("❌ Falha crítica ao obter Telegram ID para {}: {}", username, e.getMessage());
             return null;
         }
     }
