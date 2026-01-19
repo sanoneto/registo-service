@@ -120,8 +120,8 @@ telegram:
   chatId: ${TELEGRAM_CHAT_ID}
   telegramUrl: ${TELEGRAM_URL}
 
-
 app:
+  base-url: ${APP_BASE_URL}
   queries:
     monthly-summary: "SELECT 
     TO_CHAR(data_registo, 'YYYY-MM') AS mes_e_ano, 
@@ -142,7 +142,9 @@ app:
     u.email,
     tp.required_hours,
     ROUND(CAST(SUM(r.horas_trabalhadas) AS NUMERIC), 1) AS Total_horas_trabalhadas,
-   u.profile_picture_url
+   u.profile_picture_url,
+   u.public_id,
+   u.telegram_chat_id
 FROM
     auth.tb_users u
 INNER JOIN
@@ -152,4 +154,4 @@ INNER JOIN
 WHERE
     u.username =:username 
 GROUP BY
-    u.username, u.email, tp.required_hours, tp.project_name,u.profile_picture_url"
+    u.username, u.email, tp.required_hours, tp.project_name,u.profile_picture_url,u.public_id,u.telegram_chat_id"

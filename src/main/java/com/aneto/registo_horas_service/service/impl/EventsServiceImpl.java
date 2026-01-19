@@ -19,7 +19,6 @@ import com.google.api.services.calendar.model.EventDateTime;
 import com.google.api.services.calendar.model.EventReminder;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
-import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -27,6 +26,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.reactive.function.client.WebClient;
 
 import java.io.IOException;
 import java.security.GeneralSecurityException;
@@ -47,6 +47,7 @@ public class EventsServiceImpl implements EventsService {
     private final NotificationService notificationService; // Injetado aqui
     private final ObjectMapper objectMapper;
     private final RestTemplate restTemplate;
+    private final WebClient targetServiceWebClient;
 
     @Value("${telegram.botToken}")
     private String botToken;
@@ -57,67 +58,42 @@ public class EventsServiceImpl implements EventsService {
     @Value("${telegram.telegramUrl}")
     private String telegramUrl;
 
+    @Value("${app.base-url}")
+    private String baseUrl;
+
     @Override
     public EventsResponse create(EventRequest request, String googleToken) {
         log.info("### CAMADA SERVICE: Iniciando criação do evento: {}", request.title());
-        log.info("### IS MOBILE? {}", request.isMobile());
+
         // 1. Guarda localmente primeiro
         Evento novoEvento = mapper.toEntity(request);
+
+        // IMPORTANTE: Garante que o username vindo do request é guardado na entidade
+        // para que as repetições futuras saibam para quem enviar.
+        novoEvento.setUsername(request.username());
         novoEvento = repository.save(novoEvento);
 
+        // 2. Envio imediato via Telegram se for Mobile
         if (request.isMobile()) {
-            log.info("📱 Detetado Mobile no Service: Enviando via Telegram...");
+            log.info("📱 Detetado Mobile no Service: Iniciando busca de Chat ID para {}", request.username());
             try {
-                // Chame o seu método de envio (garanta que ele usa as @Value corrigidas)
-                enviarViaTelegram(request.title(), novoEvento.getId());
+                // Agora passamos o userName que vem no DTO do request
+                enviarViaTelegram(request.title(), novoEvento.getId(), request.username());
             } catch (Exception e) {
                 log.error("❌ Erro ao disparar Telegram: {}", e.getMessage());
             }
         }
-        // 2. Alerta Push Local
+
+        // 3. Alerta Push / Repetições
         if (request.sendAlert()) {
             log.info("📢 Agendando fluxo de alertas para o evento...");
+            // Certifica-te que o agendarAlertaComRepeticao usa o userName da entidade
             agendarAlertaComRepeticao(novoEvento.getId(), request);
         }
-        // 3. Google Calendar
+
+        // 4. Sincronização Google Calendar (Código original mantido)
         if (googleToken != null && !googleToken.isEmpty()) {
-            try {
-                Calendar service = getCalendarService(googleToken);
-
-                com.google.api.services.calendar.model.Event googleEvent = new com.google.api.services.calendar.model.Event()
-                        .setSummary(request.title())
-                        .setDescription(request.notes() + "\nProjeto: " + request.project());
-
-                // Start: ISO 8601
-                DateTime startDateTime = new DateTime(request.referenceDate().toString() + "T" + request.startTime() + ":00Z");
-                googleEvent.setStart(new EventDateTime().setDateTime(startDateTime));
-
-                // End: +1 hora para evitar erro de evento sem duração
-                DateTime endDateTime = new DateTime(startDateTime.getValue() + 3600000);
-                googleEvent.setEnd(new EventDateTime().setDateTime(endDateTime));
-
-                if (request.sendAlert()) {
-                    EventReminder[] reminderOverrides = new EventReminder[]{
-                            new EventReminder().setMethod("popup").setMinutes(10),
-                            new EventReminder().setMethod("popup").setMinutes(0)
-                    };
-                    googleEvent.setReminders(new com.google.api.services.calendar.model.Event.Reminders()
-                            .setUseDefault(false)
-                            .setOverrides(Arrays.asList(reminderOverrides)));
-                }
-
-                // Executa e recupera o ID gerado pelo Google
-                com.google.api.services.calendar.model.Event executedEvent = service.events().insert("primary", googleEvent).execute();
-
-                // IMPORTANTE: Guarda o ID do Google na nossa entidade para evitar duplicatas no futuro
-                novoEvento.setGoogleEventId(executedEvent.getId());
-                repository.save(novoEvento);
-
-                log.info("Sincronizado com Google Calendar. ID: {}", executedEvent.getId());
-
-            } catch (Exception e) {
-                log.error("Falha na sincronização Google: {}", e.getMessage());
-            }
+            processarSincronizacaoGoogle(novoEvento, request, googleToken);
         }
 
         return mapper.toResponse(novoEvento);
@@ -191,20 +167,20 @@ public class EventsServiceImpl implements EventsService {
 
         // Se o agendamento for feito para menos de 15 min a partir de agora, envia logo
         if (momentoAlerta.isBefore(Instant.now())) {
-            momentoAlerta = Instant.now().plusSeconds(1);
+            momentoAlerta = Instant.now().plusSeconds(2);
         }
 
         taskScheduler.schedule(() -> {
-            enviarNotificacaoPush(request.notificationSubscription(), request.title(),request.isMobile());
+            enviarNotificacaoPush(request.notificationSubscription(), request.title(), request.isMobile(),request.username());
         }, momentoAlerta);
     }
 
     @Override
-    public void enviarNotificacaoPush(PushSubscriptionDTO sub, String titulo, boolean isMobile) {
-        // Em vez de escrever todo o JSON aqui de novo,
-        // chamamos o outro método passando 'null' no lugar do ID.
-        enviarNotificacaoPushComId(sub, titulo, null,isMobile);
+    public void enviarNotificacaoPush(PushSubscriptionDTO sub, String titulo, boolean isMobile, String username) {
+        // Agora passamos o username para o método que contém a lógica de decisão (Telegram vs WebPush)
+        enviarNotificacaoPushComId(sub, titulo, null, isMobile, username);
     }
+
     @Override
     @Transactional
     public void deleteById(UUID id, String googleToken) {
@@ -288,51 +264,54 @@ public class EventsServiceImpl implements EventsService {
     }
 
     private void dispararFluxoRepeticao(UUID eventoId) {
-        repository.findById(eventoId).ifPresentOrElse(evento -> {
+        repository.findById(eventoId).ifPresent(evento -> {
             if (!evento.isAlertConfirmed()) {
-                log.info("📢 [AlertaThread] Disparando repetição para: {}", evento.getTitle());
+                // Importante: Passar o username aqui
+                enviarViaTelegram(evento.getTitle(), eventoId, evento.getUsername());
 
-                // Forçamos o envio para o Telegram se for mobile ou se não houver subscrição web
-                enviarViaTelegram(evento.getTitle(), eventoId);
-
-                // Reagenda
                 taskScheduler.schedule(
                         () -> dispararFluxoRepeticao(eventoId),
                         Instant.now().plus(1, ChronoUnit.MINUTES)
                 );
             }
-        }, () -> log.warn("⚠️ Evento {} não encontrado para repetição.", eventoId));
+        });
     }
 
-    private void enviarNotificacaoPushComId(PushSubscriptionDTO sub, String titulo, UUID eventoId, boolean isMobile) {
+    private void enviarNotificacaoPushComId(PushSubscriptionDTO sub, String titulo, UUID eventoId, boolean isMobile, String username) {
         if (isMobile) {
-            log.info("📱 Detectado Mobile: Enviando via Telegram para o evento {}", eventoId);
-            enviarViaTelegram(titulo, eventoId);
+            log.info("📱 Detetado Mobile: Enviando via Telegram para o evento {} (Utilizador: {})", eventoId, username);
+            // Agora passamos o username para a função que usa o WebClient
+            enviarViaTelegram(titulo, eventoId, username);
         } else {
-            log.info("💻 Detectado Desktop: Enviando via Web Push para o evento {}", eventoId);
+            log.info("💻 Detetado Desktop: Enviando via Web Push para o evento {}", eventoId);
             enviarViaWebPush(sub, titulo, eventoId);
         }
     }
+    private void enviarViaTelegram(String titulo, UUID eventoId, String username) {
+        // 1. Procura o ID no outro microsserviço via WebClient
+        String dynamicChatId = buscarTelegramChatIdRemoto(username);
 
-    private void enviarViaTelegram(String titulo, UUID eventoId) {
+        if (dynamicChatId == null || dynamicChatId.isBlank()) {
+            log.warn("⚠️ O utilizador {} não tem um Telegram vinculado no serviço de Auth.", username);
+            return;
+        }
         try {
             String vTelegramUrl = telegramUrl + botToken + "/sendMessage";
-            Map<String, Object> body = getStringObjectMap(titulo, eventoId, chatId);
 
-            log.info("Enviando requisição para o Telegram: {}", vTelegramUrl);
-            ResponseEntity<String> response = restTemplate.postForEntity(vTelegramUrl, body, String.class);
-            log.info("Resposta da API do Telegram: {}", response.getStatusCode());
+            // 2. Monta o corpo da mensagem com o ID recuperado
+            Map<String, Object> body = getStringObjectMap(titulo, eventoId, dynamicChatId);
 
-        } catch (org.springframework.web.client.HttpStatusCodeException e) {
-            // Erros retornados pela API (ex: 401 Unauthorized, 400 Bad Request)
-            log.error("❌ Telegram API Error: {} - {}", e.getStatusCode(), e.getResponseBodyAsString());
+            log.info("Disparando alerta para o Telegram: {} (Chat: {})", username, dynamicChatId);
+            restTemplate.postForEntity(vTelegramUrl, body, String.class);
+
         } catch (Exception e) {
-            // Erros de conexão ou timeout
-            log.error("❌ Erro de conectividade ao enviar Telegram: ", e);
+            log.error("❌ Erro na conectividade com a API do Telegram: ", e);
         }
     }
-    private  Map<String, Object> getStringObjectMap(String titulo, UUID eventoId, String chatId) {
-        String urlConfirmar = "https://www.sanoneto.com/api/v1/eventos/" + eventoId + "/confirmar-alerta";
+
+    private Map<String, Object> getStringObjectMap(String titulo, UUID eventoId, String chatId) {
+        // Agora a URL é construída dinamicamente com base no ambiente
+        String urlConfirmar = baseUrl + "/api/v1/eventos/" + eventoId + "/confirmar-alerta";
 
         Map<String, Object> body = Map.of(
                 "chat_id", chatId,
@@ -346,7 +325,6 @@ public class EventsServiceImpl implements EventsService {
         );
         return body;
     }
-
     private void enviarViaWebPush(PushSubscriptionDTO sub, String titulo, UUID eventoId) {
         if (sub == null || sub.getEndpoint() == null) {
             log.warn("⚠️ Tentativa de Web Push sem subscrição válida.");
@@ -364,6 +342,61 @@ public class EventsServiceImpl implements EventsService {
             notificationService.sendPushNotification(sub, jsonPayload);
         } catch (Exception e) {
             log.error("❌ Erro ao enviar Web Push: {}", e.getMessage());
+        }
+    }
+
+    private String buscarTelegramChatIdRemoto(String username) {
+        try {
+            return targetServiceWebClient.get()
+                    // REMOVE o prefixo que já está na baseUrl
+                    .uri("/telegram-id/{username}", username)
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .block();
+        } catch (Exception e) {
+            log.error("❌ Falha ao obter Telegram ID: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    private void processarSincronizacaoGoogle(Evento novoEvento, EventRequest request, String googleToken) {
+        try {
+            Calendar service = getCalendarService(googleToken);
+
+            com.google.api.services.calendar.model.Event googleEvent = new com.google.api.services.calendar.model.Event()
+                    .setSummary(request.title())
+                    .setDescription(request.notes() + "\nProjeto: " + request.project());
+
+            // Configuração de Horário (Início)
+            DateTime startDateTime = new DateTime(request.referenceDate().toString() + "T" + request.startTime() + ":00Z");
+            googleEvent.setStart(new EventDateTime().setDateTime(startDateTime));
+
+            // Configuração de Horário (Fim: +1 hora por defeito)
+            DateTime endDateTime = new DateTime(startDateTime.getValue());
+            googleEvent.setEnd(new EventDateTime().setDateTime(endDateTime));
+
+            // Configuração de Alertas (Reminders)
+            if (request.sendAlert()) {
+                EventReminder[] reminderOverrides = new EventReminder[]{
+                        new EventReminder().setMethod("popup").setMinutes(10),
+                        new EventReminder().setMethod("popup").setMinutes(0)
+                };
+                googleEvent.setReminders(new com.google.api.services.calendar.model.Event.Reminders()
+                        .setUseDefault(false)
+                        .setOverrides(Arrays.asList(reminderOverrides)));
+            }
+
+            // Execução no Google Calendar
+            com.google.api.services.calendar.model.Event executedEvent = service.events().insert("primary", googleEvent).execute();
+
+            // Atualização do ID do Google na nossa base de dados
+            novoEvento.setGoogleEventId(executedEvent.getId());
+            repository.save(novoEvento);
+
+            log.info("✅ Sincronizado com Google Calendar. ID: {}", executedEvent.getId());
+
+        } catch (Exception e) {
+            log.error("❌ Falha na sincronização Google: {}", e.getMessage());
         }
     }
 }

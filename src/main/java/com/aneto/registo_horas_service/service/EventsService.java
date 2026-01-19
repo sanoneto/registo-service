@@ -11,7 +11,7 @@ public interface EventsService {
     EventsResponse create(EventRequest request, String googleToken);
     List<EventsResponse> listAll ();
      void agendarAlerta(EventRequest request);
-    void enviarNotificacaoPush(PushSubscriptionDTO sub, String msg,boolean mobile);
+    void enviarNotificacaoPush(PushSubscriptionDTO sub, String titulo, boolean isMobile, String username);
     void confirmarAlerta(UUID id);
     //void deleteById(UUID id);
     void deleteById(UUID id, String googleToken);

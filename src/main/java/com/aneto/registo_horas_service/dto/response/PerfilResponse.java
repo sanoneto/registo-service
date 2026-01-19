@@ -6,6 +6,8 @@ public record PerfilResponse(
         String email,
         Double required_hours,
         Double Total_horas_trabalhadas,
-        String profile_picture_url
+        String profile_picture_url,
+        String public_id,
+        String telegram_chat_id
 ) {
 }
