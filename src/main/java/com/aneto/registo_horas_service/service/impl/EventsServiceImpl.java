@@ -8,6 +8,7 @@ import com.aneto.registo_horas_service.models.Evento;
 import com.aneto.registo_horas_service.repository.EventoRepository;
 import com.aneto.registo_horas_service.service.EventsService;
 import com.aneto.registo_horas_service.service.NotificationService;
+import com.aneto.registo_horas_service.service.TelegramBotService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.api.client.auth.oauth2.BearerToken;
 import com.google.api.client.auth.oauth2.Credential;
@@ -16,25 +17,29 @@ import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.client.util.DateTime;
 import com.google.api.services.calendar.Calendar;
 import com.google.api.services.calendar.model.EventDateTime;
-import com.google.api.services.calendar.model.EventReminder;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardRow;
+import reactor.core.publisher.Mono;
 
-import java.io.IOException;
-import java.security.GeneralSecurityException;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -48,15 +53,7 @@ public class EventsServiceImpl implements EventsService {
     private final ObjectMapper objectMapper;
     private final RestTemplate restTemplate;
     private final WebClient targetServiceWebClient;
-
-    @Value("${telegram.botToken}")
-    private String botToken;
-
-    @Value("${telegram.chatId}")
-    private String chatId;
-
-    @Value("${telegram.telegramUrl}")
-    private String telegramUrl;
+    private final TelegramBotService telegramBotService;
 
 
     @Override
@@ -138,10 +135,10 @@ public class EventsServiceImpl implements EventsService {
         }
     }
 
-    private Calendar getCalendarService(String accessToken) throws GeneralSecurityException, IOException {
+    private Calendar getCalendarService(String accessToken) throws Exception {
         Credential credential = new Credential(BearerToken.authorizationHeaderAccessMethod()).setAccessToken(accessToken);
         return new Calendar.Builder(GoogleNetHttpTransport.newTrustedTransport(), GsonFactory.getDefaultInstance(), credential)
-                .setApplicationName("Aneto-Registo-Horas")
+                .setApplicationName("Registo-Horas")
                 .build();
     }
 
@@ -169,7 +166,7 @@ public class EventsServiceImpl implements EventsService {
         }
 
         taskScheduler.schedule(() -> {
-            enviarNotificacaoPush(request.notificationSubscription(), request.title(), request.isMobile(),request.username());
+            enviarNotificacaoPush(request.notificationSubscription(), request.title(), request.isMobile(), request.username());
         }, momentoAlerta);
     }
 
@@ -249,24 +246,22 @@ public class EventsServiceImpl implements EventsService {
         LocalDateTime dataHora = LocalDateTime.of(request.referenceDate(), request.startTime());
         Instant momentoInicio = dataHora.atZone(zoneLisboa).toInstant();
 
+        // Se o horário já passou, agenda para daqui a 5 segundos
         if (momentoInicio.isBefore(Instant.now())) {
             momentoInicio = Instant.now().plusSeconds(5);
-            log.info("⚠️ O evento já passou ou é agora. Agendando disparo imediato para {}", eventoId);
         }
 
-        log.info("⏰ [AGENDADO] Evento: {} | Hora Lisboa: {} | Instant Global: {}",
-                request.title(), dataHora, momentoInicio);
-
-        // IMPORTANTE: Passamos apenas o ID para a frente
         taskScheduler.schedule(() -> dispararFluxoRepeticao(eventoId), momentoInicio);
     }
 
     private void dispararFluxoRepeticao(UUID eventoId) {
         repository.findById(eventoId).ifPresent(evento -> {
             if (!evento.isAlertConfirmed()) {
-                // Importante: Passar o username aqui
+                log.info("🔔 Disparando repetição de alerta para: {}", evento.getTitle());
+
                 enviarViaTelegram(evento.getTitle(), eventoId, evento.getUsername());
 
+                // Reagenda para daqui a 1 minuto se não confirmar
                 taskScheduler.schedule(
                         () -> dispararFluxoRepeticao(eventoId),
                         Instant.now().plus(1, ChronoUnit.MINUTES)
@@ -285,25 +280,41 @@ public class EventsServiceImpl implements EventsService {
             enviarViaWebPush(sub, titulo, eventoId);
         }
     }
+
+    // Se o seu TelegramBotService tiver o método execute() herdado da biblioteca
+
     private void enviarViaTelegram(String titulo, UUID eventoId, String username) {
-        // 1. Procura o ID no outro microsserviço via WebClient
         String dynamicChatId = buscarTelegramChatIdRemoto(username);
-
-        if (dynamicChatId == null || dynamicChatId.isBlank()) {
-            log.warn("⚠️ O utilizador {} não tem um Telegram vinculado no serviço de Auth.", username);
-            return;
-        }
+        if (dynamicChatId == null || dynamicChatId.isBlank()) return;
         try {
-            String vTelegramUrl = telegramUrl + botToken + "/sendMessage";
+            // 1. Criar o Botão de Confirmação
+            String urlConfirmar = "https://www.sanoneto.com/api/v1/eventos/" + eventoId + "/confirmar-alerta";
 
-            // 2. Monta o corpo da mensagem com o ID recuperado
-            Map<String, Object> body = getStringObjectMap(titulo, eventoId, dynamicChatId);
+            InlineKeyboardButton botaoConfirmar = InlineKeyboardButton.builder()
+                    .text("Confirmar ✅")
+                    .url(urlConfirmar)
+                    .build();
 
-            log.info("Disparando alerta para o Telegram: {} (Chat: {})", username, dynamicChatId);
-            restTemplate.postForEntity(vTelegramUrl, body, String.class);
+            // 2. Montar o Teclado (Keyboard)
+            InlineKeyboardMarkup keyboard = InlineKeyboardMarkup.builder()
+                    .keyboardRow(new InlineKeyboardRow(botaoConfirmar))
+                    .build();
 
+            // 3. Montar a Mensagem Final
+            SendMessage message = SendMessage.builder()
+                    .chatId(dynamicChatId)
+                    .text("🚨 *ALERTA TREG*\n\nEvento: " + titulo + "\n\n_Clique no botão abaixo para confirmar._")
+                    .parseMode("Markdown")
+                    .replyMarkup(keyboard) // Aqui entra o botão!
+                    .build();
+
+            // 4. Enviar usando o bot ativo
+            telegramBotService.enviarMensagem(message);
         } catch (Exception e) {
-            log.error("❌ Erro na conectividade com a API do Telegram: ", e);
+            if (e.getMessage().contains("blocked")) {
+                log.error("🚫 Bloqueio detectado. Cancelando repetições para {}", username);
+                // Opcional: confirmar o alerta no banco apenas para parar as tentativas
+            }
         }
     }
 
@@ -323,6 +334,7 @@ public class EventsServiceImpl implements EventsService {
         );
         return body;
     }
+
     private void enviarViaWebPush(PushSubscriptionDTO sub, String titulo, UUID eventoId) {
         if (sub == null || sub.getEndpoint() == null) {
             log.warn("⚠️ Tentativa de Web Push sem subscrição válida.");
@@ -344,57 +356,35 @@ public class EventsServiceImpl implements EventsService {
     }
 
     private String buscarTelegramChatIdRemoto(String username) {
-        try {
-            return targetServiceWebClient.get()
-                    .uri("/telegram-id/{username}", username)
-                    .retrieve()
-                    .bodyToMono(String.class)
-                    .timeout(java.time.Duration.ofSeconds(5)) // Evita bloqueio infinito
-                    .block();
-        } catch (Exception e) {
-            log.error("❌ Falha crítica ao obter Telegram ID para {}: {}", username, e.getMessage());
-            return null;
-        }
+        return targetServiceWebClient.get()
+                .uri("/telegram-id/{username}", username)
+                .retrieve()
+                .bodyToMono(String.class)
+                .timeout(Duration.ofSeconds(5))
+                .onErrorResume(e -> {
+                    log.error("❌ Erro ao buscar ChatID remoto para {}: {}", username, e.getMessage());
+                    // Retorna um Mono vazio, que o .block() converterá para null
+                    return Mono.empty();
+                })
+                .block();
     }
 
     private void processarSincronizacaoGoogle(Evento novoEvento, EventRequest request, String googleToken) {
         try {
             Calendar service = getCalendarService(googleToken);
-
-            com.google.api.services.calendar.model.Event googleEvent = new com.google.api.services.calendar.model.Event()
+            com.google.api.services.calendar.model.Event gEvent = new com.google.api.services.calendar.model.Event()
                     .setSummary(request.title())
-                    .setDescription(request.notes() + "\nProjeto: " + request.project());
+                    .setDescription(request.notes());
 
-            // Configuração de Horário (Início)
-            DateTime startDateTime = new DateTime(request.referenceDate().toString() + "T" + request.startTime() + ":00Z");
-            googleEvent.setStart(new EventDateTime().setDateTime(startDateTime));
+            DateTime start = new DateTime(request.referenceDate().toString() + "T" + request.startTime() + ":00Z");
+            gEvent.setStart(new EventDateTime().setDateTime(start));
+            gEvent.setEnd(new EventDateTime().setDateTime(start));
 
-            // Configuração de Horário (Fim: +1 hora por defeito)
-            DateTime endDateTime = new DateTime(startDateTime.getValue());
-            googleEvent.setEnd(new EventDateTime().setDateTime(endDateTime));
-
-            // Configuração de Alertas (Reminders)
-            if (request.sendAlert()) {
-                EventReminder[] reminderOverrides = new EventReminder[]{
-                        new EventReminder().setMethod("popup").setMinutes(10),
-                        new EventReminder().setMethod("popup").setMinutes(0)
-                };
-                googleEvent.setReminders(new com.google.api.services.calendar.model.Event.Reminders()
-                        .setUseDefault(false)
-                        .setOverrides(Arrays.asList(reminderOverrides)));
-            }
-
-            // Execução no Google Calendar
-            com.google.api.services.calendar.model.Event executedEvent = service.events().insert("primary", googleEvent).execute();
-
-            // Atualização do ID do Google na nossa base de dados
-            novoEvento.setGoogleEventId(executedEvent.getId());
+            com.google.api.services.calendar.model.Event executed = service.events().insert("primary", gEvent).execute();
+            novoEvento.setGoogleEventId(executed.getId());
             repository.save(novoEvento);
-
-            log.info("✅ Sincronizado com Google Calendar. ID: {}", executedEvent.getId());
-
         } catch (Exception e) {
-            log.error("❌ Falha na sincronização Google: {}", e.getMessage());
+            log.error("Erro sincronização Google: {}", e.getMessage());
         }
     }
 }

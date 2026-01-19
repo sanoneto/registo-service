@@ -12,12 +12,12 @@ spring:
   sql:
     init:
       schema-locations: classpath:schema.sql
-      mode: never
+      mode: always
   datasource:
     url: ${SPRING_DATASOURCE_URL}
     username: ${SPRING_DATASOURCE_USERNAME}
     password: ${SPRING_DATASOURCE_PASSWORD}
-    driver-class-name: ${SPRING_DATASOURCE_DRIVER}
+    driver-class-name: ${SPRING_DATASOURCE_DRIVER:org.postgresql.Driver}
   jpa:
     hibernate:
       ddl-auto: update
@@ -51,6 +51,24 @@ spring:
     enabled: false
     locations: classpath:db/migration
     baseline-on-migrate: true
+logging:
+  level:
+    org.hibernate.orm.jdbc.bind: TRACE # Mostra o valor de :username no log
+    org.hibernate.SQL: DEBUG
+    org:
+      springframework:
+        security:
+          web:
+            ObservationFilterChainDecorator: ERROR
+            FilterChainProxy: ERROR
+    com:
+      aneto:
+        registo_horas_service:
+          security:
+            GatewayAuthFilter: ERROR
+    org.flywaydb: INFO
+  file:
+    name: logs/app.log
 
 management:
   endpoints:
@@ -68,7 +86,6 @@ server:
   port: ${PORT:8083}
   forward-headers-strategy: native
 
-
 url:
   micro_service_auth: ${URI_AUTH_SERVICE}
 
@@ -84,22 +101,6 @@ springdoc:
     filter: true
     display-request-duration: true
 
-logging:
-  level:
-    org:
-      springframework:
-        security:
-          web:
-            ObservationFilterChainDecorator: ERROR
-            FilterChainProxy: ERROR
-  file:
-    name: logs/app.log
-# src/main/resources/application.yml
-
-Football:
-  Data:
-    url: ${FOOTBALL_DATA_URL}
-    API_TOKEN: ${FOOTBALL_DATA_API_TOKEN}
 
 gcp:
   project:
@@ -107,6 +108,11 @@ gcp:
     location: ${GCP_PROJECT_LOCATION}
   credentials:
     json-content: ${GCP_CREDENTIALS_JSO_CONTENT}
+
+Football:
+  Data:
+    url: ${FOOTBALL_DATA_URL}
+    API_TOKEN: ${FOOTBALL_DATA_API_TOKEN}
 
 vapid:
   public:
@@ -116,12 +122,11 @@ vapid:
   subject:  ${VAPID_SUBJECT}
 
 telegram:
-  botToken: ${TELEGRAM_BOT_TOKEN}
-  chatId: ${TELEGRAM_CHAT_ID}
-  telegramUrl: ${TELEGRAM_URL}
+  bot:
+    token:
+      anetoBot: ${TELEGRAM_BOT_TOKEN}
 
 app:
-  base-url: ${APP_BASE_URL}
   queries:
     monthly-summary: "SELECT 
     TO_CHAR(data_registo, 'YYYY-MM') AS mes_e_ano, 
@@ -136,22 +141,22 @@ app:
     mes_e_ano DESC"
 
     # 4. Query findTotalHoursAndRequiredHoursByUserName (A mais longa)
-    user-required-vs-total-hours: "SELECT
-    u.username,
-    tp.project_name,
-    u.email,
-    tp.required_hours,
-    ROUND(CAST(SUM(r.horas_trabalhadas) AS NUMERIC), 1) AS Total_horas_trabalhadas,
-   u.profile_picture_url,
-   u.public_id,
-   u.telegram_chat_id
-FROM
-    auth.tb_users u
-INNER JOIN
-    registos.registos_horas r ON u.username = r.username
-INNER JOIN
-    auth.tb_projetos tp ON u.username = tp.username
-WHERE
-    u.username =:username 
-GROUP BY
-    u.username, u.email, tp.required_hours, tp.project_name,u.profile_picture_url,u.public_id,u.telegram_chat_id"
+    user-required-vs-total-hours: "SELECT 
+        u.username, 
+        COALESCE(tp.project_name, 'Sem Projeto') as project_name, 
+        u.email, 
+        COALESCE(tp.required_hours, 0) as required_hours, 
+        COALESCE(ROUND(CAST(SUM(r.horas_trabalhadas) AS NUMERIC), 1), 0) AS Total_horas_trabalhadas, 
+        u.profile_picture_url,
+        u.public_id,
+        u.telegram_chat_id
+    FROM 
+        auth.tb_users u 
+    LEFT JOIN 
+        registos.registos_horas r ON u.username = r.username 
+    LEFT JOIN 
+        auth.tb_projetos tp ON u.username = tp.username 
+    WHERE 
+        u.username = :username 
+    GROUP BY 
+        u.username, u.email, tp.required_hours, tp.project_name, u.profile_picture_url, u.public_id, u.telegram_chat_id"

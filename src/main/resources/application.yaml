@@ -51,6 +51,24 @@ spring:
     enabled: false
     locations: classpath:db/migration
     baseline-on-migrate: true
+logging:
+  level:
+    org.hibernate.orm.jdbc.bind: TRACE # Mostra o valor de :username no log
+    org.hibernate.SQL: DEBUG
+    org:
+      springframework:
+              security:
+                web:
+                  ObservationFilterChainDecorator: ERROR
+                  FilterChainProxy: ERROR
+    com:
+      aneto:
+              registo_horas_service:
+                security:
+                  GatewayAuthFilter: ERROR
+    org.flywaydb: INFO
+  file:
+    name: logs/app.log
 
 management:
   endpoints:
@@ -83,23 +101,6 @@ springdoc:
     filter: true
     display-request-duration: true
 
-logging:
-  level:
-    org:
-      springframework:
-        security:
-          web:
-            ObservationFilterChainDecorator: ERROR
-            FilterChainProxy: ERROR
-    com:
-      aneto:
-        registo_horas_service:
-          security:
-            GatewayAuthFilter: ERROR
-
-    org.flywaydb: INFO
-  file:
-    name: logs/app.log
 
 gcp:
   project:
@@ -121,9 +122,9 @@ vapid:
   subject:  ${VAPID_SUBJECT}
 
 telegram:
-  botToken: ${TELEGRAM_BOT_TOKEN}
-  chatId: ${TELEGRAM_CHAT_ID}
-  telegramUrl: ${TELEGRAM_URL}
+  bot:
+    token:
+      anetoBot: ${TELEGRAM_BOT_TOKEN}
 
 app:
   queries:
@@ -140,20 +141,22 @@ app:
     mes_e_ano DESC"
 
     # 4. Query findTotalHoursAndRequiredHoursByUserName (A mais longa)
-    user-required-vs-total-hours: "SELECT
-    u.username,
-    tp.project_name,
-    u.email,
-    tp.required_hours,
-    ROUND(CAST(SUM(r.horas_trabalhadas) AS NUMERIC), 1) AS Total_horas_trabalhadas,
-   u.profile_picture_url
-FROM
-    auth.tb_users u
-INNER JOIN
-    registos.registos_horas r ON u.username = r.username
-INNER JOIN
-    auth.tb_projetos tp ON u.username = tp.username
-WHERE
-    u.username =:username
-GROUP BY
-    u.username, u.email, tp.required_hours, tp.project_name,u.profile_picture_url"
+    user-required-vs-total-hours: "SELECT 
+        u.username, 
+        COALESCE(tp.project_name, 'Sem Projeto') as project_name, 
+        u.email, 
+        COALESCE(tp.required_hours, 0) as required_hours, 
+        COALESCE(ROUND(CAST(SUM(r.horas_trabalhadas) AS NUMERIC), 1), 0) AS Total_horas_trabalhadas, 
+        u.profile_picture_url,
+        u.public_id,
+        u.telegram_chat_id
+    FROM 
+        auth.tb_users u 
+    LEFT JOIN 
+        registos.registos_horas r ON u.username = r.username 
+    LEFT JOIN 
+        auth.tb_projetos tp ON u.username = tp.username 
+    WHERE 
+        u.username = :username 
+    GROUP BY 
+        u.username, u.email, tp.required_hours, tp.project_name, u.profile_picture_url, u.public_id, u.telegram_chat_id"
