@@ -126,7 +126,6 @@ telegram:
   telegramUrl: ${TELEGRAM_URL}
 
 app:
-  base-url: ${APP_BASE_URL}
   queries:
     monthly-summary: "SELECT 
     TO_CHAR(data_registo, 'YYYY-MM') AS mes_e_ano, 

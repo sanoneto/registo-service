@@ -58,8 +58,6 @@ public class EventsServiceImpl implements EventsService {
     @Value("${telegram.telegramUrl}")
     private String telegramUrl;
 
-    @Value("${app.base-url}")
-    private String baseUrl;
 
     @Override
     public EventsResponse create(EventRequest request, String googleToken) {
@@ -310,7 +308,7 @@ public class EventsServiceImpl implements EventsService {
     }
 
     private Map<String, Object> getStringObjectMap(String titulo, UUID eventoId, String chatId) {
-        // Agora a URL é construída dinamicamente com base no ambiente
+        // so se aplica a produçao no ambiente
         String urlConfirmar = "https://www.sanoneto.com/api/v1/eventos/" + eventoId + "/confirmar-alerta";
 
         Map<String, Object> body = Map.of(
