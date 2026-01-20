@@ -16,6 +16,7 @@ public record UserProfileRequest(String bodyType,
                                  String objective,
                                  String country,
                                  String location,
-                                 String recommended) {
+                                 String recommended,
+                                 String studentName) {
 
 }

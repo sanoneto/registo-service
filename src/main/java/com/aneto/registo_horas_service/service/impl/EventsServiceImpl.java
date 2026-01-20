@@ -377,8 +377,9 @@ public class EventsServiceImpl implements EventsService {
                     .setDescription(request.notes());
 
             DateTime start = new DateTime(request.referenceDate().toString() + "T" + request.startTime() + ":00Z");
+            DateTime End = new DateTime(request.referenceDate().toString() + "T" + request.endDate() + ":00Z");
             gEvent.setStart(new EventDateTime().setDateTime(start));
-            gEvent.setEnd(new EventDateTime().setDateTime(start));
+            gEvent.setEnd(new EventDateTime().setDateTime(End));
 
             com.google.api.services.calendar.model.Event executed = service.events().insert("primary", gEvent).execute();
             novoEvento.setGoogleEventId(executed.getId());

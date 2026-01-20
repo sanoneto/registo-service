@@ -73,11 +73,10 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
         salvarDadosDoPlano(username, newPlan.getUserProfile(), key, newPlan, planId, true);
     }
 
-
     @Override
     public TrainingPlanResponse generateTrainingPlan(UserProfileRequest userRequest) {
         String userPrompt = """
-                Atue como um Personal Trainer e Nutricionista especialista.
+                Atue como um Personal Trainer e Nutricionista especialista em reabilitação física.
                 Gere um plano de treino e um plano alimentar personalizado de %d dias por semana em Português.
                 
                 PERFIL DO ALUNO:
@@ -87,32 +86,36 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
                 - Peso: %.2f kg
                 - Histórico de Exercício: %s
                 - Patologias/Limitações: %s
-                - Localização: %s, %s (País: %s)
+                - Localização: %s (País: %s)
                 - Objetivo: %s
                 
-                DIRETRIZES DE TREINO:
-                1. Adapte os exercícios considerando as patologias mencionadas.
-                2. O plano deve ser dividido exatamente em %d dias.
+                DIRETRIZES DE TREINO (ADAPTAÇÃO ESPECÍFICA):
+                1. O plano deve ser dividido EXATAMENTE em %d dias.
+                2. ADAPTAÇÃO PARA LIMITAÇÕES:
+                   - Analise a limitação mencionada ("%s") e adapte todos os exercícios para evitar o agravamento da dor.
+                   - Substitua exercícios de risco por alternativas seguras.
+                   - Inclua exercícios de mobilidade ou fortalecimento específicos para a zona afetada: %s.
                 
                 DIRETRIZES DE NUTRIÇÃO:
                 1. Calcule o gasto calórico diário estimado para o objetivo de %s.
                 2. Sugira alimentos típicos e acessíveis na região de %s, %s.
-                3. Distribua as refeições ao longo do dia com foco em macronutrientes adequados ao biótipo %s.
+                3. Se a limitação for inflamatória, priorize alimentos com propriedades anti-inflamatórias.
                 
                 FORMATO DE RESPOSTA (JSON APENAS):
                 {
-                  "summary": "Explicação da estratégia de treino e nutrição focada no biótipo e limitações.",
+                  "summary": "Explicação da estratégia de treino focada na adaptação para %s e nutrição para o objetivo.",
                   "plan": [
                     {
-                      "day": "Dia 1 - [Foco do Treino]",
+                      "day": "Dia X - [Foco do Treino]",
                       "exercises": [
                         {
                           "name": "Nome do Exercício",
+                          "muscleGroup": "Ex: Peito, Costas, Quadríceps",
                           "sets": "Séries",
                           "reps": "Repetições",
                           "rest": "Tempo de descanso",
-                          "details": "Dica de segurança"
-                          "Notes": "Adicionar notas"
+                          "details": "Dica de segurança focada em %s",
+                          "notas": "Instrução técnica"
                         }
                       ]
                     }
@@ -120,36 +123,43 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
                   "dietPlan": {
                     "dailyCalories": 2500,
                     "macroDistribution": {
-                      "protein": "180g",
-                      "carbs": "300g",
-                      "fats": "70g"
+                      "protein": "Xg",
+                      "carbs": "Xg",
+                      "fats": "Xg"
                     },
                     "meals": [
                       {
-                        "time": "08:00",
-                        "description": "Pequeno-almoço/Café da manhã",
-                        "ingredients": ["Ovos", "Pão integral", "Fruta local"]
+                        "time": "HH:MM",
+                        "description": "Nome da Refeição",
+                        "ingredients": ["Ingrediente 1", "Ingrediente 2"]
                       }
                     ],
-                    "localTips": "Breve comentário sobre alimentos específicos da região sugeridos."
+                    "localTips": "Dicas regionais."
                   }
                 }
                 """.formatted(
-                userRequest.frequencyPerWeek(),
-                userRequest.bodyType(),
-                userRequest.gender(),
-                userRequest.heightCm(),
-                userRequest.weightKg(),
-                userRequest.exerciseHistory(),
-                userRequest.pathology(),
-                userRequest.location(), userRequest.country(), userRequest.country(), // Localização e País
-                userRequest.objective(),
-                userRequest.frequencyPerWeek(),
-                userRequest.objective(),
-                userRequest.location(), userRequest.country(), // Para a nutrição local
-                userRequest.bodyType()
-        );
+                userRequest.frequencyPerWeek(), // %d dias/semana
+                userRequest.bodyType(),         // %s Biótipo
+                userRequest.gender(),           // %s Género
+                userRequest.heightCm(),         // %.2f Altura
+                userRequest.weightKg(),         // %.2f Peso
+                userRequest.exerciseHistory(),  // %s Histórico
+                userRequest.pathology(),        // %s Patologias
+                userRequest.location(),         // %s Cidade (Localização)
+                userRequest.country(),          // %s País
+                userRequest.objective(),        // %s Objetivo
 
+                userRequest.frequencyPerWeek(), // %d diretrizes treino
+                userRequest.pathology(),        // %s Analise a limitação
+                userRequest.pathology(),        // %s Fortalecimento zona
+
+                userRequest.objective(),        // %s Gasto calórico
+                userRequest.location(),         // %s Sugira alimentos região
+                userRequest.country(),          // %s País (Nutrição)
+
+                userRequest.pathology(),        // %s Sumário JSON
+                userRequest.pathology()         // %s Detalhes exercício JSON
+        );
         Content content = Content.newBuilder()
                 .addParts(Part.newBuilder()
                         .setText(userPrompt))
@@ -258,26 +268,31 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
     private void salvarDadosDoPlano(String username, UserProfileRequest request, String key, TrainingPlanResponse plan, String planId, boolean update) {
         PlanoRequestDTO dto;
 
-        // 1. Independentemente de ser novo ou update,
-        // precisamos garantir que outros planos fiquem inativos.
-        if (update) { // se for update a plano
+        if (update) {
             planoService.prepararNovoPlanoAtivo(username);
         }
 
         if (planId == null || planId.isEmpty()) {
-            // Cenário 1: Novo Plano (já nasce ATIVO)
+            // --- OTIMIZAÇÃO AQUI ---
+            // Verificamos uma única vez se existe um nome de aluno no request
+            boolean temNomeAluno = request.studentName() != null && !request.studentName().isBlank();
+
+            String nomeNoPlano = temNomeAluno ? request.studentName() : username;
+            String especialista = temNomeAluno ? username : "Sem Especialista";
+            String recommended = temNomeAluno ? request.recommended() : username;
+
             dto = new PlanoRequestDTO(
-                    username,
+                    nomeNoPlano,
                     request.objective(),
-                    "Sem Especialista",
+                    especialista,
                     EstadoPlano.ATIVO,
                     EstadoPedido.PENDENTE,
                     key,
-                    request.recommended()
+                    recommended
             );
             planoService.createPlano(dto);
+            // -----------------------
         } else {
-            // Cenário 2: Atualizar Plano Existente
             PlanoResponseDTO planoExistente = planoService.getByPlanoById(UUID.fromString(planId));
 
             if (planoExistente == null) {
@@ -285,13 +300,13 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
             }
 
             dto = new PlanoRequestDTO(
-                    planoExistente.nomeAluno(),   // 1. nomeAluno
-                    planoExistente.objetivo(),    // 2. objetivo
-                    username,                     // 3. especialista (quem está salvando)
-                    EstadoPlano.ATIVO,            // 4. estadoPlano (Tipo Enum)
-                    EstadoPedido.FINALIZADO,      // 5. estadoPedido (Tipo Enum)
-                    key,                          // 6. link
-                    planoExistente.recommended()  // 7. recommended
+                    planoExistente.nomeAluno(),
+                    planoExistente.objetivo(),
+                    username,
+                    EstadoPlano.ATIVO,
+                    EstadoPedido.FINALIZADO,
+                    key,
+                    planoExistente.recommended()
             );
             planoService.updatePlano(planId, dto);
         }
