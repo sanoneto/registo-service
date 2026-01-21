@@ -1,6 +1,8 @@
 package com.aneto.registo_horas_service.controller;
 
 import com.aneto.registo_horas_service.dto.request.UserProfileRequest;
+import com.aneto.registo_horas_service.dto.response.ExerciseProgressLog;
+import com.aneto.registo_horas_service.dto.response.TrainingExercise;
 import com.aneto.registo_horas_service.dto.response.TrainingPlanResponse;
 import com.aneto.registo_horas_service.service.TrainingPlanService;
 import lombok.RequiredArgsConstructor;
@@ -8,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -45,4 +48,14 @@ public class TrainingController {
         return ResponseEntity.ok(Map.of("message", "Plano atualizado com sucesso"));
     }
 
+    @PostMapping("/progress")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ESPECIALISTA', 'ESTAGIARIO', 'ALUNO')")
+    public ResponseEntity<?> saveProgress(
+            @RequestBody List<TrainingExercise> logs, // Agora o símbolo será resolvido
+            @RequestHeader(X_USER_ID) String username,
+            @RequestParam(value = "planId", required = false) String planId) {
+
+        trainingPlanService.saveProgressLogs(logs, username, planId);
+        return ResponseEntity.ok(Map.of("message", "Progresso guardado com sucesso"));
+    }
 }

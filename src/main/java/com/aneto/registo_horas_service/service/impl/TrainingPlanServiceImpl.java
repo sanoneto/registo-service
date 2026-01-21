@@ -2,10 +2,14 @@ package com.aneto.registo_horas_service.service.impl;
 
 import com.aneto.registo_horas_service.dto.request.PlanoRequestDTO;
 import com.aneto.registo_horas_service.dto.request.UserProfileRequest;
+import com.aneto.registo_horas_service.dto.response.ExerciseProgressLog;
 import com.aneto.registo_horas_service.dto.response.PlanoResponseDTO;
+import com.aneto.registo_horas_service.dto.response.TrainingExercise;
 import com.aneto.registo_horas_service.dto.response.TrainingPlanResponse;
 import com.aneto.registo_horas_service.models.EstadoPedido;
 import com.aneto.registo_horas_service.models.EstadoPlano;
+import com.aneto.registo_horas_service.models.ExerciseHistoryEntity;
+import com.aneto.registo_horas_service.repository.ExerciseHistoryRepository;
 import com.aneto.registo_horas_service.service.PlanoService;
 import com.aneto.registo_horas_service.service.TrainingPlanService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -14,6 +18,7 @@ import com.google.cloud.vertexai.api.GenerateContentResponse;
 import com.google.cloud.vertexai.api.Part;
 import com.google.cloud.vertexai.generativeai.GenerativeModel;
 import com.google.cloud.vertexai.generativeai.ResponseHandler;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,8 +34,10 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -40,7 +47,7 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
     private final ObjectMapper objectMapper;
     private final GenerativeModel generativeModel;
     private final PlanoService planoService;
-
+    private final ExerciseHistoryRepository exerciseHistoryRepository;
     private final S3Client s3Client;
     @Value("${aws.s3.bucket-name}")
     private String bucketName;
@@ -74,12 +81,43 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
     }
 
     @Override
+    @Transactional
+    public void saveProgressLogs(List<TrainingExercise> logs, String username, String planId) {
+        if (logs == null || logs.isEmpty()) return;
+
+        // Converte os DTOs em Entidades e guarda
+        List<ExerciseHistoryEntity> entities = logs.stream().map(log -> {
+            return ExerciseHistoryEntity.builder()
+                    .username(username)
+                    .planId(planId)
+                    .exerciseName(log.name())
+                    .muscleGroup(log.muscleGroup())
+                    .weight(log.weight())
+                    .registeredAt(LocalDateTime.now()) // Data do servidor para segurança
+                    .clientDate(log.date()) // Data que veio do telemóvel do aluno
+                    .build();
+        }).collect(Collectors.toList());
+
+        exerciseHistoryRepository.saveAll(entities);
+    }
+
+    @Override
     public TrainingPlanResponse generateTrainingPlan(UserProfileRequest userRequest) {
+        // Tratamento de campos opcionais
+        String durationText = (userRequest.duration() != null && !userRequest.duration().isBlank())
+                ? userRequest.duration()
+                : "tempo padrão (aprox. 60 minutos)";
+
+        String protocolText = (userRequest.protocol() != null && !userRequest.protocol().isBlank())
+                ? userRequest.protocol()
+                : "o protocolo mais eficiente para o objetivo mencionado";
+
         String userPrompt = """
-                Atue como um Personal Trainer e Nutricionista especialista em reabilitação física.
+                Atue como um Personal Trainer e Nutricionista especialista em reabilitação física e metodologias de treino.
                 Gere um plano de treino e um plano alimentar personalizado de %d dias por semana em Português.
                 
                 PERFIL DO ALUNO:
+                - Idade: %d anos
                 - Biótipo: %s
                 - Género: %s
                 - Altura: %.2f cm
@@ -89,76 +127,77 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
                 - Localização: %s (País: %s)
                 - Objetivo: %s
                 
-                DIRETRIZES DE TREINO (ADAPTAÇÃO ESPECÍFICA):
+                DIRETRIZES DE TREINO (PROTOCOLO ESPECÍFICO):
                 1. O plano deve ser dividido EXATAMENTE em %d dias.
-                2. ADAPTAÇÃO PARA LIMITAÇÕES:
-                   - Analise a limitação mencionada ("%s") e adapte todos os exercícios para evitar o agravamento da dor.
-                   - Substitua exercícios de risco por alternativas seguras.
-                   - Inclua exercícios de mobilidade ou fortalecimento específicos para a zona afetada: %s.
-                
-                DIRETRIZES DE NUTRIÇÃO:
-                1. Calcule o gasto calórico diário estimado para o objetivo de %s.
-                2. Sugira alimentos típicos e acessíveis na região de %s, %s.
-                3. Se a limitação for inflamatória, priorize alimentos com propriedades anti-inflamatórias.
+                2. PROTOCOLO DE TREINO: Utilize obrigatoriamente a metodologia "%s".
+                3. DURAÇÃO: O treino deve ser projetado para durar aproximadamente %s.
+                4. SEQUÊNCIA LÓGICA: Os exercícios devem ser numerados (campo order) do aquecimento para o relaxamento.
+                5. ADAPTAÇÃO PARA IDADE E LIMITAÇÕES:
+                   - Analise a idade (%d anos) e a limitação ("%s") para ajustar volume e intensidade.
+                   - Substitua exercícios de risco e inclua mobilidade específica para: %s.
                 
                 FORMATO DE RESPOSTA (JSON APENAS):
                 {
-                  "summary": "Explicação da estratégia de treino focada na adaptação para %s e nutrição para o objetivo.",
+                  "summary": "Explicação técnica da estratégia usando o protocolo %s para o objetivo de %s, adaptado para %d anos e a patologia %s.",
                   "plan": [
                     {
-                      "day": "Dia X - [Foco do Treino]",
+                      "day": "Dia X - [Foco conforme Protocolo]",
                       "exercises": [
                         {
+                          "order": 1,
                           "name": "Nome do Exercício",
-                          "muscleGroup": "Ex: Peito, Costas, Quadríceps",
+                          "muscleGroup": "Grupo Muscular",
                           "sets": "Séries",
                           "reps": "Repetições",
                           "rest": "Tempo de descanso",
-                          "details": "Dica de segurança focada em %s",
-                          "notas": "Instrução técnica"
+                          "details": "Dica de segurança para %s",
+                          "notas": "Instrução técnica do protocolo"
                         }
                       ]
                     }
                   ],
                   "dietPlan": {
                     "dailyCalories": 2500,
-                    "macroDistribution": {
-                      "protein": "Xg",
-                      "carbs": "Xg",
-                      "fats": "Xg"
-                    },
+                    "macroDistribution": { "protein": "Xg", "carbs": "Xg", "fats": "Xg" },
                     "meals": [
                       {
                         "time": "HH:MM",
-                        "description": "Nome da Refeição",
-                        "ingredients": ["Ingrediente 1", "Ingrediente 2"]
+                        "description": "Refeição",
+                        "ingredients": ["Item 1", "Item 2"]
                       }
                     ],
-                    "localTips": "Dicas regionais."
+                    "localTips": "Dicas regionais para %s, %s."
                   }
                 }
                 """.formatted(
-                userRequest.frequencyPerWeek(), // %d dias/semana
-                userRequest.bodyType(),         // %s Biótipo
-                userRequest.gender(),           // %s Género
-                userRequest.heightCm(),         // %.2f Altura
-                userRequest.weightKg(),         // %.2f Peso
-                userRequest.exerciseHistory(),  // %s Histórico
-                userRequest.pathology(),        // %s Patologias
-                userRequest.location(),         // %s Cidade (Localização)
-                userRequest.country(),          // %s País
-                userRequest.objective(),        // %s Objetivo
+                userRequest.frequencyPerWeek(),
+                userRequest.age(),
+                userRequest.bodyType(),
+                userRequest.gender(),
+                userRequest.heightCm(),
+                userRequest.weightKg(),
+                userRequest.exerciseHistory(),
+                userRequest.pathology(),
+                userRequest.location(),
+                userRequest.country(),
+                userRequest.objective(),
 
-                userRequest.frequencyPerWeek(), // %d diretrizes treino
-                userRequest.pathology(),        // %s Analise a limitação
-                userRequest.pathology(),        // %s Fortalecimento zona
+                userRequest.frequencyPerWeek(),
+                protocolText,
+                durationText,
+                userRequest.age(),              // Novo parâmetro na diretriz de adaptação
+                userRequest.pathology(),
+                userRequest.pathology(),
 
-                userRequest.objective(),        // %s Gasto calórico
-                userRequest.location(),         // %s Sugira alimentos região
-                userRequest.country(),          // %s País (Nutrição)
+                protocolText,
+                userRequest.objective(),
+                userRequest.age(),              // Novo parâmetro no sumário JSON
+                userRequest.pathology(),
 
-                userRequest.pathology(),        // %s Sumário JSON
-                userRequest.pathology()         // %s Detalhes exercício JSON
+                userRequest.pathology(),
+
+                userRequest.location(),
+                userRequest.country()
         );
         Content content = Content.newBuilder()
                 .addParts(Part.newBuilder()

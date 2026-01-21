@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotNull;
 
 public record UserProfileRequest(String bodyType,
                                  String gender,
+                                 Integer age,
                                  Double heightCm, // Usando Double para números decimais
                                  Double weightKg,
                                  String exerciseHistory,
@@ -17,6 +18,8 @@ public record UserProfileRequest(String bodyType,
                                  String country,
                                  String location,
                                  String recommended,
-                                 String studentName) {
+                                 String studentName,
+                                 String duration,
+                                 String protocol) {
 
 }
