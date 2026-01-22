@@ -41,18 +41,18 @@ public class EventoController {
     }
 
 
-    // Adiciona o CrossOrigin para a Gateway/React não bloquear
-    // Aceita tanto GET (Telegram) como POST (Service Worker)
     @GetMapping("/eventos/{id}/confirmar-alerta")
     public ResponseEntity<Void> confirmarAlerta(@PathVariable UUID id) {
         log.info(">>> PROCESSANDO CONFIRMAÇÃO PARA ID: {}", id);
 
-        // 1. Executa a lógica de parar o alerta no banco de dados
-        eventsService.confirmarAlerta(id);
+        String nomeEvento = eventsService.confirmarAlerta(id);
 
-        // Podes criar uma rota no teu React chamada /sucesso ou mandar para a Home
+        // Encode para evitar que espaços no nome do evento quebrem a URL
+        String nomeEncoded = java.net.URLEncoder.encode(nomeEvento, java.nio.charset.StandardCharsets.UTF_8);
+
+        // Redireciona para o caminho público do React
         return ResponseEntity.status(HttpStatus.FOUND)
-                .location(URI.create("https://www.sanoneto.com/Lista-agenda?confirmado=true"))
+                .location(URI.create("https://www.sanoneto.com/alerta-confirmado?evento=" + nomeEncoded))
                 .build();
     }
 

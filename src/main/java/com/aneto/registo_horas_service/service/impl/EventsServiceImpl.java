@@ -20,6 +20,7 @@ import com.google.api.services.calendar.model.EventDateTime;
 import com.google.auth.http.HttpCredentialsAdapter;
 import com.google.auth.oauth2.AccessToken;
 import com.google.auth.oauth2.GoogleCredentials;
+import jakarta.annotation.PostConstruct;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -47,7 +48,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class EventsServiceImpl implements EventsService {
     private static final Logger log = LoggerFactory.getLogger(EventsServiceImpl.class);
-    private final EventoRepository repository;
+    private final EventoRepository eventRepository;
     private final EventsMapper mapper;
     private final TaskScheduler taskScheduler; // Adicionado final
     private final NotificationService notificationService; // Injetado aqui
@@ -67,7 +68,7 @@ public class EventsServiceImpl implements EventsService {
         // IMPORTANTE: Garante que o username vindo do request é guardado na entidade
         // para que as repetições futuras saibam para quem enviar.
         novoEvento.setUsername(request.username());
-        novoEvento = repository.save(novoEvento);
+        novoEvento = eventRepository.save(novoEvento);
 
         // 2. Envio imediato via Telegram se for Mobile
         if (request.isMobile()) {
@@ -124,10 +125,10 @@ public class EventsServiceImpl implements EventsService {
 
                 for (com.google.api.services.calendar.model.Event gEvent : events.getItems()) {
                     // Verificação de duplicados por ID de Evento E Utilizador
-                    if (!repository.existsByGoogleEventIdAndUsername(gEvent.getId(), userId)) {
+                    if (!eventRepository.existsByGoogleEventIdAndUsername(gEvent.getId(), userId)) {
                         Evento novo = mapGoogleEventToEntity(gEvent, userId);
                         if (novo != null) {
-                            todosEventosNovos.add(repository.save(novo));
+                            todosEventosNovos.add(eventRepository.save(novo));
                         }
                     }
                 }
@@ -139,6 +140,7 @@ public class EventsServiceImpl implements EventsService {
             throw new RuntimeException("Falha ao ler agendas do Google");
         }
     }
+
     private Calendar getCalendarService(String accessToken) {
         // Usamos uma subclasse que apenas retorna o token sem tentar renová-lo
         AccessToken token = new AccessToken(accessToken, null);
@@ -153,12 +155,22 @@ public class EventsServiceImpl implements EventsService {
     }
 
     @Override
-    public void confirmarAlerta(UUID id) {
-        repository.findById(id).ifPresentOrElse(evento -> {
-            evento.setAlertConfirmed(true);
-            repository.save(evento);
-            log.info("✅ Sucesso: Evento {} confirmado pelo utilizador {}.", id, evento.getUsername());
-        }, () -> log.error("❌ Erro: Tentativa de confirmar evento inexistente ID: {}", id));
+    @Transactional
+    public String confirmarAlerta(UUID id) {
+        // 1. Procura o evento no banco
+        Evento evento = eventRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Evento não encontrado com ID: " + id));
+
+        // 2. Verifica se o alerta já foi confirmado anteriormente
+        // Se alertConfirmed for false, significa que o alerta ainda está "ativo" ou pendente
+        if (!evento.isAlertConfirmed()) {
+            evento.setAlertConfirmed(true); // Marca como confirmado (para parar de enviar notificações)
+            eventRepository.save(evento);
+            log.info("Alerta confirmado com sucesso para o evento: {}", id);
+        } else {
+            log.info("O alerta para o evento {} já havia sido confirmado anteriormente.", id);
+        }
+        return evento.getTitle();
     }
 
     @Override
@@ -189,7 +201,7 @@ public class EventsServiceImpl implements EventsService {
     @Override
     @Transactional
     public void deleteById(UUID id, String googleToken) {
-        repository.findById(id).ifPresentOrElse(
+        eventRepository.findById(id).ifPresentOrElse(
                 evento -> {
                     // 1. Tenta apagar no Google Agenda apenas se tivermos o ID e o Token
                     if (evento.getGoogleEventId() != null && googleToken != null && !googleToken.isBlank()) {
@@ -206,7 +218,7 @@ public class EventsServiceImpl implements EventsService {
 
                     // 2. Apaga no seu banco de dados local
                     // Isso deve estar FORA do try do Google para garantir que o registro local suma
-                    repository.delete(evento);
+                    eventRepository.delete(evento);
                     log.info(">>> Evento com ID {} eliminado localmente.", id);
                 },
                 () -> {
@@ -219,21 +231,21 @@ public class EventsServiceImpl implements EventsService {
 
     @Override
     public EventsResponse findById(UUID id) {
-        return repository.findById(id)
+        return eventRepository.findById(id)
                 .map(mapper::toResponse)
                 .orElseThrow(() -> new RuntimeException("Evento não encontrado com o ID: " + id));
     }
 
     @Override
     public EventsResponse update(UUID id, EventRequest request) {
-        return repository.findById(id).map(existente -> {
+        return eventRepository.findById(id).map(existente -> {
             boolean horarioMudou = !existente.getStartTime().equals(request.startTime()) ||
                     !existente.getReferenceDate().equals(request.referenceDate());
 
             mapper.updateEntityFromDto(request, existente);
             if (horarioMudou) existente.setAlertConfirmed(false);
 
-            Evento salvo = repository.save(existente);
+            Evento salvo = eventRepository.save(existente);
             if (request.sendAlert() && horarioMudou) agendarAlertaComRepeticao(salvo.getId(), request);
 
             return mapper.toResponse(salvo);
@@ -243,7 +255,7 @@ public class EventsServiceImpl implements EventsService {
     @Override
     public List<EventsResponse> listAll() {
         // 1. Vai buscar todas as entidades ao banco de dados
-        List<Evento> eventos = repository.findAll();
+        List<Evento> eventos = eventRepository.findAll();
 
         // 2. Transforma a lista de entidades em lista de DTOs usando o mapper
         return eventos.stream()
@@ -265,7 +277,7 @@ public class EventsServiceImpl implements EventsService {
     }
 
     private void dispararFluxoRepeticao(UUID eventoId) {
-        repository.findById(eventoId).ifPresent(evento -> {
+        eventRepository.findById(eventoId).ifPresent(evento -> {
             if (!evento.isAlertConfirmed()) {
                 log.info("🔔 Disparando repetição de alerta para: {}", evento.getTitle());
 
@@ -404,7 +416,7 @@ public class EventsServiceImpl implements EventsService {
 
             com.google.api.services.calendar.model.Event executed = service.events().insert("primary", gEvent).execute();
             novoEvento.setGoogleEventId(executed.getId());
-            repository.save(novoEvento);
+            eventRepository.save(novoEvento);
         } catch (Exception e) {
             log.error("Erro sincronização Google: {}", e.getMessage());
         }
@@ -436,6 +448,30 @@ public class EventsServiceImpl implements EventsService {
         }
 
         return novo;
+    }
+
+    // Adicione esta anotação para correr ao iniciar
+    @PostConstruct
+    public void recuperarAlertasPendentes() {
+        log.info("### 🔄 Verificando alertas pendentes para recuperação...");
+
+        LocalDate hoje = LocalDate.now();
+        LocalDateTime agora = LocalDateTime.now();
+
+        // 1. Usa o método otimizado do repositório
+        List<Evento> pendentes = eventRepository.findPendentesParaNotificar(hoje);
+
+        log.info("### 🔍 Encontrados {} eventos com alertas ativos no banco.", pendentes.size());
+
+        pendentes.forEach(evento -> {
+            LocalDateTime dataHoraEvento = LocalDateTime.of(evento.getReferenceDate(), evento.getStartTime());
+
+            // 2. Só reinicia o fluxo se a hora do evento já passou ou é exatamente agora
+            if (dataHoraEvento.isBefore(agora) || dataHoraEvento.isEqual(agora)) {
+                log.info("### 🚀 Retomando fluxo de repetição para: {}", evento.getTitle());
+                dispararFluxoRepeticao(evento.getId());
+            }
+        });
     }
 }
 
