@@ -309,12 +309,12 @@ public class EventsServiceImpl implements EventsService {
         String dynamicChatId = buscarTelegramChatIdRemoto(username);
         if (dynamicChatId == null || dynamicChatId.isBlank()) return;
         try {
-            // 1. Criar o Botão de Confirmação
-            String urlConfirmar = "https://www.sanoneto.com/api/v1/eventos/" + eventoId + "/confirmar-alerta";
+
+            String urlConfirmacao = "https://treg-aneto.com:8085/api/v1/eventos/" + eventoId + "/confirmar-alerta";
 
             InlineKeyboardButton botaoConfirmar = InlineKeyboardButton.builder()
                     .text("Confirmar ✅")
-                    .url(urlConfirmar)
+                    .url(urlConfirmacao)
                     .build();
 
             // 2. Montar o Teclado (Keyboard)
