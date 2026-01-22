@@ -15,4 +15,6 @@ public interface EventoRepository extends JpaRepository<Evento, UUID> {
 
     // Melhor alternativa: evitar duplicatas pelo ID único do Google
     boolean existsByGoogleEventId(String googleEventId);
+
+    boolean existsByGoogleEventIdAndUsername(String id, String userId);
 }

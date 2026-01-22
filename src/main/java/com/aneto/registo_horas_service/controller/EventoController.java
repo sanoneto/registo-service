@@ -3,6 +3,7 @@ package com.aneto.registo_horas_service.controller;
 import com.aneto.registo_horas_service.dto.request.EventRequest;
 import com.aneto.registo_horas_service.dto.response.EventsResponse;
 import com.aneto.registo_horas_service.service.EventsService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -83,11 +84,11 @@ public class EventoController {
 
     @GetMapping("/eventos/sync-from-google")
     public ResponseEntity<List<EventsResponse>> syncFromGoogle(
-            @RequestHeader("Authorization") String token,
-            @RequestHeader("X-Google-Token") String googleToken) {
+            @RequestHeader("X-Google-Token") String googleToken,
+            @RequestHeader(value = "X-User-Id", required = false) String userId) {
 
-        // Chamamos o serviço para buscar no Google e salvar o que for novo
-        List<EventsResponse> novosEventos = eventsService.syncFromGoogle(googleToken);
+        // Se o userId for null, pode usar o "username" do contexto de segurança do Spring se preferir
+        List<EventsResponse> novosEventos = eventsService.syncFromGoogle(googleToken, userId);
         return ResponseEntity.ok(novosEventos);
     }
 }

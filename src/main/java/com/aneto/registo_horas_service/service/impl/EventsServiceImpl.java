@@ -10,13 +10,16 @@ import com.aneto.registo_horas_service.service.EventsService;
 import com.aneto.registo_horas_service.service.NotificationService;
 import com.aneto.registo_horas_service.service.TelegramBotService;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.api.client.auth.oauth2.BearerToken;
-import com.google.api.client.auth.oauth2.Credential;
-import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
+import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.client.util.DateTime;
 import com.google.api.services.calendar.Calendar;
+import com.google.api.services.calendar.model.CalendarList;
+import com.google.api.services.calendar.model.CalendarListEntry;
 import com.google.api.services.calendar.model.EventDateTime;
+import com.google.auth.http.HttpCredentialsAdapter;
+import com.google.auth.oauth2.AccessToken;
+import com.google.auth.oauth2.GoogleCredentials;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -31,10 +34,8 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKe
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardRow;
 import reactor.core.publisher.Mono;
 
-import java.time.Duration;
-import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
+import java.time.*;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
@@ -95,49 +96,58 @@ public class EventsServiceImpl implements EventsService {
     }
 
     @Override
-    public List<EventsResponse> syncFromGoogle(String googleToken) {
+    public List<EventsResponse> syncFromGoogle(String googleToken, String userId) {
         try {
             Calendar service = getCalendarService(googleToken);
+
+            // 1. Limitar a janela de tempo (ex: hoje até daqui a 3 meses)
             DateTime now = new DateTime(System.currentTimeMillis());
+            DateTime limit = new DateTime(System.currentTimeMillis() + (90L * 24 * 60 * 60 * 1000));
 
-            com.google.api.services.calendar.model.Events events = service.events().list("primary")
-                    .setTimeMin(now)
-                    .setMaxResults(50)
-                    .setOrderBy("startTime")
-                    .setSingleEvents(true)
-                    .execute();
+            // 2. Obter a lista de todos os calendários visíveis
+            CalendarList calendarList = service.calendarList().list().execute();
+            List<Evento> todosEventosNovos = new java.util.ArrayList<>();
 
-            List<com.google.api.services.calendar.model.Event> items = events.getItems();
-            List<Evento> eventosNovos = new java.util.ArrayList<>();
+            for (CalendarListEntry entry : calendarList.getItems()) {
+                // Ignorar calendários de feriados se desejar, ou filtrar por ID
+                if ("reader".equals(entry.getAccessRole()) && entry.getId().contains("#holiday")) {
+                    log.info("Ignorando calendário de feriados: {}", entry.getSummary());
+                    continue;
+                }
+                log.info("Sincronizando calendário: {}", entry.getSummary());
 
-            for (com.google.api.services.calendar.model.Event gEvent : items) {
-                // VERIFICAÇÃO POR ID (Resolve o erro do seu repositório)
-                if (!repository.existsByGoogleEventId(gEvent.getId())) {
-                    Evento novo = new Evento();
-                    novo.setGoogleEventId(gEvent.getId());
-                    novo.setTitle(gEvent.getSummary());
-                    novo.setNotes(gEvent.getDescription() != null ? gEvent.getDescription() : "Importado do Google");
+                com.google.api.services.calendar.model.Events events = service.events().list(entry.getId())
+                        .setTimeMin(now)
+                        .setTimeMax(limit) // 👈 Essencial para evitar aniversários repetidos até 2036
+                        .setSingleEvents(true)
+                        .execute();
 
-                    DateTime start = gEvent.getStart().getDateTime();
-                    if (start != null) {
-                        LocalDateTime ldt = LocalDateTime.ofInstant(Instant.ofEpochMilli(start.getValue()), ZoneId.systemDefault());
-                        novo.setReferenceDate(ldt.toLocalDate());
-                        novo.setStartTime(ldt.toLocalTime().truncatedTo(ChronoUnit.MINUTES));
+                for (com.google.api.services.calendar.model.Event gEvent : events.getItems()) {
+                    // Verificação de duplicados por ID de Evento E Utilizador
+                    if (!repository.existsByGoogleEventIdAndUsername(gEvent.getId(), userId)) {
+                        Evento novo = mapGoogleEventToEntity(gEvent, userId);
+                        if (novo != null) {
+                            todosEventosNovos.add(repository.save(novo));
+                        }
                     }
-                    eventosNovos.add(repository.save(novo));
                 }
             }
-            return eventosNovos.stream().map(mapper::toResponse).collect(Collectors.toList());
+            return todosEventosNovos.stream().map(mapper::toResponse).collect(Collectors.toList());
 
         } catch (Exception e) {
-            log.error("Erro na sincronização: {}", e.getMessage());
-            throw new RuntimeException("Falha ao ler agenda do Google");
+            log.error("Erro na sincronização completa: ", e);
+            throw new RuntimeException("Falha ao ler agendas do Google");
         }
     }
+    private Calendar getCalendarService(String accessToken) {
+        // Usamos uma subclasse que apenas retorna o token sem tentar renová-lo
+        AccessToken token = new AccessToken(accessToken, null);
+        GoogleCredentials credentials = GoogleCredentials.create(token);
 
-    private Calendar getCalendarService(String accessToken) throws Exception {
-        Credential credential = new Credential(BearerToken.authorizationHeaderAccessMethod()).setAccessToken(accessToken);
-        return new Calendar.Builder(GoogleNetHttpTransport.newTrustedTransport(), GsonFactory.getDefaultInstance(), credential)
+        return new Calendar.Builder(
+                new NetHttpTransport(),
+                GsonFactory.getDefaultInstance(),
+                new HttpCredentialsAdapter(credentials))
                 .setApplicationName("Registo-Horas")
                 .build();
     }
@@ -376,10 +386,21 @@ public class EventsServiceImpl implements EventsService {
                     .setSummary(request.title())
                     .setDescription(request.notes());
 
-            DateTime start = new DateTime(request.referenceDate().toString() + "T" + request.startTime() + ":00Z");
-            DateTime End = new DateTime(request.referenceDate().toString() + "T" + request.endDate() + ":00Z");
-            gEvent.setStart(new EventDateTime().setDateTime(start));
-            gEvent.setEnd(new EventDateTime().setDateTime(End));
+            // 1. Defina o formatador padrão RFC3339 que o Google exige
+            DateTimeFormatter rfc3339Formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'");
+
+            // 2. Combine data e hora (Assumindo que são LocalDate e LocalTime)
+            OffsetDateTime startIso = request.referenceDate()
+                    .atTime(request.startTime())
+                    .atOffset(ZoneOffset.UTC);
+
+            OffsetDateTime endIso = request.referenceDate()
+                    .atTime(request.endTime())
+                    .atOffset(ZoneOffset.UTC);
+
+            // 3. Formate explicitamente para String antes de passar para o DateTime do Google
+            gEvent.setStart(new EventDateTime().setDateTime(new DateTime(startIso.format(rfc3339Formatter))));
+            gEvent.setEnd(new EventDateTime().setDateTime(new DateTime(endIso.format(rfc3339Formatter))));
 
             com.google.api.services.calendar.model.Event executed = service.events().insert("primary", gEvent).execute();
             novoEvento.setGoogleEventId(executed.getId());
@@ -387,6 +408,34 @@ public class EventsServiceImpl implements EventsService {
         } catch (Exception e) {
             log.error("Erro sincronização Google: {}", e.getMessage());
         }
+    }
+
+    private Evento mapGoogleEventToEntity(com.google.api.services.calendar.model.Event gEvent, String userId) {
+        Evento novo = new Evento();
+        novo.setGoogleEventId(gEvent.getId());
+        novo.setTitle(gEvent.getSummary());
+        novo.setUsername(userId);
+        novo.setNotes(gEvent.getDescription() != null ? gEvent.getDescription() : "Importado do Google");
+
+        // Tratar data de eventos com hora (DateTime)
+        if (gEvent.getStart().getDateTime() != null) {
+            LocalDateTime ldt = LocalDateTime.ofInstant(
+                    Instant.ofEpochMilli(gEvent.getStart().getDateTime().getValue()),
+                    ZoneId.systemDefault()
+            );
+            novo.setReferenceDate(ldt.toLocalDate());
+            novo.setStartTime(ldt.toLocalTime().truncatedTo(ChronoUnit.MINUTES));
+        }
+        // Tratar eventos de dia inteiro (Date) - Resolve o erro dos Aniversários
+        else if (gEvent.getStart().getDate() != null) {
+            LocalDate date = LocalDate.parse(gEvent.getStart().getDate().toStringRfc3339().substring(0, 10));
+            novo.setReferenceDate(date);
+            novo.setStartTime(LocalTime.MIDNIGHT);
+        } else {
+            return null; // Caso não tenha data nenhuma (inválido)
+        }
+
+        return novo;
     }
 }
 
