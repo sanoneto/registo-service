@@ -5,18 +5,13 @@ import com.aneto.registo_horas_service.dto.request.UserProfileRequest;
 import com.aneto.registo_horas_service.dto.response.PlanoResponseDTO;
 import com.aneto.registo_horas_service.dto.response.TrainingExercise;
 import com.aneto.registo_horas_service.dto.response.TrainingPlanResponse;
-import com.aneto.registo_horas_service.models.EstadoPedido;
-import com.aneto.registo_horas_service.models.EstadoPlano;
+import com.aneto.registo_horas_service.models.Enum;
 import com.aneto.registo_horas_service.models.ExerciseHistoryEntity;
+import com.aneto.registo_horas_service.models.Training.Training;
 import com.aneto.registo_horas_service.repository.ExerciseHistoryRepository;
 import com.aneto.registo_horas_service.service.PlanoService;
 import com.aneto.registo_horas_service.service.TrainingPlanService;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.cloud.vertexai.api.Content;
-import com.google.cloud.vertexai.api.GenerateContentResponse;
-import com.google.cloud.vertexai.api.Part;
-import com.google.cloud.vertexai.generativeai.GenerativeModel;
-import com.google.cloud.vertexai.generativeai.ResponseHandler;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -44,9 +39,9 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
     private static final Logger log = LoggerFactory.getLogger(TrainingPlanServiceImpl.class);
 
     private final ObjectMapper objectMapper;
-    private final GenerativeModel generativeModel;
     private final PlanoService planoService;
     private final ExerciseHistoryRepository exerciseHistoryRepository;
+    private final Training training;
     private final S3Client s3Client;
     @Value("${aws.s3.bucket-name}")
     private String bucketName;
@@ -64,7 +59,7 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
                     .orElseThrow(() -> new RuntimeException("Dados insuficientes para gerar novo plano e nenhum histórico encontrado."));
         }
         // 3. Se chegou aqui, temos dados para gerar um novo plano
-        TrainingPlanResponse newPlan = generateTrainingPlan(request);
+        TrainingPlanResponse newPlan = training.generateTrainingPlan(request);
         configurarNovoPlano(newPlan, request);
         // 4. Persistência (Banco e S3)
         salvarDadosDoPlano(username, request, key, newPlan, planId, false);
@@ -100,118 +95,6 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
         exerciseHistoryRepository.saveAll(entities);
     }
 
-    @Override
-    public TrainingPlanResponse generateTrainingPlan(UserProfileRequest userRequest) {
-        // Tratamento de campos opcionais
-        String durationText = (userRequest.duration() != null && !userRequest.duration().isBlank())
-                ? userRequest.duration()
-                : "tempo padrão (aprox. 60 minutos)";
-
-        String protocolText = (userRequest.protocol() != null && !userRequest.protocol().isBlank())
-                ? userRequest.protocol()
-                : "o protocolo mais eficiente para o objetivo mencionado";
-
-        String userPrompt = """
-                Atue como um Personal Trainer e Nutricionista especialista em reabilitação física e metodologias de treino.
-                Gere um plano de treino e um plano alimentar personalizado de %d dias por semana em Português.
-                
-                PERFIL DO ALUNO:
-                - Idade: %d anos
-                - Biótipo: %s
-                - Género: %s
-                - Altura: %.2f cm
-                - Peso: %.2f kg
-                - Histórico de Exercício: %s
-                - Patologias/Limitações: %s
-                - Localização: %s (País: %s)
-                - Objetivo: %s
-                
-                DIRETRIZES DE TREINO (PROTOCOLO ESPECÍFICO):
-                1. O plano deve ser dividido EXATAMENTE em %d dias.
-                2. PROTOCOLO DE TREINO: Utilize obrigatoriamente a metodologia "%s".
-                3. DURAÇÃO: O treino deve ser projetado para durar aproximadamente %s.
-                4. SEQUÊNCIA LÓGICA: Os exercícios devem ser numerados (campo order) do aquecimento para o relaxamento.
-                5. ADAPTAÇÃO PARA IDADE E LIMITAÇÕES:
-                   - Analise a idade (%d anos) e a limitação ("%s") para ajustar volume e intensidade.
-                   - Substitua exercícios de risco e inclua mobilidade específica para: %s.
-                
-                FORMATO DE RESPOSTA (JSON APENAS):
-                {
-                  "summary": "Explicação técnica da estratégia usando o protocolo %s para o objetivo de %s, adaptado para %d anos e a patologia %s.",
-                  "plan": [
-                    {
-                      "day": "Dia X - [Foco conforme Protocolo]",
-                      "exercises": [
-                        {
-                          "order": 1,
-                          "name": "Nome do Exercício",
-                          "muscleGroup": "Grupo Muscular",
-                          "sets": "Séries",
-                          "reps": "Repetições",
-                          "rest": "Tempo de descanso",
-                          "details": "Dica de segurança para %s",
-                          "notas": "Instrução técnica do protocolo"
-                        }
-                      ]
-                    }
-                  ],
-                  "dietPlan": {
-                    "dailyCalories": 2500,
-                    "macroDistribution": { "protein": "Xg", "carbs": "Xg", "fats": "Xg" },
-                    "meals": [
-                      {
-                        "time": "HH:MM",
-                        "description": "Refeição",
-                        "ingredients": ["Item 1", "Item 2"]
-                      }
-                    ],
-                    "localTips": "Dicas regionais para %s, %s."
-                  }
-                }
-                """.formatted(
-                userRequest.frequencyPerWeek(),
-                userRequest.age(),
-                userRequest.bodyType(),
-                userRequest.gender(),
-                userRequest.heightCm(),
-                userRequest.weightKg(),
-                userRequest.exerciseHistory(),
-                userRequest.pathology(),
-                userRequest.location(),
-                userRequest.country(),
-                userRequest.objective(),
-
-                userRequest.frequencyPerWeek(),
-                protocolText,
-                durationText,
-                userRequest.age(),              // Novo parâmetro na diretriz de adaptação
-                userRequest.pathology(),
-                userRequest.pathology(),
-
-                protocolText,
-                userRequest.objective(),
-                userRequest.age(),              // Novo parâmetro no sumário JSON
-                userRequest.pathology(),
-
-                userRequest.pathology(),
-
-                userRequest.location(),
-                userRequest.country()
-        );
-        Content content = Content.newBuilder()
-                .addParts(Part.newBuilder()
-                        .setText(userPrompt))
-                .setRole("user")
-                .build();
-
-        try {
-            GenerateContentResponse response = generativeModel.generateContent(content);
-            String textResponse = ResponseHandler.getText(response);
-            return objectMapper.readValue(cleanMarkdown(textResponse), TrainingPlanResponse.class);
-        } catch (Exception e) {
-            throw new RuntimeException("Erro Gemini: " + e.getMessage(), e);
-        }
-    }
 
     @Override
     public Optional<TrainingPlanResponse> loadFromS3(String key) {
@@ -241,14 +124,6 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
         }
     }
 
-    private String cleanMarkdown(String text) {
-        if (text == null) return "{}";
-        return text.trim()
-                .replaceAll("^```json", "")
-                .replaceAll("^```", "")
-                .replaceAll("```$", "")
-                .trim();
-    }
 
     // --- Métodos Auxiliares para Limpar o Fluxo Principal ---
     private String buscarChaveDoPlano(String planId, String username, UserProfileRequest request) {
@@ -323,8 +198,8 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
                     nomeNoPlano,
                     request.objective(),
                     especialista,
-                    EstadoPlano.ATIVO,
-                    EstadoPedido.PENDENTE,
+                    Enum.EstadoPlano.ATIVO,
+                    Enum.EstadoPedido.PENDENTE,
                     key,
                     recommended
             );
@@ -341,8 +216,8 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
                     planoExistente.nomeAluno(),
                     planoExistente.objetivo(),
                     username,
-                    EstadoPlano.ATIVO,
-                    EstadoPedido.FINALIZADO,
+                    Enum.EstadoPlano.ATIVO,
+                    Enum.EstadoPedido.FINALIZADO,
                     key,
                     planoExistente.recommended()
             );
@@ -351,4 +226,6 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
 
         saveToS3(key, plan);
     }
+
+
 }

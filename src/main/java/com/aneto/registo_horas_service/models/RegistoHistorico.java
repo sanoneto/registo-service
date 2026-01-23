@@ -26,7 +26,7 @@ public class RegistoHistorico {
     private String registoPublicId; // FK para RegistoHoras.publicId
 
     @Enumerated(EnumType.STRING)
-    private OperacaoAuditoria operacao; // ENUM: UPDATE, DELETE, CREATE
+    private Enum.OperacaoAuditoria operacao; // ENUM: UPDATE, DELETE, CREATE
 
     private LocalDateTime dataAlteracao;
 

@@ -28,7 +28,7 @@ public class Absence {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private AbsenceType type;
+    private Enum.AbsenceType type;
 
     @Column(nullable = false)
     private LocalDate startDate;
@@ -44,7 +44,7 @@ public class Absence {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private AbsenceStatus status;
+    private Enum.AbsenceStatus status;
 
     // Construtor, Getters e Setters
 
@@ -52,7 +52,7 @@ public class Absence {
     protected void onCreate() {
         this.publicId = UUID.randomUUID().toString();
         this.registrationDate = LocalDate.now();
-        this.status = AbsenceStatus.PENDENTE; // Todos os pedidos começam como Pendentes
+        this.status = Enum.AbsenceStatus.PENDENTE; // Todos os pedidos começam como Pendentes
     }
 }
 

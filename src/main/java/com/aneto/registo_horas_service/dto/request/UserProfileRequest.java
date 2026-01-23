@@ -20,6 +20,8 @@ public record UserProfileRequest(String bodyType,
                                  String recommended,
                                  String studentName,
                                  String duration,
-                                 String protocol) {
+                                 String protocol,
+                                 Double bodyFat
+                                 ) {
 
 }

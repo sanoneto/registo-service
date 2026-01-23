@@ -1,7 +1,6 @@
 package com.aneto.registo_horas_service.repository;
 
-import com.aneto.registo_horas_service.models.EstadoPedido;
-import com.aneto.registo_horas_service.models.EstadoPlano;
+import com.aneto.registo_horas_service.models.Enum;
 import com.aneto.registo_horas_service.models.Plano;
 import jakarta.transaction.Transactional;
 import org.springframework.data.domain.Page;
@@ -24,12 +23,12 @@ public interface PlanoRepository extends JpaRepository<Plano, UUID> {
 
     Optional<Plano> findByNomeAlunoContainingAndEstadoPlanoAndEstadoPedido(
             String nomeAluno,
-            EstadoPlano estadoPlano,
-            EstadoPedido estadoPedido
+            Enum.EstadoPlano estadoPlano,
+            Enum.EstadoPedido estadoPedido
     );
     Page<Plano> findByNomeAlunoContainingIgnoreCase(String nomeAluno, Pageable pageable);
 
-    List<Plano>  findByNomeAlunoAndEstadoPlano (String username, EstadoPlano estadoPlano);
+    List<Plano>  findByNomeAlunoAndEstadoPlano (String username, Enum.EstadoPlano estadoPlano);
     @Query("SELECT p FROM Plano p WHERE p.especialista = :nome " +
             "OR p.especialista IS NULL " +
             "OR p.especialista = '' " +

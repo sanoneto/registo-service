@@ -32,11 +32,11 @@ public class Plano {
 
     @Column(name = "estado_plano")
     @Enumerated(EnumType.STRING)
-    private EstadoPlano estadoPlano;
+    private Enum.EstadoPlano estadoPlano;
 
     @Column(name = "estado_pedido")
     @Enumerated(EnumType.STRING)
-    private EstadoPedido estadoPedido;
+    private Enum.EstadoPedido estadoPedido;
 
     private String link;
 

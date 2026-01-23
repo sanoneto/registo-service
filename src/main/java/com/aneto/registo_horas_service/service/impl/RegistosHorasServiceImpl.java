@@ -8,7 +8,7 @@ import com.aneto.registo_horas_service.dto.response.PageResponse;
 import com.aneto.registo_horas_service.dto.response.PerfilResponse;
 import com.aneto.registo_horas_service.dto.response.RegisterResponse;
 import com.aneto.registo_horas_service.mapper.RequestMapper;
-import com.aneto.registo_horas_service.models.OperacaoAuditoria;
+import com.aneto.registo_horas_service.models.Enum;
 import com.aneto.registo_horas_service.models.RegistoHistorico;
 import com.aneto.registo_horas_service.models.RegistosHoras;
 import com.aneto.registo_horas_service.repository.RegistoHistoricoRepository;
@@ -117,7 +117,7 @@ public class RegistosHorasServiceImpl implements RegistosHorasService {
         // 4. Salva a entrada no Histórico
         RegistoHistorico historico = RegistoHistorico.builder()
                 .registoPublicId(String.valueOf(publicId))
-                .operacao(OperacaoAuditoria.UPDATE)
+                .operacao(Enum.OperacaoAuditoria.UPDATE)
                 .dataAlteracao(LocalDateTime.now())
                 .utilizadorAlteracao(username)
                 .dadosAnterioresJson(dadosAnteriores)

@@ -8,7 +8,6 @@ import java.util.List;
 import java.util.Optional;
 
 public interface TrainingPlanService {
-    TrainingPlanResponse generateTrainingPlan(UserProfileRequest request);
 
     Optional<TrainingPlanResponse> loadFromS3(String key);
 

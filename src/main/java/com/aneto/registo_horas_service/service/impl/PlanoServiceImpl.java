@@ -3,8 +3,7 @@ package com.aneto.registo_horas_service.service.impl;
 import com.aneto.registo_horas_service.dto.request.PlanoRequestDTO;
 import com.aneto.registo_horas_service.dto.response.PlanoResponseDTO;
 import com.aneto.registo_horas_service.mapper.PlanoMapper;
-import com.aneto.registo_horas_service.models.EstadoPedido;
-import com.aneto.registo_horas_service.models.EstadoPlano;
+import com.aneto.registo_horas_service.models.Enum;
 import com.aneto.registo_horas_service.models.Plano;
 import com.aneto.registo_horas_service.repository.PlanoRepository;
 import com.aneto.registo_horas_service.service.PlanoService;
@@ -88,8 +87,8 @@ public class PlanoServiceImpl implements PlanoService {
         // Aqui assume-se que o seu Repository tem esta consulta
         return repository.findByNomeAlunoContainingAndEstadoPlanoAndEstadoPedido(
                 username,
-                EstadoPlano.ATIVO,        // Uso do Enum
-                EstadoPedido.FINALIZADO   // Uso do Enum
+                Enum.EstadoPlano.ATIVO,        // Uso do Enum
+                Enum.EstadoPedido.FINALIZADO   // Uso do Enum
         ).map(mapper::toResponse); // Converta para DTO antes de retornar
     }
 
@@ -124,9 +123,9 @@ public class PlanoServiceImpl implements PlanoService {
                 .orElseThrow(() -> new RuntimeException("Plano não encontrado"));
 
         // 2. Só altera se estiver PENDENTE
-        if (plano.getEstadoPedido() == EstadoPedido.PENDENTE) {
+        if (plano.getEstadoPedido() == Enum.EstadoPedido.PENDENTE) {
 
-            EstadoPedido proximoEstado = EstadoPedido.fromDescricao(newStatus);
+            Enum.EstadoPedido proximoEstado = Enum.EstadoPedido.fromDescricao(newStatus);
             plano.setEstadoPedido(proximoEstado);
             plano.setEspecialista(username);
             repository.save(plano);
@@ -139,8 +138,8 @@ public class PlanoServiceImpl implements PlanoService {
         repository.inativarPlanosAtivosPorAluno(username);
     }
 
-    private EstadoPedido converterParaEnum(String status) {
+    private Enum.EstadoPedido converterParaEnum(String status) {
         String formatado = status.toUpperCase().replace(" ", "_");
-        return EstadoPedido.valueOf(formatado);
+        return Enum.EstadoPedido.valueOf(formatado);
     }
 }

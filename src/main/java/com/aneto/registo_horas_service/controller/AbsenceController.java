@@ -2,7 +2,7 @@ package com.aneto.registo_horas_service.controller;
 
 import com.aneto.registo_horas_service.dto.request.AbsenceRequest;
 import com.aneto.registo_horas_service.models.Absence;
-import com.aneto.registo_horas_service.models.AbsenceStatus;
+import com.aneto.registo_horas_service.models.Enum;
 import com.aneto.registo_horas_service.service.AbsenceService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -46,7 +46,7 @@ public class AbsenceController {
     @GetMapping("/Pageable/list")
     @PreAuthorize("hasRole('ADMIN')")
     public Page<Absence> listAllAbsencesPage(
-            @RequestParam(required = false) AbsenceStatus status, // Filtro opcional por Status
+            @RequestParam(required = false) Enum.AbsenceStatus status, // Filtro opcional por Status
             @PageableDefault(sort = "registrationDate", direction = Sort.Direction.DESC, size = 10) Pageable pageable
     ) {
         // Se for ADMIN, o userName é null, e o serviço retorna todos
@@ -60,7 +60,7 @@ public class AbsenceController {
     @PreAuthorize("hasAnyRole('ADMIN') || #username == authentication.name") // Proteção
     public Page<Absence> listUserAbsencesPage(
             @PathVariable String username,
-            @RequestParam(required = false) AbsenceStatus status, // Filtro opcional por Status
+            @RequestParam(required = false) Enum.AbsenceStatus status, // Filtro opcional por Status
             @PageableDefault(sort = "registrationDate", direction = Sort.Direction.DESC, size = 10) Pageable pageable
     ) {
         // O serviço filtra automaticamente pelo userName passado na URL
@@ -88,7 +88,7 @@ public class AbsenceController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Absence> updateAbsenceStatus(
             @PathVariable String publicId,
-            @RequestParam AbsenceStatus newStatus) {
+            @RequestParam Enum.AbsenceStatus newStatus) {
 
         Optional<Absence> updatedAbsence = absenceService.updateAbsenceStatus(publicId, newStatus);
 
