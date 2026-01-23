@@ -310,7 +310,7 @@ public class EventsServiceImpl implements EventsService {
         if (dynamicChatId == null || dynamicChatId.isBlank()) return;
         try {
 
-            String urlConfirmacao = "https://treg-aneto.com:8085/api/v1/eventos/" + eventoId + "/confirmar-alerta";
+            String urlConfirmacao = "https://treg-aneto.com/api/v1/eventos/" + eventoId + "/confirmar-alerta";
 
             InlineKeyboardButton botaoConfirmar = InlineKeyboardButton.builder()
                     .text("Confirmar ✅")
