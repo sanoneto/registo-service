@@ -2,9 +2,8 @@ package com.aneto.registo_horas_service.service.impl;
 
 import com.aneto.registo_horas_service.dto.request.PlanoRequestDTO;
 import com.aneto.registo_horas_service.dto.request.UserProfileRequest;
-import com.aneto.registo_horas_service.dto.response.PlanoResponseDTO;
-import com.aneto.registo_horas_service.dto.response.TrainingExercise;
-import com.aneto.registo_horas_service.dto.response.TrainingPlanResponse;
+import com.aneto.registo_horas_service.dto.response.*;
+import com.aneto.registo_horas_service.mapper.ExerciseHistoryMapper;
 import com.aneto.registo_horas_service.models.Enum;
 import com.aneto.registo_horas_service.models.ExerciseHistoryEntity;
 import com.aneto.registo_horas_service.models.Training.Training;
@@ -40,9 +39,11 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
 
     private final ObjectMapper objectMapper;
     private final PlanoService planoService;
+    private final ExerciseHistoryMapper exerciseHistoryMapper;
     private final ExerciseHistoryRepository exerciseHistoryRepository;
     private final Training training;
     private final S3Client s3Client;
+
     @Value("${aws.s3.bucket-name}")
     private String bucketName;
 
@@ -95,6 +96,11 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
         exerciseHistoryRepository.saveAll(entities);
     }
 
+    @Override
+    public List<ExerciseHistoryResponse> getProgressLogs(String exerciseName, String username) {
+        var entities = exerciseHistoryRepository.findByUsernameAndExerciseNameOrderByRegisteredAtDesc(username, exerciseName);
+        return exerciseHistoryMapper.toResponseList(entities);
+    }
 
     @Override
     public Optional<TrainingPlanResponse> loadFromS3(String key) {
@@ -104,9 +110,6 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
 
             // Verifica se o plano tem menos de 7 dias (opcional)
             Instant lastModified = s3Object.response().lastModified();
-            //  if (Duration.between(lastModified, Instant.now()).toDays() > 7) {
-            //   return Optional.empty();
-            //  }
             return Optional.of(objectMapper.readValue(s3Object, TrainingPlanResponse.class));
         } catch (Exception e) {
             return Optional.empty(); // Arquivo não existe ou erro na leitura

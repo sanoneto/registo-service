@@ -1,6 +1,8 @@
 package com.aneto.registo_horas_service.service;
 
 import com.aneto.registo_horas_service.dto.request.UserProfileRequest;
+import com.aneto.registo_horas_service.dto.response.ExerciseHistoryResponse;
+import com.aneto.registo_horas_service.dto.response.ExerciseProgressLog;
 import com.aneto.registo_horas_service.dto.response.TrainingExercise;
 import com.aneto.registo_horas_service.dto.response.TrainingPlanResponse;
 
@@ -19,4 +21,6 @@ public interface TrainingPlanService {
 
 
     void saveProgressLogs(List<TrainingExercise> logs, String username, String planId);
+
+    List<ExerciseHistoryResponse> getProgressLogs(String exerciseName, String username);
 }

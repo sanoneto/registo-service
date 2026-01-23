@@ -78,7 +78,10 @@ public record Training(GenerativeModel generativeModel, ObjectMapper objectMappe
 
         String diretrizAlimentar = """
                 DIRETRIZES ALIMENTARES (FÓRMULA %s):
-                - Calorias: %d kcal | Proteína: %d g | Carbs: %d g | Gordura: %d g
+                - TOTAIS DIÁRIOS: Calorias: %d kcal | Proteína: %d g | Carbs: %d g | Gordura: %d g
+                - REGRA DE OURO: Cada ingrediente deve ser descrito com sua função (Ex: "100g de Frango - Proteína para reparação muscular").
+                - CÁLCULO POR REFEIÇÃO: É obrigatório calcular as calorias e macros exatos de cada refeição com base nos ingredientes listados.
+                - PRIORIZAÇÃO: Pequeno-almoço e almoço mais calóricos.
                 """.formatted(macros.formula(), macros.calories(), macros.protein(), macros.carbs(), macros.fats());
 
         String diretrizRepertorio = """
@@ -125,7 +128,7 @@ public record Training(GenerativeModel generativeModel, ObjectMapper objectMappe
 
         // --- MONTAGEM FINAL DO PROMPT ---
         String userPrompt = """
-                ESTRITA REGRA: RESPONDA APENAS O JSON.\s
+                ESTRITA REGRA: RESPONDA APENAS O JSON.
                 NÃO DIGA "OLÁ", NÃO DÊ EXPLICAÇÕES FORA DO JSON.
                 
                 Atue como um Personal Trainer e Nutricionista especialista em reabilitação física e metodologias de treino.
@@ -175,10 +178,29 @@ public record Training(GenerativeModel generativeModel, ObjectMapper objectMappe
                   "dietPlan": {
                     "dailyCalories": %d,
                     "macroDistribution": { "protein": "%dg", "carbs": "%dg", "fats": "%dg" },
-                    "meals": [{ "time": "HH:MM", "description": "...", "ingredients": [] }],
+                    "meals": [
+                      {
+                        "time": "HH:MM",
+                        "description": "Nome da Refeição",
+                       "ingredients": [
+                        "150g de Peito de Frango Grelhado - Fonte de proteína de alto valor biológico",
+                        "200g de Arroz Basmati - Hidrato de carbono de absorção gradual",
+                        "80g de Brócolos ao vapor - Micronutrientes e fibras para digestão"
+                          ],
+                        "calories": 0,
+                        "protein": 0,
+                        "carbs": 0,
+                        "fats": 0
+                      }
+                    ],
                     "localTips": "Dicas para %s, %s."
                   }
                 }
+                
+                REGRAS CRÍTICAS PARA A DIETA:
+                1. O campo "ingredients" DEVE ser preenchido com uma lista detalhada de alimentos e quantidades.
+                2. Para cada refeição, os campos "calories", "protein", "carbs" e "fats" DEVEM ser calculados e preenchidos com números inteiros reais baseados nos ingredientes.
+                3. A soma total dos macros das refeições deve ser aproximadamente: %d kcal, %dg Prot, %dg Carbs e %dg Fats.
                 """.formatted(
                 // 1-10: Perfil
                 userRequest.age(), bodyTypeText, genderText, userRequest.heightCm(), userRequest.weightKg(),
@@ -191,17 +213,19 @@ public record Training(GenerativeModel generativeModel, ObjectMapper objectMappe
                 // 21-24: JSON Summary
                 protocol.getLabel(), objectiveText, userRequest.age(), pathologyText,
 
-                // 25-28: JSON Exercício (Metrics)
+                // 25-28: JSON Exercício
                 protocol.getTempo(), protocol.getSets(), protocol.getReps(), protocol.getRest(),
 
-                // 29-32: JSON Justificativas (AQUI ESTAVA O ERRO - FALTAVAM ARGUMENTOS)
+                // 29-32: JSON Justificativas
                 pathologyText, protocol.getLabel(), pathologyText, protocol.getTempo(),
 
                 // 33-38: JSON Diet
                 macros.calories(), macros.protein(), macros.carbs(), macros.fats(),
-                locationText, countryText
-        );
+                locationText, countryText,
 
+                // 39-42: REGRAS CRÍTICAS (Novos argumentos para formatar o final do prompt)
+                macros.calories(), macros.protein(), macros.carbs(), macros.fats()
+        );
         return executeGeneration(userPrompt);
     }
 

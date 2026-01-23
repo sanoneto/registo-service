@@ -1,6 +1,7 @@
 package com.aneto.registo_horas_service.controller;
 
 import com.aneto.registo_horas_service.dto.request.UserProfileRequest;
+import com.aneto.registo_horas_service.dto.response.ExerciseHistoryResponse;
 import com.aneto.registo_horas_service.dto.response.ExerciseProgressLog;
 import com.aneto.registo_horas_service.dto.response.TrainingExercise;
 import com.aneto.registo_horas_service.dto.response.TrainingPlanResponse;
@@ -34,6 +35,7 @@ public class TrainingController {
 
         return ResponseEntity.ok(response);
     }
+
     @PutMapping("/plan")
     @PreAuthorize("hasRole('ADMIN') or hasRole('ESPECIALISTA') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
     public ResponseEntity<?> updatePlan(
@@ -57,5 +59,17 @@ public class TrainingController {
 
         trainingPlanService.saveProgressLogs(logs, username, planId);
         return ResponseEntity.ok(Map.of("message", "Progresso guardado com sucesso"));
+    }
+
+    @GetMapping("/progress")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ESPECIALISTA', 'ESTAGIARIO', 'ALUNO')")
+    public ResponseEntity<List<ExerciseHistoryResponse>> getProgress(
+            @RequestParam  String username,
+            @RequestParam String exerciseName) {
+
+        // Chama o serviço para procurar a lista de logs filtrada
+        List<ExerciseHistoryResponse> history = trainingPlanService.getProgressLogs(exerciseName, username);
+
+        return ResponseEntity.ok(history);
     }
 }

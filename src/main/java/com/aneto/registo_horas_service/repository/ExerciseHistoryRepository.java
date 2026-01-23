@@ -10,4 +10,5 @@ import java.util.List;
 public interface ExerciseHistoryRepository extends JpaRepository<ExerciseHistoryEntity, Long> {
     // No futuro, podes buscar a evolução de um exercício específico:
     List<ExerciseHistoryEntity> findByUsernameAndExerciseNameOrderByRegisteredAtDesc(String username, String exerciseName);
+
 }
