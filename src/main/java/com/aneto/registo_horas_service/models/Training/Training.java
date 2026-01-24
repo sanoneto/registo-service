@@ -228,19 +228,57 @@ public record Training(GenerativeModel generativeModel, ObjectMapper objectMappe
         );
         return executeGeneration(userPrompt);
     }
-
     @NotNull
     private static String getString(String pathologyText) {
-        String diretrizReabilitacao = "";
-        if (pathologyText != null && !pathologyText.equalsIgnoreCase("Nenhuma") && !pathologyText.isBlank()) {
-            diretrizReabilitacao = """
-                    REGRA DE REABILITAÇÃO (OBRIGATÓRIA):
-                    - Como o aluno possui "%s", o PRIMEIRO exercício de cada dia (Order 1) deve ser obrigatoriamente um exercício de fisioterapia, mobilidade ou fortalecimento específico para tratar esta condição.
-                    - Deve ser apenas 1 exercício focado na patologia por treino.
-                    - No campo 'notas', justifica como este exercício ajuda especificamente na recuperação de %s.
-                    """.formatted(pathologyText, pathologyText);
+        if (pathologyText == null || pathologyText.equalsIgnoreCase("Nenhuma") || pathologyText.isBlank()) {
+            return "";
         }
-        return diretrizReabilitacao;
+
+        StringBuilder correcao = new StringBuilder();
+        String lowerPathology = pathologyText.toLowerCase();
+
+        // 1. JOELHOS VALGOS (Colapso Medial)
+        if (lowerPathology.contains("valgo") || lowerPathology.contains("joelho")) {
+            correcao.append("""
+            - DIRETRIZ VALGO: Foco em ABDUÇÃO e ROTAÇÃO EXTERNA da anca. 
+            - OBRIGATÓRIO: Incluir exercícios no PLANO FRONTAL (ex: Clamshells, Monster Walk ou Side-lying leg raises).
+            - JUSTIFICATIVA: Fortalecer Glúteo Médio para estabilizar o fémur e evitar o colapso do joelho.
+            """);
+        }
+
+        // 2. PESCOÇO PARA A FRENTE (Anteriorização Cervical)
+        if (lowerPathology.contains("pescoço") || lowerPathology.contains("cervical") || lowerPathology.contains("frente")) {
+            correcao.append("""
+            - DIRETRIZ CERVICAL: Corrigir a anteriorização da cabeça e hipercifose.
+            - OBRIGATÓRIO: Exercícios de retração (ex: Chin Tucks) e fortalecimento de retratores da escápula (ex: Face Pulls ou Y-W-T).
+            - JUSTIFICATIVA: Fortalecer flexores profundos do pescoço e trapézio inferior.
+            """);
+        }
+
+        // 3. RETROVERSÃO DA BACIA (Posterior Pelvic Tilt / "Rabo para dentro")
+        if (lowerPathology.contains("retroversão")) {
+            correcao.append("""
+            - DIRETRIZ RETROVERSÃO: Restaurar a lordose lombar natural.
+            - OBRIGATÓRIO: Fortalecer Flexores da Anca (Psoas/Ilíaco) e Eretores da Espinha (ex: Superman ou Good Morning).
+            - RESTRIÇÃO: Priorizar alongamento de isquiotibiais e glúteos.
+            """);
+        }
+
+        // 4. ANTEVERSÃO DA BACIA (Anterior Pelvic Tilt / "Rabo empinado")
+        if (lowerPathology.contains("anteversão") || lowerPathology.contains("lordose")) {
+            correcao.append("""
+            - DIRETRIZ ANTEVERSÃO: Reduzir a hiperlordose lombar.
+            - OBRIGATÓRIO: Fortalecer Glúteos e Core Anterior (ex: Dead Bug, Plank ou Hollow Body).
+            - RESTRIÇÃO: Alongar obrigatoriamente os Flexores da Anca (Psoas).
+            """);
+        }
+
+        return """
+            REGRA DE OURO DE REABILITAÇÃO E BIOMECÂNICA:
+            %s
+            - Como o aluno possui "%s", o primeiro exercício de cada dia (Order 1) deve ser a correção motora indicada acima.
+            - No campo 'notas', explica tecnicamente como o exercício neutraliza o desvio postural específico.
+            """.formatted (correcao.toString(), pathologyText);
     }
 
     private String defaultIfEmpty(String value, String defaultValue) {
