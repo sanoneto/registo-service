@@ -21,7 +21,8 @@ public record UserProfileRequest(String bodyType,
                                  String studentName,
                                  String duration,
                                  String protocol,
-                                 Double bodyFat
+                                 Double bodyFat,
+                                 Integer mealsPerDay
                                  ) {
 
 }

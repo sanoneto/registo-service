@@ -5,20 +5,13 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import java.util.List;
 
-@JsonIgnoreProperties(ignoreUnknown = true) // Regra de Ouro 1: Não crashar com chaves novas
+@JsonIgnoreProperties(ignoreUnknown = true)
 public record Meal(
-        @JsonAlias({"mealTime", "hour", "horario"}) // Regra de Ouro 2: Aceitar variações da IA
-        String time,
-
-        @JsonAlias({"meal", "name", "label"})
-        String description,
-
-        @JsonAlias({"ingredientes", "items", "components"})
+        @JsonAlias({"time", "hour"}) String time,
+        @JsonAlias({"description", "mealName"}) String description,
         List<String> ingredients,
-
-        Integer calories,  // Novo
-        Integer protein,   // Novo
-        Integer carbs,     // Novo
-        Integer fats       // Novo
-) {
-}
+        Integer calories,
+        Integer protein,
+        Integer carbs,
+        Integer fats
+) {}
