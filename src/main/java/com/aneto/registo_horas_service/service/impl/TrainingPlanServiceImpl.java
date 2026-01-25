@@ -57,16 +57,22 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
     public TrainingPlanResponse getOrGeneratePlan(UserProfileRequest request, String username, String planId) {
         // 1. Determina a chave (prioriza a existente no banco, senão usa o padrão)
         String key = buscarChaveDoPlano(planId, username, request);
-        // 2. Se o request for insuficiente para gerar algo novo, tenta carregar do S3
+
         if (isRequestEmpty(request)) {
-            return loadFromS3(key)
-                    .orElseThrow(() -> new RuntimeException("Dados insuficientes para gerar novo plano e nenhum histórico encontrado."));
+            Optional<TrainingPlanResponse> existingPlan = loadFromS3(key);
+
+            if (existingPlan.isEmpty()) {
+                log.warn("Dados insuficientes para gerar novo plano e nenhum histórico encontrado no S3 para a chave: {}", key);
+                return null; // Ou return new TrainingPlanResponse(); dependendo da sua necessidade
+            }
+            return existingPlan.get();
         }
-        // 3. Se chegou aqui, temos dados para gerar um novo plano
+
         TrainingPlanResponse newPlan = training.generateTrainingPlan(request);
         configurarNovoPlano(newPlan, request);
         // 4. Persistência (Banco e S3)
         salvarDadosDoPlano(username, request, key, newPlan, planId, false);
+
         return newPlan;
     }
 
