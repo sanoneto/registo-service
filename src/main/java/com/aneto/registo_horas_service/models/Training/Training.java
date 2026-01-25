@@ -6,16 +6,12 @@ import com.aneto.registo_horas_service.dto.response.MealSuggestion;
 import com.aneto.registo_horas_service.dto.response.TrainingPlanResponse;
 import com.aneto.registo_horas_service.models.Enum;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.cloud.vertexai.api.Content;
-import com.google.cloud.vertexai.api.GenerateContentResponse;
-import com.google.cloud.vertexai.api.Part;
-import com.google.cloud.vertexai.generativeai.GenerativeModel;
-import com.google.cloud.vertexai.generativeai.ResponseHandler;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.stereotype.Component;
 
 @Component
-public record Training(GenerativeModel generativeModel, ObjectMapper objectMapper) {
+public record Training(ChatModel chatModel, ObjectMapper objectMapper) {
 
     public TrainingPlanResponse generateTrainingPlan(UserProfileRequest userRequest) {
 
@@ -114,82 +110,82 @@ public record Training(GenerativeModel generativeModel, ObjectMapper objectMappe
 
         // --- MONTAGEM FINAL DO PROMPT ---
         String userPrompt = """
-        ESTRITA REGRA: RESPONDA APENAS O JSON.
-        NÃO DIGA "OLÁ", NÃO DÊ EXPLICAÇÕES FORA DO JSON.
-        
-        Atue como um Personal Trainer e Nutricionista especialista em reabilitação física e metodologias de treino.
-        Gere um plano de treino e um plano alimentar personalizado em Português.
-        
-        PERFIL DO ALUNO:
-        - Idade: %d anos | Biótipo: %s | Género: %s
-        - Altura: %.2f cm | Peso: %.2f kg
-        - Histórico: %s | Patologias: %s
-        - Localização: %s, %s | Objetivo: %s
-        
-        %s
-        %s
-        %s
-        %s
-        %s
-        %s
-        %s
-        %s
-        %s
-        %s
-        %s
-        
-        FORMATO DE RESPOSTA (JSON APENAS):
-        {
-         "summary": "Explicação técnica da estratégia %s (Fórmula: %s) para %s, considerando %d anos e a patologia %s.",
-          "plan": [
-            {
-              "day": "Dia 1 - SUPERIOR: Peitoral e Tríceps",
-              "exercises": [
+                ESTRITA REGRA: RESPONDA APENAS O JSON.
+                NÃO DIGA "OLÁ", NÃO DÊ EXPLICAÇÕES FORA DO JSON.
+                
+                Atue como um Personal Trainer e Nutricionista especialista em reabilitação física e metodologias de treino.
+                Gere um plano de treino e um plano alimentar personalizado em Português.
+                
+                PERFIL DO ALUNO:
+                - Idade: %d anos | Biótipo: %s | Género: %s
+                - Altura: %.2f cm | Peso: %.2f kg
+                - Histórico: %s | Patologias: %s
+                - Localização: %s, %s | Objetivo: %s
+                
+                %s
+                %s
+                %s
+                %s
+                %s
+                %s
+                %s
+                %s
+                %s
+                %s
+                %s
+                
+                FORMATO DE RESPOSTA (JSON APENAS):
                 {
-                  "order": 1,
-                  "name": "Nome",
-                  "muscleGroup": "Grupo Muscular (Ex: Quadríceps, Isquiotibiais )",
-                  "intensity": "ALTA | MODERADA | BAIXA",
-                  "tempo": "%s",
-                  "equipment": "Tipo de Equipamento",
-                  "sets": "%s",
-                  "reps": "%s",
-                  "rest": "%s",
-                  "details": "Dica de segurança para %s",
-                  "notas": "JUSTIFICATIVA: Por que este exercício é ideal para %s e seguro para %s considerando o ritmo %s?"
+                 "summary": "Explicação técnica da estratégia %s (Fórmula: %s) para %s, considerando %d anos e a patologia %s.",
+                  "plan": [
+                    {
+                      "day": "Dia 1 - SUPERIOR: Peitoral e Tríceps",
+                      "exercises": [
+                        {
+                          "order": 1,
+                          "name": "Nome",
+                          "muscleGroup": "Grupo Muscular (Ex: Quadríceps, Isquiotibiais )",
+                          "intensity": "ALTA | MODERADA | BAIXA",
+                          "tempo": "%s",
+                          "equipment": "Tipo de Equipamento",
+                          "sets": "%s",
+                          "reps": "%s",
+                          "rest": "%s",
+                          "details": "Dica de segurança para %s",
+                          "notas": "JUSTIFICATIVA: Por que este exercício é ideal para %s e seguro para %s considerando o ritmo %s?"
+                        }
+                      ]
+                    }
+                  ],
+                  "dietPlan": {
+                    "methodology": "%s",
+                    "dailyCalories": %d,
+                    "imc": %.2f,
+                    "imcCategory": "%s",
+                    "statusSummary": "%s",
+                    "macroDistribution": { "protein": "%dg", "carbs": "%dg", "fats": "%dg" },
+                    "meals": [
+                      {
+                        "time": "HH:MM",
+                        "description": "Nome da Refeição",
+                        "ingredients": [
+                          "Ex: 150g de Peito de Frango Grelhado - Fonte de proteína"
+                        ],
+                        "calories": 0,
+                        "protein": 0,
+                        "carbs": 0,
+                        "fats": 0
+                      }
+                    ],
+                    "localTips": "Dicas para %s, %s."
+                  }
                 }
-              ]
-            }
-          ],
-          "dietPlan": {
-            "methodology": "%s",
-            "dailyCalories": %d,
-            "imc": %.2f,
-            "imcCategory": "%s",
-            "statusSummary": "%s",
-            "macroDistribution": { "protein": "%dg", "carbs": "%dg", "fats": "%dg" },
-            "meals": [
-              {
-                "time": "HH:MM",
-                "description": "Nome da Refeição",
-                "ingredients": [
-                  "Ex: 150g de Peito de Frango Grelhado - Fonte de proteína"
-                ],
-                "calories": 0,
-                "protein": 0,
-                "carbs": 0,
-                "fats": 0
-              }
-            ],
-            "localTips": "Dicas para %s, %s."
-          }
-        }
-        
-        REGRAS CRÍTICAS PARA A DIETA:
-        1. O campo "ingredients" DEVE ser preenchido com uma lista detalhada de alimentos e quantidades.
-        2. Para cada refeição, os campos "calories", "protein", "carbs" e "fats" DEVEM ser números inteiros.
-        3. A soma total deve ser aproximadamente: %d kcal, %dg Prot, %dg Carbs e %dg Fats.
-        """.formatted(
+                
+                REGRAS CRÍTICAS PARA A DIETA:
+                1. O campo "ingredients" DEVE ser preenchido com uma lista detalhada de alimentos e quantidades.
+                2. Para cada refeição, os campos "calories", "protein", "carbs" e "fats" DEVEM ser números inteiros.
+                3. A soma total deve ser aproximadamente: %d kcal, %dg Prot, %dg Carbs e %dg Fats.
+                """.formatted(
                 // 1-10: Perfil
                 userRequest.age(), bodyTypeText, genderText, userRequest.heightCm(), userRequest.weightKg(),
                 historyText, pathologyText, locationText, countryText, objectiveText,
@@ -215,7 +211,7 @@ public record Training(GenerativeModel generativeModel, ObjectMapper objectMappe
                 locationText, countryText,
 
                 // 45-48: REGRAS CRÍTICAS FINAIS
-                macros.dailyCalories(),  macros.protein(),  macros.carbs(), macros.fats()
+                macros.dailyCalories(), macros.protein(), macros.carbs(), macros.fats()
         );
         return executeGeneration(userPrompt);
     }
@@ -227,24 +223,24 @@ public record Training(GenerativeModel generativeModel, ObjectMapper objectMappe
             dietTable.append("- %s (%s): %d kcal [P: %dg, C: %dg, G: %dg]\n".formatted(
                     m.name(),
                     m.time(),
-                    (int)(macros.dailyCalories() * m.pctCalories()),
-                    (int)(macros.protein() * m.pctProtein()),
-                    (int)(macros.carbs() * m.pctCarbs()),
-                    (int)(macros.fats() * m.pctFats())
+                    (int) (macros.dailyCalories() * m.pctCalories()),
+                    (int) (macros.protein() * m.pctProtein()),
+                    (int) (macros.carbs() * m.pctCarbs()),
+                    (int) (macros.fats() * m.pctFats())
             ));
         }
 
         return """
-            ANÁLISE BIOMÉTRICA: %s
-            CATEGORIA DE IMC: %s
-            
-            DIRETRIZES ALIMENTARES ESTRITAS (PROIBIDO ALTERAR VALORES):
-            1. O plano deve conter EXATAMENTE estas %d refeições e valores:
-            %s
-            2. REGRA DE CÁLCULO: Para cada refeição, escolhe ingredientes que somem exatamente os valores acima.
-            3. VALIDAÇÃO: A soma final das refeições no JSON deve ser: %d kcal, %dg P, %dg C, %dg G.
-            4. FOCO NUTRICIONAL: %s
-            """.formatted(
+                ANÁLISE BIOMÉTRICA: %s
+                CATEGORIA DE IMC: %s
+                
+                DIRETRIZES ALIMENTARES ESTRITAS (PROIBIDO ALTERAR VALORES):
+                1. O plano deve conter EXATAMENTE estas %d refeições e valores:
+                %s
+                2. REGRA DE CÁLCULO: Para cada refeição, escolhe ingredientes que somem exatamente os valores acima.
+                3. VALIDAÇÃO: A soma final das refeições no JSON deve ser: %d kcal, %dg P, %dg C, %dg G.
+                4. FOCO NUTRICIONAL: %s
+                """.formatted(
                 macros.statusSummary(),
                 macros.imcCategory(),
                 macros.mealSuggestions().size(),
@@ -342,10 +338,11 @@ public record Training(GenerativeModel generativeModel, ObjectMapper objectMappe
     }
 
     private TrainingPlanResponse executeGeneration(String prompt) {
-        Content content = Content.newBuilder().addParts(Part.newBuilder().setText(prompt)).setRole("user").build();
+
         try {
-            GenerateContentResponse response = generativeModel.generateContent(content);
-            String textResponse = ResponseHandler.getText(response);
+            String textResponse = chatModel.call(prompt);
+            // Se configurou o MIME type, textResponse já vira um JSON puro.
+            // O cleanMarkdown ainda é bom por segurança, mas o erro de "end-of-input" deve sumir.
             return objectMapper.readValue(cleanMarkdown(textResponse), TrainingPlanResponse.class);
         } catch (Exception e) {
             throw new RuntimeException("Erro ao gerar plano: " + e.getMessage(), e);
@@ -355,22 +352,15 @@ public record Training(GenerativeModel generativeModel, ObjectMapper objectMappe
     private String cleanMarkdown(String text) {
         if (text == null || text.isBlank()) return "{}";
 
-        // 1. Remove os blocos de marcação de código do Markdown
-        String cleaned = text.trim()
-                .replaceAll("^```json", "")
-                .replaceAll("^```", "")
-                .replaceAll("```$", "")
-                .trim();
+        // Remove blocos de código
+        String cleaned = text.replaceAll("(?s)```json\\s*(.*?)\\s*```", "$1").trim();
 
-        // 2. TENTATIVA DE RESGATE: Se a IA escreveu algo antes do JSON (ex: "Olá! { ... }")
-        // Procuramos o primeiro '{' e o último '}'
         int firstBrace = cleaned.indexOf("{");
         int lastBrace = cleaned.lastIndexOf("}");
 
-        if (firstBrace != -1 && lastBrace != -1 && lastBrace > firstBrace) {
+        if (firstBrace != -1 && lastBrace != -1) {
             return cleaned.substring(firstBrace, lastBrace + 1);
         }
-
         return cleaned;
     }
 }

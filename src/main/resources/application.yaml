@@ -47,12 +47,24 @@ spring:
         bucket-name: ${AWS_S3_BUCKET_NAME}
         folder-name: ${AWS_S3_FOLDER_NAME} # usava quando a ler gemini pa os jogos
 
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY} # Defina esta variável no seu ambiente
+      chat:
+        options:
+          model: gpt-4o-mini # O mais rápido e barato
+          temperature: 0.7
+
   flyway:
     enabled: false
     locations: classpath:db/migration
     baseline-on-migrate: true
 logging:
   level:
+    # Mostra o corpo da requisição e resposta da OpenAI
+    org.springframework.ai.chat.client.ChatClient: DEBUG
+    # Mostra detalhes da comunicação HTTP (opcional, mas muito detalhado)
+    org.springframework.web.client.RestTemplate: DEBUG
     org.hibernate.orm.jdbc.bind: TRACE # Mostra o valor de :username no log
     org.hibernate.SQL: DEBUG
     org:

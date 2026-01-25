@@ -2,7 +2,10 @@ package com.aneto.registo_horas_service.service.impl;
 
 import com.aneto.registo_horas_service.dto.request.PlanoRequestDTO;
 import com.aneto.registo_horas_service.dto.request.UserProfileRequest;
-import com.aneto.registo_horas_service.dto.response.*;
+import com.aneto.registo_horas_service.dto.response.ExerciseHistoryResponse;
+import com.aneto.registo_horas_service.dto.response.PlanoResponseDTO;
+import com.aneto.registo_horas_service.dto.response.TrainingExercise;
+import com.aneto.registo_horas_service.dto.response.TrainingPlanResponse;
 import com.aneto.registo_horas_service.mapper.ExerciseHistoryMapper;
 import com.aneto.registo_horas_service.models.Enum;
 import com.aneto.registo_horas_service.models.ExerciseHistoryEntity;
