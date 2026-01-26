@@ -24,6 +24,8 @@ public record Training(ChatModel chatModel, ObjectMapper objectMapper) {
         String countryText = defaultIfEmpty(userRequest.country(), "Não especificado");
         String bodyTypeText = defaultIfEmpty(userRequest.bodyType(), "Ectomorfo");
         String genderText = defaultIfEmpty(userRequest.gender(), "Não especificado");
+        String weightKg = defaultIfEmpty(String.valueOf(userRequest.weightKg()), "Não especificado");
+
 
         // 2. Dados do Protocolo e Macros
         Enum.TrainingProtocol protocol = Enum.TrainingProtocol.fromId(protocolId);
@@ -39,7 +41,7 @@ public record Training(ChatModel chatModel, ObjectMapper objectMapper) {
 
         // --- SEPARAÇÃO DAS REGRAS (DIRETRIZES) ---
 
-        String descansoCientifico = calcularDescansoCientifico(protocol, objectiveText);
+        String descansoCientifico = calcularDescansoCientifico(protocol, objectiveText, weightKg);
 
         String diretrizProtocolo = """
                 DIRETRIZES TÉCNICAS E FISIOLÓGICAS (%s):
