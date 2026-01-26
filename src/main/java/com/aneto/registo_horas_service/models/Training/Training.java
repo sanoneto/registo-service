@@ -440,20 +440,38 @@ public record Training(ChatModel chatModel, ObjectMapper objectMapper) {
         return cleaned;
     }
 
-    private String calcularDescansoCientifico(Enum.TrainingProtocol protocol, String objective) {
-        // Lógica baseada na fisiologia do exercício:
-        // Força Pura/Potência: 3-5 min (Resíntese completa de ATP-CP)
-        // Hipertrofia: 60-90 seg (Estresse metabólico + Tensão mecânica)
-        // FST-7/Resistência: 30-45 seg (Foco em pump e expansão da fáscia)
-        //O descanso ideal depende da via metabólica utilizada (ATP-CP vs. Glicolítica) e do objetivo do protocolo (FST-7, no seu caso).
+    private String calcularDescansoCientifico(Enum.TrainingProtocol protocol, String objective, String cargaAtual) {
+        // 1. Converter carga para número (remover 'kg' se existir)
+        double peso = 0;
+        try {
+            peso = Double.parseDouble(cargaAtual.replaceAll("[^0-9.]", ""));
+        } catch (Exception e) {
+            peso = 0;
+        }
+
+        // 2. Lógica FST-7 (Protocolo rígido: foco em pump)
         if (protocol.getLabel().contains("FST-7")) {
-            return "30-45 segundos (Otimização do fluxo sanguíneo e hipóxia local)";
+            // Mesmo com carga alta, o FST-7 exige descanso curto para hipóxia
+            return "30";
         }
 
+        // 3. Lógica baseada em Carga vs Objetivo
         if (objective.equalsIgnoreCase("Hipertrofia")) {
-            return "60-90 segundos (Equilíbrio entre resíntese de ATP e estresse metabólico)";
+            // Se o peso for muito elevado (ex: > 80kg num exercício composto),
+            // aumentamos o descanso para garantir qualidade na próxima série.
+            if (peso > 80) return "90";
+            if (peso > 40) return "60";
+            return "45"; // Cargas leves/isoladores
         }
 
-        return protocol.getRest(); // Fallback para o valor do Enum
+        if (objective.equalsIgnoreCase("Força")) {
+            // Na força, o descanso escala drasticamente com o peso
+            if (peso > 100) return "300"; // 5 min para agachamentos/supinos pesados
+            if (peso > 50) return "180";  // 3 min
+            return "120";                // 2 min
+        }
+
+        // Fallback limpo (apenas números)
+        return protocol.getRest().replaceAll("[^0-9]", "");
     }
 }
