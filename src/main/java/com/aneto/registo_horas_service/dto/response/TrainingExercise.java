@@ -14,7 +14,11 @@ public record TrainingExercise(
         String notas,
         String weight,
         String cargaAtual,
+        String videoUrl,
         String date
 ) {
 
+    public Object videoUrl(String linkByExerciseName) {
+        return videoUrl;
+    }
 }

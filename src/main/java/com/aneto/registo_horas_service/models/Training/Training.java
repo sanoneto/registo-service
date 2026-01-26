@@ -1,14 +1,14 @@
 package com.aneto.registo_horas_service.models.Training;
 
 import com.aneto.registo_horas_service.dto.request.UserProfileRequest;
-import com.aneto.registo_horas_service.dto.response.Macros;
-import com.aneto.registo_horas_service.dto.response.MealSuggestion;
-import com.aneto.registo_horas_service.dto.response.TrainingPlanResponse;
+import com.aneto.registo_horas_service.dto.response.*;
 import com.aneto.registo_horas_service.models.Enum;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.stereotype.Component;
+
+import java.util.List;
 
 @Component
 public record Training(ChatModel chatModel, ObjectMapper objectMapper) {
@@ -39,18 +39,30 @@ public record Training(ChatModel chatModel, ObjectMapper objectMapper) {
 
         // --- SEPARAÇÃO DAS REGRAS (DIRETRIZES) ---
 
+        String descansoCientifico = calcularDescansoCientifico(protocol, objectiveText);
+
         String diretrizProtocolo = """
-                DIRETRIZES TÉCNICAS (%s):
-                - Séries: %s | Repetições: %s | Descanso: %s | Ritmo (Tempo): %s
-                """.formatted(protocol.getLabel(), protocol.getSets(), protocol.getReps(), protocol.getRest(), protocol.getTempo());
+                DIRETRIZES TÉCNICAS E FISIOLÓGICAS (%s):
+                - Séries: %s | Repetições: %s
+                - DESCANSO CIENTÍFICO: %s
+                - RITMO (Tempo): %s
+                - JUSTIFICATIVA FISIOLÓGICA: O descanso de %s é calculado para garantir a resíntese parcial de substratos energéticos (Fosfocreatina) enquanto mantém o estresse metabólico necessário para a sinalização hipertrófica.
+                """.formatted(
+                protocol.getLabel(),
+                protocol.getSets(),
+                protocol.getReps(),
+                descansoCientifico,
+                protocol.getTempo(),
+                descansoCientifico
+        );
 
         String diretrizBiomecanica = """
-                DIRETRIZES DE SELEÇÃO BIOMECÂNICA AVANÇADA:
-                1. EXERCÍCIOS SUGERIDOS: %s
-                2. EXERCÍCIOS PROIBIDOS: %s
-                3. ADAPTAÇÃO PATOLÓGICA: Sendo a patologia "%s", substitui exercícios de alto impacto por variantes de baixo torque.
-                4. PERFIL DE RESISTÊNCIA: Ajusta a curva de força para que o ponto mais difícil do exercício não coincida com a posição de maior vulnerabilidade da articulação lesionada.
-                5. ESTABILIZAÇÃO: Prioriza exercícios que exijam ativação do Core para estabilizar a coluna antes de mover as extremidades.
+                DIRETRIZES DE SELEÇÃO BIOMECÂNICA E FILTRAGEM:
+                1. REPERTÓRIO DO PROTOCOLO: %s. 
+                   - IMPORTANTE: Usa estes exercícios APENAS se eles pertencerem ao grupo muscular do dia definido no campo "day".
+                2. EXERCÍCIOS PROIBIDOS: %s.
+                3. ADAPTAÇÃO: Sendo a patologia "%s", substitui impactos por baixo torque.
+                4. COERÊNCIA ANATÓMICA: É estritamente proibido incluir exercícios de pernas (ex: Cadeira Extensora) em dias de Membros Superiores, e vice-versa.
                 """.formatted(protocol.getSuggestedExercises(), protocol.getForbiddenExercises(), pathologyText);
 
         String diretrizAquecimento = """
@@ -97,16 +109,18 @@ public record Training(ChatModel chatModel, ObjectMapper objectMapper) {
                 """.formatted(protocol.getLabel());
 
         String diretrizNomenclaturaDias = """
-                REGRAS CRÍTICAS DE NOMENCLATURA (Campo "day"):
-                1. PROIBIDO gerar treinos idênticos ou repetir categorias. Cada dia DEVE ter exercícios de grupos diferentes.
-                2. PADRÃO OBRIGATÓRIO: "Dia X - [CATEGORIA]: [Foco Principal]"
-                3. DISTRIBUIÇÃO CONFORME FREQUÊNCIA:
-                   - Frequência 3: Dia 1: SUPERIOR, Dia 2: INFERIOR, Dia 3: POSTERIOR ou CORE.
-                   - Frequência 2: Dia 1: SUPERIOR, Dia 2: INFERIOR.
-                4. ADAPTAÇÃO: Sendo a patologia "%s", o Foco Principal deve refletir o cuidado (Ex: "Dia X - [CAT]: Mobilidade de %s").
-                """.formatted(pathologyText, pathologyText);
+                REGRAS CRÍTICAS DE DIVISÃO E NOMENCLATURA (Frequência %d):
+                1. PADRÃO OBRIGATÓRIO NO CAMPO "day": "Dia X - [CATEGORIA]: [Foco Principal]"
+                2. COERÊNCIA ANATÓMICA: É estritamente PROIBIDO misturar exercícios de pernas em dias de tronco. 
+                3. DISTRIBUIÇÃO SUGERIDA:
+                   - Se Frequência 6 (PPL 2x): Dia 1: PEITO/TRÍCEPS, Dia 2: COSTAS/BÍCEPS, Dia 3: PERNAS, Dia 4: OMBROS, Dia 5: SUPERIOR (Foco antagonistas), Dia 6: INFERIOR (Foco Posterior).
+                   - Se Frequência 3: Dia 1: SUPERIOR (Empurrar), Dia 2: INFERIOR (Pernas), Dia 3: SUPERIOR (Puxar).
+                4. ADAPTAÇÃO PATOLÓGICA: Sendo a patologia "%s", o Foco Principal de pelo menos um dia deve ser a reabilitação/mobilidade dessa zona.
+                """.formatted(userRequest.frequencyPerWeek(), pathologyText);
 
-        String diretrizReabilitacao = getString(pathologyText);
+        String diretrizReabilitacao = pathologyText.contains("Nenhuma") ?
+                "Sendo um aluno sem limitações, foca o primeiro exercício (Order 1) em mobilidade geral ou ativação neuromuscular." :
+                getString(pathologyText);
 
         // --- MONTAGEM FINAL DO PROMPT ---
         String userPrompt = """
@@ -145,6 +159,7 @@ public record Training(ChatModel chatModel, ObjectMapper objectMapper) {
                           "order": 1,
                           "name": "Nome",
                           "muscleGroup": "Grupo Muscular (Ex: Quadríceps, Isquiotibiais )",
+                          "videoUrl": "https://www.youtube.com/results?search_query=dumbbell+incline+press+3d+anatomy",
                           "intensity": "ALTA | MODERADA | BAIXA",
                           "tempo": "%s",
                           "equipment": "Tipo de Equipamento",
@@ -213,7 +228,7 @@ public record Training(ChatModel chatModel, ObjectMapper objectMapper) {
                 // 45-48: REGRAS CRÍTICAS FINAIS
                 macros.dailyCalories(), macros.protein(), macros.carbs(), macros.fats()
         );
-        return executeGeneration(userPrompt);
+        return executeGeneration(userPrompt, userRequest);
     }
 
     @NotNull
@@ -256,18 +271,34 @@ public record Training(ChatModel chatModel, ObjectMapper objectMapper) {
         String durationText = (userRequest.duration() != null && !userRequest.duration().isBlank())
                 ? userRequest.duration() : "aprox. 60 minutos";
 
+        // Lógica de mapeamento de dias conforme a frequência
+        String divisaoSugerida = switch (userRequest.frequencyPerWeek()) {
+            case 1, 2 -> "Dia 1: SUPERIOR (Empurrar/Puxar), Dia 2: INFERIOR (Pernas/Core).";
+            case 3 -> "Dia 1: SUPERIOR (Empurrar), Dia 2: INFERIOR (Pernas), Dia 3: SUPERIOR (Puxar).";
+            case 4 -> "Dia 1: PEITO/OMBRO, Dia 2: COSTAS/BÍCEPS, Dia 3: PERNAS (Quadríceps), Dia 4: POSTERIOR/CORE.";
+            case 5 -> "Dia 1: PEITO, Dia 2: COSTAS, Dia 3: PERNAS, Dia 4: OMBROS, Dia 5: BRAÇOS/CORE.";
+            default ->
+                    "Dia 1: PEITO/TRÍCEPS, Dia 2: COSTAS/BÍCEPS, Dia 3: PERNAS (Foco Quadríceps), Dia 4: OMBROS, Dia 5: PERNAS (Foco Posterior), Dia 6: FULL BODY/REABILITAÇÃO.";
+        };
+
         return """
                 DIRETRIZES DE ESTRUTURA E BIOMECÂNICA (REGRAS CRÍTICAS):
-                1. DIVISÃO E DURAÇÃO: Exatamente %d dias por semana, com sessões de %s.
-                2. MÉTODO DE DIVISÃO (ANTI-REPETIÇÃO): Se frequência >= 3, PROIBIDO repetir o mesmo treino "Full Body".
-                   - Deves obrigatoriamente separar por grupos (Ex: Superior, Inferior, Posterior).
-                3. VARIAÇÃO DE PLANOS (OBRIGATÓRIO): Cada treino deve conter exercícios nos 3 planos:
-                   - PLANO SAGITAL: Frente/Trás (ex: Agachamento, Flexão).
-                   - PLANO FRONTAL: Lateral (ex: Abdução, Elevação Lateral).
-                   - PLANO TRANSVERSAL: Rotação (ex: Woodchop, Rotação de Tronco).
-                4. REABILITAÇÃO (ORDER 1): O primeiro exercício deve focar na patologia "%s" no plano de maior limitação.
-                5. LÓGICA: Alternar grupos e planos mantém o ritmo %s e evita desgaste articular.
-                """.formatted(userRequest.frequencyPerWeek(), durationText, pathologyText, protocol.getTempo());
+                1. DIVISÃO E DURAÇÃO: Exatamente %d dias por semana, sessões de %s.
+                2. COERÊNCIA ANATÓMICA (ESTRITA): É PROIBIDO incluir exercícios de membros inferiores (ex: Cadeira Extensora, Agachamento) em dias marcados como "SUPERIOR" ou "PEITO/COSTAS".
+                3. MAPA DE TREINO OBRIGATÓRIO:
+                   - %s
+                4. VARIAÇÃO DE PLANOS: Cada treino deve navegar entre o PLANO SAGITAL, FRONTAL e TRANSVERSAL para equilíbrio articular.
+                5. REABILITAÇÃO E AQUECIMENTO (ORDER 1): 
+                   - O primeiro exercício de cada dia DEVE ser específico para a patologia "%s" E para os músculos que serão treinados no dia.
+                   - Exemplo: Se o dia é PEITO e a patologia é OMBRO, o 'order 1' deve ser Mobilidade de Ombro/Manguito.
+                6. LÓGICA DO PROTOCOLO: Filtra os exercícios do protocolo %s para que apareçam apenas nos dias anatomicamente corretos.
+                """.formatted(
+                userRequest.frequencyPerWeek(),
+                durationText,
+                divisaoSugerida,
+                pathologyText,
+                protocol.getLabel()
+        );
     }
 
     @NotNull
@@ -336,16 +367,61 @@ public record Training(ChatModel chatModel, ObjectMapper objectMapper) {
     private String defaultIfEmpty(String value, String defaultValue) {
         return (value == null || value.isBlank()) ? defaultValue : value;
     }
-
-    private TrainingPlanResponse executeGeneration(String prompt) {
-
+    private TrainingPlanResponse executeGeneration(String prompt, UserProfileRequest userRequest) {
         try {
             String textResponse = chatModel.call(prompt);
-            // Se configurou o MIME type, textResponse já vira um JSON puro.
-            // O cleanMarkdown ainda é bom por segurança, mas o erro de "end-of-input" deve sumir.
-            return objectMapper.readValue(cleanMarkdown(textResponse), TrainingPlanResponse.class);
+            String cleanedJson = cleanMarkdown(textResponse);
+
+            // 1. Desserialização inicial
+            // O Jackson lê o JSON da IA e preenche o objeto temporário
+            TrainingPlanResponse response = objectMapper.readValue(cleanedJson, TrainingPlanResponse.class);
+
+            // 2. Reconstrução do Plano (Injetando links de Anatomia 3D)
+            // Usamos Streams para navegar na estrutura imutável de Records
+            List<TrainingDay> updatedPlan = response.getPlan().stream()
+                    .map(day -> {
+                        List<TrainingExercise> enrichedExercises = day.exercises().stream()
+                                .map(ex -> {
+                                    // Busca o link bonito de fibras musculares no Enum
+                                    String anatomyLink = EnumExerciseCategory.findLinkByExerciseName(ex.name());
+
+                                    // Cria uma nova instância do record com o link preenchido
+                                    return new TrainingExercise(
+                                            ex.order(),
+                                            ex.name(),
+                                            ex.muscleGroup(),
+                                            ex.equipment(),
+                                            ex.intensity(),
+                                            ex.sets(),
+                                            ex.reps(),
+                                            ex.rest(),
+                                            ex.tempo(),
+                                            ex.details(),
+                                            ex.notas(),
+                                            ex.weight(),
+                                            ex.cargaAtual(),
+                                            anatomyLink, // Link injetado aqui
+                                            ex.date()
+                                    );
+                                })
+                                .toList();
+
+                        return new TrainingDay(day.day(), enrichedExercises);
+                    })
+                    .toList();
+
+            // 3. Retorno com todos os 5 campos exigidos pelo @AllArgsConstructor
+            return new TrainingPlanResponse(
+                    false,                        // isExistingPlan (primeiro campo da classe)
+                    response.getSummary(),        // summary
+                    updatedPlan,                  // plan (a lista que acabámos de reconstruir)
+                    response.getDietPlan(),       // dietPlan
+                    userRequest                   // userProfile (conforme solicitado)
+            );
+
         } catch (Exception e) {
-            throw new RuntimeException("Erro ao gerar plano: " + e.getMessage(), e);
+            System.err.println("Erro na geração ou no mapeamento: " + e.getMessage());
+            throw new RuntimeException("Falha ao processar plano de treino: " + e.getMessage(), e);
         }
     }
 
@@ -362,5 +438,22 @@ public record Training(ChatModel chatModel, ObjectMapper objectMapper) {
             return cleaned.substring(firstBrace, lastBrace + 1);
         }
         return cleaned;
+    }
+
+    private String calcularDescansoCientifico(Enum.TrainingProtocol protocol, String objective) {
+        // Lógica baseada na fisiologia do exercício:
+        // Força Pura/Potência: 3-5 min (Resíntese completa de ATP-CP)
+        // Hipertrofia: 60-90 seg (Estresse metabólico + Tensão mecânica)
+        // FST-7/Resistência: 30-45 seg (Foco em pump e expansão da fáscia)
+        //O descanso ideal depende da via metabólica utilizada (ATP-CP vs. Glicolítica) e do objetivo do protocolo (FST-7, no seu caso).
+        if (protocol.getLabel().contains("FST-7")) {
+            return "30-45 segundos (Otimização do fluxo sanguíneo e hipóxia local)";
+        }
+
+        if (objective.equalsIgnoreCase("Hipertrofia")) {
+            return "60-90 segundos (Equilíbrio entre resíntese de ATP e estresse metabólico)";
+        }
+
+        return protocol.getRest(); // Fallback para o valor do Enum
     }
 }

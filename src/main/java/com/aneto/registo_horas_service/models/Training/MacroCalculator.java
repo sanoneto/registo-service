@@ -6,7 +6,6 @@ import lombok.NoArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
-
 @Component
 @NoArgsConstructor
 public class MacroCalculator {
@@ -24,15 +23,18 @@ public class MacroCalculator {
                 ? "Katch-McArdle (Alta Precisão: Baseado em Massa Magra)"
                 : "Mifflin-St Jeor (Padrão Biométrico)";
 
-        // 3. Calorias e Macros Totais
+        // 3. Calorias Totais (Usando o método que você criou abaixo)
         int dailyCalories = getDailyCalories(typeKey, tmb);
+
+        // 4. Macros Totais
         int proteinGrams = calculateProtein(typeKey, weight);
         int fatGrams = calculateFats(typeKey, weight);
 
+        // Cálculo de Carboidratos Restantes
         int caloriesFromPAndF = (proteinGrams * 4) + (fatGrams * 9);
-        int carbGrams = Math.max(20, (dailyCalories - caloriesFromPAndF) / 4);
+        int carbGrams = Math.max(50, (dailyCalories - caloriesFromPAndF) / 4);
 
-        // 4. Análise Biométrica (O "Cérebro" da IA)
+        // 5. Análise Biométrica
         double imc = calculateIMC(weight, height);
         String imcCat = getIMCCategory(imc);
 
@@ -45,14 +47,13 @@ public class MacroCalculator {
                 typeKey, imc, imcCat, bfAnalysis
         );
 
-        // 5. Distribuição via Enum
+        // 6. Distribuição via Enum
         List<MealSuggestion> meals = MealDistribution
                 .fromBodyType(typeKey)
                 .getMeals(mealsPerDay);
 
         validateMealIntegrity(meals);
 
-        // 6. Retorno para o DTO Macros
         return new Macros(
                 dailyCalories,
                 proteinGrams,
@@ -65,36 +66,39 @@ public class MacroCalculator {
                 aiAnalysisSummary
         );
     }
+
+    // --- MÉTODOS AUXILIARES ---
+
     private static int calculateProtein(String bodyType, double weight) {
         return switch (bodyType) {
-            case "ENDOMORFO" -> (int) (weight * 2.3);
+            case "ENDOMORFO" -> (int) (weight * 2.4);
             case "ECTOMORFO" -> (int) (weight * 2.0);
-            default -> (int) (weight * 2.2); // Mesomorfo ou outros
+            default          -> (int) (weight * 2.2);
         };
     }
 
     private static int calculateFats(String bodyType, double weight) {
         return switch (bodyType) {
-            case "ECTOMORFO" -> (int) (weight * 0.8);
-            default -> (int) (weight * 0.9); // Endomorfo e Mesomorfo precisam de um pouco mais de gordura para saciedade/hormonas
+            case "ENDOMORFO" -> (int) (weight * 0.8); // Menos gordura, mais proteína
+            case "ECTOMORFO" -> (int) (weight * 1.1); // Mais gordura para bater calorias
+            default          -> (int) (weight * 1.0);
         };
     }
 
-    // O teu getDailyCalories que já tinhas, mas agora como switch limpo:
     private static int getDailyCalories(String bodyType, double tmb) {
         double activityFactor = switch (bodyType) {
-            case "ECTOMORFO" -> 1.55;
-            case "ENDOMORFO" -> 1.30;
-            default          -> 1.45;
+            case "ECTOMORFO" -> 1.6; // Metabolismo rápido + Treino Intenso
+            case "ENDOMORFO" -> 1.4;
+            default          -> 1.5;
         };
 
-        int calorieAdjustment = switch (bodyType) {
-            case "ECTOMORFO" -> 400;
-            case "ENDOMORFO" -> 200;
+        int surplus = switch (bodyType) {
+            case "ECTOMORFO" -> 450; // Superavit agressivo
+            case "ENDOMORFO" -> 150; // Superavit controlado
             default          -> 300;
         };
 
-        return (int) (tmb * activityFactor) + calorieAdjustment;
+        return (int) (tmb * activityFactor) + surplus;
     }
 
     private static double calculateTMB(double w, double h, int a, String g, Double bf, boolean usedKatch) {
@@ -106,26 +110,22 @@ public class MacroCalculator {
     }
 
     private static void validateMealIntegrity(List<MealSuggestion> meals) {
+        if (meals == null || meals.isEmpty()) return;
         double totalPct = meals.stream().mapToDouble(MealSuggestion::pctCalories).sum();
-
-        // Usamos uma pequena margem de erro (epsilon) para lidar com imprecisões de double
         if (Math.abs(totalPct - 1.0) > 0.001) {
-            throw new IllegalStateException(
-                    String.format("ERRO CRÍTICO: A soma das calorias das refeições é %.2f%% e deve ser 100%%!", totalPct * 100)
-            );
+            throw new IllegalStateException(String.format("Erro na soma das refeições: %.2f%%", totalPct * 100));
         }
     }
 
-    // Adiciona estes métodos ao MacroCalculator.java
     public static double calculateIMC(double weight, double heightCm) {
         double heightM = heightCm / 100;
         return weight / (heightM * heightM);
     }
 
     public static String getIMCCategory(double imc) {
-        if (imc < 18.5) return "Abaixo do Peso (Risco de Catabolismo)";
-        if (imc < 25.0) return "Peso Ideal (Foco em Recomposição)";
-        if (imc < 30.0) return "Sobrepeso (Foco em Ganho Limpo)";
-        return "Obesidade (Necessidade de Défice Estratégico)";
+        if (imc < 18.5) return "Abaixo do Peso";
+        if (imc < 25.0) return "Peso Ideal";
+        if (imc < 30.0) return "Sobrepeso";
+        return "Obesidade";
     }
 }
