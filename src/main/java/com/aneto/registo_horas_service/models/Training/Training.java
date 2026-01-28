@@ -163,7 +163,7 @@ public record Training(ChatModel chatModel, ObjectMapper objectMapper) {
                 - Proteína: Reparação das fibras dos motores primários (agonistas).
                 - Carbohidratos: Reposição de glicogénio para o próximo treino.
                 - Gorduras: Suporte hormonal para a síntese proteica.
-                """.formatted((int) macros.dailyCalories());
+                """.formatted( macros.dailyCalories());
 
         String diretrizInstrucoesDetalhadas = """
                 REGRAS DE FEEDBACK TÉCNICO:

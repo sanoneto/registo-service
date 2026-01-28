@@ -1,5 +1,6 @@
 package com.aneto.registo_horas_service.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.With;
 
 import java.time.LocalDate;
