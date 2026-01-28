@@ -57,16 +57,18 @@ public enum EnumExerciseCategory {
 
     // Método estático para encontrar o link pelo nome que a IA gerar
     public static String findLinkByExerciseName(String exerciseName) {
-        String normalizedInput = exerciseName.toLowerCase();
+        if (exerciseName == null) return "";
+        String normalizedInput = exerciseName.toLowerCase().replace(" ", "").replace("-", "");
 
         for (EnumExerciseCategory exercise : values()) {
-            if (normalizedInput.contains(exercise.displayName.toLowerCase()) ||
-                    normalizedInput.contains(exercise.name().toLowerCase().replace("_", " "))) {
+            String enumName = exercise.displayName.toLowerCase().replace(" ", "");
+            String enumConst = exercise.name().toLowerCase().replace("_", "");
+
+            if (normalizedInput.contains(enumName) || normalizedInput.contains(enumConst)) {
                 return exercise.getAnatomyLink();
             }
         }
-
-        // Fallback dinâmico caso o exercício não esteja no Enum
-        return BASE_URL + exerciseName.replace(" ", "+") + "+3d+anatomy";
+        // Fallback: Se não estiver no dicionário, cria uma busca genérica
+        return BASE_URL + exerciseName.replace(" ", "+") + "+technique";
     }
 }

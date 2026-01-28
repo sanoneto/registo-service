@@ -16,464 +16,472 @@ public record Training(ChatModel chatModel, ObjectMapper objectMapper) {
     public TrainingPlanResponse generateTrainingPlan(UserProfileRequest userRequest) {
 
         // 1. Sanitização de entradas
-        String protocolId = defaultIfEmpty(userRequest.protocol(), "nasm_estabilizacao");
-        String pathologyText = defaultIfEmpty(userRequest.pathology(), "Nenhuma limitação relatada");
-        String historyText = defaultIfEmpty(userRequest.exerciseHistory(), "Não informado");
+        String exerciseHistoryText = defaultIfEmpty(userRequest.exerciseHistory(), "Não informado");
         String objectiveText = defaultIfEmpty(userRequest.objective(), "Manutenção de saúde e bem-estar");
         String locationText = defaultIfEmpty(userRequest.location(), "Não especificada");
         String countryText = defaultIfEmpty(userRequest.country(), "Não especificado");
         String bodyTypeText = defaultIfEmpty(userRequest.bodyType(), "Ectomorfo");
         String genderText = defaultIfEmpty(userRequest.gender(), "Não especificado");
-        String weightKg = defaultIfEmpty(String.valueOf(userRequest.weightKg()), "Não especificado");
+        String weightKg = defaultIfEmpty(String.valueOf(userRequest.weightKg()), "70");
 
+        String durationText = (userRequest.duration() != null && !userRequest.duration().isBlank())
+                ? userRequest.duration() : "60 minutos";
 
-        // 2. Dados do Protocolo e Macros
+        String protocolId = (userRequest.protocol() == null) ? "nasm_estabilizacao" : userRequest.protocol();
         Enum.TrainingProtocol protocol = Enum.TrainingProtocol.fromId(protocolId);
 
-        Double bodyFat = userRequest.bodyFat() != null ? userRequest.bodyFat() : 15.0;
+        int totalMinutos = extrairMinutosTotais(durationText);
+        int volumeIdeal = Math.max(6, totalMinutos / 7);
+        String pathologyText = (userRequest.pathology() == null || userRequest.pathology().isBlank()) ? "Nenhuma limitação relatada" : userRequest.pathology();
 
-        int mealsPerDay = userRequest.mealsPerDay() != null ? userRequest.mealsPerDay() : 6;
-
+        // 2. Cálculos Nutricionais Protocolo e Macros
         Macros macros = MacroCalculator.calculate(
                 userRequest.weightKg(), userRequest.heightCm(), userRequest.age(),
-                genderText, bodyTypeText, bodyFat, mealsPerDay
+                userRequest.gender(), userRequest.bodyType(),
+                userRequest.bodyFat() != null ? userRequest.bodyFat() : 15.0,
+                userRequest.mealsPerDay() != null ? userRequest.mealsPerDay() : 6
         );
-
         // --- SEPARAÇÃO DAS REGRAS (DIRETRIZES) ---
-
         String descansoCientifico = calcularDescansoCientifico(protocol, objectiveText, weightKg);
+
+
+
+        String detalhesEquipamento = locationText.equalsIgnoreCase("Casa") ?
+                "UTILIZA APENAS: 'Peso Corporal', 'Halteres' ou 'Bandas Elásticas'. PROIBIDO o uso de máquinas de ginásio." :
+                "UTILIZA: 'Máquinas', 'Barras', 'Polias' ou 'Halteres'.";
+
 
         String diretrizProtocolo = """
                 DIRETRIZES TÉCNICAS E FISIOLÓGICAS (%s):
                 - Séries: %s | Repetições: %s
-                - DESCANSO CIENTÍFICO: %s
+                - DESCANSO CIENTÍFICO: %s segundos fixos.
                 - RITMO (Tempo): %s
-                - JUSTIFICATIVA FISIOLÓGICA: O descanso de %s é calculado para garantir a resíntese parcial de substratos energéticos (Fosfocreatina) enquanto mantém o estresse metabólico necessário para a sinalização hipertrófica.
-                """.formatted(
-                protocol.getLabel(),
-                protocol.getSets(),
-                protocol.getReps(),
-                descansoCientifico,
-                protocol.getTempo(),
-                descansoCientifico
-        );
+                - JUSTIFICATIVA FISIOLÓGICA: O descanso de %s é calculado para garantir a resíntese de Fosfocreatina.
+                """.formatted(protocol.getLabel(), protocol.getSets(), protocol.getReps(), descansoCientifico, protocol.getTempo(), descansoCientifico);
 
         String diretrizBiomecanica = """
-                DIRETRIZES DE SELEÇÃO BIOMECÂNICA E FILTRAGEM:
-                1. REPERTÓRIO DO PROTOCOLO: %s. 
-                   - IMPORTANTE: Usa estes exercícios APENAS se eles pertencerem ao grupo muscular do dia definido no campo "day".
-                2. EXERCÍCIOS PROIBIDOS: %s.
-                3. ADAPTAÇÃO: Sendo a patologia "%s", substitui impactos por baixo torque.
-                4. COERÊNCIA ANATÓMICA: É estritamente proibido incluir exercícios de pernas (ex: Cadeira Extensora) em dias de Membros Superiores, e vice-versa.
+                DIRETRIZES DE SELEÇÃO BIOMECÂNICA ESTREITAS:
+                1. REPERTÓRIO: %s.
+                2. PROIBIDOS: %s.
+                3. ADAPTAÇÃO: Patologia "%s", substitui impactos por baixo torque.
+                4. SEPARAÇÃO TOTAL (ERRO CRÍTICO): É terminantemente PROIBIDO incluir exercícios de PERNAS (Ex: Agachamentos, Elevação Pélvica, Leg Press) em dias de SUPERIORES (Push/Pull).
+                5. COERÊNCIA: Se o dia é PUSH, usa apenas Peito, Ombros e Tríceps. Se o dia é LEGS, usa apenas Quadríceps, Isquiotibiais e Glúteos.
                 """.formatted(protocol.getSuggestedExercises(), protocol.getForbiddenExercises(), pathologyText);
 
         String diretrizAquecimento = """
                 REGRA OBRIGATÓRIA DE AQUECIMENTO:
-                - Se houver exercício de Reabilitação, este aquecimento deve ser o "order": 2.
-                - Caso contrário, deve ser o "order": 1.
-                - Se for Cárdio (ex: Passadeira): use reps como tempo (ex: "10 min").
+                - Se houver Reabilitação, "order": 2. Caso contrário, "order": 1.
                 - Foco específico na região: %s.
                 """.formatted(pathologyText);
 
-// 1. Defina as duas diretrizes
-        String diretrizTreino = getString(userRequest, pathologyText, protocol);
-
+        String diretrizTreino = getString(userRequest, pathologyText, protocol, durationText, descansoCientifico, volumeIdeal);
         String diretrizAlimentar = getString(macros);
 
         String diretrizRepertorio = """
                 EXPANSÃO DE REPERTÓRIO:
-                - Podes escolher qualquer exercício da tua base de dados que respeite a biomecânica do protocolo %s.
+                - Podes escolher exercícios da base que respeitem o protocolo %s.
                 - Objetivo: %s. Frequência: %d dias.
                 """.formatted(protocol.getLabel(), objectiveText, userRequest.frequencyPerWeek());
 
         String diretrizEquipamento = """
-                LOGÍSTICA DE EQUIPAMENTO:
-                - Identifica o equipamento necessário no campo "equipment".
-                - Localização: %s. Se for "Casa", foca em Peso Corporal/Halteres.
-                """.formatted(locationText);
+                LOGÍSTICA E EQUIPAMENTO:
+                - Localização atual: %s.
+                - REGRA ABSOLUTA: O campo 'equipment' no JSON deve indicar claramente o material necessário.
+                - %s
+                - VÍDEOS: Usa obrigatoriamente nomes do DICIONÁRIO para garantir o mapeamento.
+                """.formatted(locationText, detalhesEquipamento);
 
         String diretrizArrefecimento = """
-                REGRA DE ARREFECIMENTO (VOLTA À CALMA):
-                - O ÚLTIMO exercício de cada dia deve ser obrigatoriamente Arrefecimento ou Alongamento Estático.
-                - No campo "reps", especifica o tempo (ex: "30-60 seg por posição").
-                - No campo "details", descreve o ritmo: "Ritmo decrescente, foco na respiração profunda e relaxamento muscular".
-                - Personaliza os alongamentos para os músculos solicitados no dia e para a patologia: %s.
+                REGRA DE ARREFECIMENTO:
+                - O ÚLTIMO exercício de cada dia deve ser Alongamento Estático focado em %s.
+                - No campo "reps", especifica o tempo (ex: "30-60 seg").
                 """.formatted(pathologyText);
 
-        String diretrizIntensidade = """
-                DIRETRIZ DE INTENSIDADE E ESFORÇO (RPE):
-                - Deves atribuir obrigatoriamente um valor ao campo "intensity" para cada exercício.
-                - Critérios de atribuição:
-                  1. "BAIXA": Para o primeiro exercício (Mobilidade/Cárdio) e o último (Alongamento).
-                  2. "MODERADA": Para exercícios acessórios ou técnicos.
-                  3. "ALTA": Para exercícios multiarticulares base do protocolo %s.
-                - Este campo controla a cor dinâmica na interface do aluno.
-                """.formatted(protocol.getLabel());
+        String diretrizIntensidade = "INTENSIDADE: Atribua BAIXA, MODERADA ou ALTA para cada exercício (campo 'intensity').";
 
+        // 1. Define a divisão muscular exata e a reabilitação
         String diretrizNomenclaturaDias = """
-                REGRAS CRÍTICAS DE DIVISÃO E NOMENCLATURA (Frequência %d):
-                1. PADRÃO OBRIGATÓRIO NO CAMPO "day": "Dia X - [CATEGORIA]: [Foco Principal]"
-                2. COERÊNCIA ANATÓMICA: É estritamente PROIBIDO misturar exercícios de pernas em dias de tronco. 
-                3. DISTRIBUIÇÃO SUGERIDA:
-                   - Se Frequência 6 (PPL 2x): Dia 1: PEITO/TRÍCEPS, Dia 2: COSTAS/BÍCEPS, Dia 3: PERNAS, Dia 4: OMBROS, Dia 5: SUPERIOR (Foco antagonistas), Dia 6: INFERIOR (Foco Posterior).
-                   - Se Frequência 3: Dia 1: SUPERIOR (Empurrar), Dia 2: INFERIOR (Pernas), Dia 3: SUPERIOR (Puxar).
-                4. ADAPTAÇÃO PATOLÓGICA: Sendo a patologia "%s", o Foco Principal de pelo menos um dia deve ser a reabilitação/mobilidade dessa zona.
-                """.formatted(userRequest.frequencyPerWeek(), pathologyText);
+                REGRAS ESTRITAS DE DIVISÃO E EXCLUSIVIDADE (FREQUÊNCIA %d):
+                1. NOMENCLATURA E FOCO:
+                   - "Dia 1 - PUSH: Peito/Ombros/Tríceps"
+                   - "Dia 2 - PULL: Costas/Bíceps"
+                   - "Dia 3 - LEGS: Pernas e Core"
+                2. REABILITAÇÃO DIÁRIA: Todos os dias DEVEM começar (Order 1) com um exercício de reabilitação para %s. Escolha um diferente para cada dia.
+                3. PROIBIÇÃO BIOMECÂNICA: É terminantemente PROIBIDO incluir exercícios de pernas ou glúteos (ex: Agachamentos, Elevação Pélvica, Leg Press) nos dias de PUSH ou PULL.
+                4. VARIABILIDADE: Cada bloco de treino deve ter exercícios 100%% únicos. Não repitas o treino do Dia 1 no Dia 3.
+                5. QUANTIDADE: Gera exatamente %d blocos no array "plan".
+                """.formatted(userRequest.frequencyPerWeek(), pathologyText, userRequest.frequencyPerWeek());
 
         String diretrizReabilitacao = pathologyText.contains("Nenhuma") ?
-                "Sendo um aluno sem limitações, foca o primeiro exercício (Order 1) em mobilidade geral ou ativação neuromuscular." :
-                getString(pathologyText);
+                "Foca o primeiro exercício em mobilidade geral ou ativação dinâmica." :
+                getString(pathologyText) + "\n- REGRA: Proibido repetir o mesmo exercício de reabilitação em dias consecutivos.";
 
-        // --- MONTAGEM FINAL DO PROMPT ---
-        String userPrompt = """
-                ESTRITA REGRA: RESPONDA APENAS O JSON.
-                NÃO DIGA "OLÁ", NÃO DÊ EXPLICAÇÕES FORA DO JSON.
-                
-                Atue como um Personal Trainer e Nutricionista especialista em reabilitação física e metodologias de treino.
-                Gere um plano de treino e um plano alimentar personalizado em Português.
-                
-                PERFIL DO ALUNO:
-                - Idade: %d anos | Biótipo: %s | Género: %s
-                - Altura: %.2f cm | Peso: %.2f kg
-                - Histórico: %s | Patologias: %s
-                - Localização: %s, %s | Objetivo: %s
-                
-                %s
-                %s
-                %s
-                %s
-                %s
-                %s
-                %s
-                %s
-                %s
-                %s
-                %s
-                
-                FORMATO DE RESPOSTA (JSON APENAS):
-                {
-                 "summary": "Explicação técnica da estratégia %s (Fórmula: %s) para %s, considerando %d anos e a patologia %s.",
-                  "plan": [
-                    {
-                      "day": "Dia 1 - SUPERIOR: Peitoral e Tríceps",
-                      "exercises": [
-                        {
-                          "order": 1,
-                          "name": "Nome",
-                          "muscleGroup": "Grupo Muscular (Ex: Quadríceps, Isquiotibiais )",
-                          "videoUrl": "https://www.youtube.com/results?search_query=dumbbell+incline+press+3d+anatomy",
-                          "intensity": "ALTA | MODERADA | BAIXA",
-                          "tempo": "%s",
-                          "equipment": "Tipo de Equipamento",
-                          "sets": "%s",
-                          "reps": "%s",
-                          "rest": "%s",
-                          "details": "Dica de segurança para %s",
-                          "notas": "JUSTIFICATIVA: Por que este exercício é ideal para %s e seguro para %s considerando o ritmo %s?"
-                        }
-                      ]
-                    }
-                  ],
-                  "dietPlan": {
-                    "methodology": "%s",
-                    "dailyCalories": %d,
-                    "imc": %.2f,
-                    "imcCategory": "%s",
-                    "statusSummary": "%s",
-                    "macroDistribution": { "protein": "%dg", "carbs": "%dg", "fats": "%dg" },
-                    "meals": [
-                      {
-                        "time": "HH:MM",
-                        "description": "Nome da Refeição",
-                        "ingredients": [
-                          "Ex: 150g de Peito de Frango Grelhado - Fonte de proteína"
-                        ],
-                        "calories": 0,
-                        "protein": 0,
-                        "carbs": 0,
-                        "fats": 0
-                      }
-                    ],
-                    "localTips": "Dicas para %s, %s."
-                  }
-                }
-                
-                REGRAS CRÍTICAS PARA A DIETA:
-                1. O campo "ingredients" DEVE ser preenchido com uma lista detalhada de alimentos e quantidades.
-                2. Para cada refeição, os campos "calories", "protein", "carbs" e "fats" DEVEM ser números inteiros.
-                3. A soma total deve ser aproximadamente: %d kcal, %dg Prot, %dg Carbs e %dg Fats.
+        String regrasFinais = """
+                REGRAS CRÍTICAS DE FECHAMENTO:
+                1. DURAÇÃO E VOLUME: O treino deve durar %d minutos. Para isso, gera EXATAMENTE %d exercícios por dia.
+                2. RITMO E DESCANSO: Usa obrigatoriamente Ritmo %s e Descanso %s segundos.
+                3. FORMATO: Responde APENAS o JSON puro. Proibido usar hífens em números.
+                4. FREQUÊNCIA: O JSON deve conter exatamente %d dias no array "plan".
+                5. TOTAIS DIETA: %d kcal, %dg Prot, %dg Carbs, %dg Fats.
                 """.formatted(
-                // 1-10: Perfil
-                userRequest.age(), bodyTypeText, genderText, userRequest.heightCm(), userRequest.weightKg(),
-                historyText, pathologyText, locationText, countryText, objectiveText,
-
-                // 11-21: Blocos de Regras
-                diretrizProtocolo, diretrizBiomecanica, diretrizAquecimento, diretrizTreino, diretrizAlimentar, diretrizRepertorio,
-                diretrizEquipamento, diretrizArrefecimento, diretrizIntensidade, diretrizNomenclaturaDias, diretrizReabilitacao,
-
-                // 22-26: JSON Summary
-                protocol.getLabel(), macros.formula(), objectiveText, userRequest.age(), pathologyText,
-
-                // 27-30: JSON Exercício
-                protocol.getTempo(), protocol.getSets(), protocol.getReps(), protocol.getRest(),
-
-                // 31-34: JSON Justificativas
-                pathologyText, protocol.getLabel(), pathologyText, protocol.getTempo(),
-
-                // 35-42: JSON Diet (Metodologia, Calorias, IMC, Categoria, Status, Macros)
-                macros.formula(), macros.dailyCalories(), macros.imc(), macros.imcCategory(), macros.statusSummary(),
-                macros.protein(), macros.carbs(), macros.fats(),
-
-                // 43-44: Dicas Locais
-                locationText, countryText,
-
-                // 45-48: REGRAS CRÍTICAS FINAIS
+                totalMinutos, volumeIdeal, protocol.getTempo(), descansoCientifico, // <--- totalMinutos e volumeIdeal
+                userRequest.frequencyPerWeek(),
                 macros.dailyCalories(), macros.protein(), macros.carbs(), macros.fats()
         );
-        return executeGeneration(userPrompt, userRequest);
+        String diretrizDicionario = """
+                DICIONÁRIO DE NOMES OBRIGATÓRIOS (Usa APENAS estes nomes exatos para garantir o vídeo):
+                - Peito: Supino Plano, Supino Inclinado, Peck Deck, Crossover.
+                - Costas: Puxada à Frente, Remada Curvada, Remada Unilateral, Pulldown Corda.
+                - Pernas: Agachamento Livre, Leg Press 45, Cadeira Extensora, Mesa Flexora, Stiff / RDL, Gémeos em Pé, Mobilidade Tornozelo.
+                - Ombros/Braços: Desenvolvimento, Elevação Lateral, Face Pull, Rosca Direta, Tríceps Corda.
+                - Reabilitação: Dead Bug, Cat Cow, Clamshell, Y-W-T, Rotação Externa.
+                """;
+
+        String diretrizPlanosMovimento = """
+                VARIABILIDADE BIOMECÂNICA (Planos de Movimento):
+                - REGRA: No mesmo dia, deves incluir exercícios que explorem diferentes planos:
+                  1. PLANO SAGITAL: Movimentos de flexão/extensão (ex: Agachamento, Supino, Remada).
+                  2. PLANO FRONTAL: Movimentos de abdução/adução (ex: Elevação Lateral, Puxada à Frente, Abdução de anca).
+                  3. PLANO TRANSVERSAL: Movimentos de rotação (ex: Rotação Externa, Woodchopper, Prancha Lateral com rotação).
+                - IMPORTANTE: Garante que a Reabilitação e o Core explorem os planos Transversal ou Frontal para compensar os exercícios de força que são maioritariamente Sagitais.
+                """;
+
+        String diretrizAnatomiaDetalhada = """
+                DETALHAMENTO ANATÓMICO EXAUSTIVO:
+                - No campo 'muscleGroup', deves listar TODOS os músculos envolvidos no movimento, divididos por:
+                  1. Motores Primários (Agonistas).
+                  2. Sinergistas (Músculos que auxiliam).
+                  3. Estabilizadores (Fixadores).
+                - Exemplo para Supino: "Peitoral Maior (Fibras Médias e Inferiores), Deltoide Anterior, Tríceps Braquial, Serrátil Anterior e Coracobraquial".
+                - Exemplo para Agachamento: "Quadríceps (Vasto Lateral, Medial, Intermédio e Reto Femoral), Glúteo Maior, Isquiotibiais, Eretores da Espinha e Transverso do Abdómen".
+                """;
+
+        String diretrizAlimentarDetalhada = """
+                DIRETRIZES NUTRICIONAIS (FUNÇÃO METABÓLICA):
+                - O plano atual tem um total de %d kcal.
+                - Explica no 'summary' como os macros vão recuperar os músculos listados:
+                - Proteína: Reparação das fibras dos motores primários (agonistas).
+                - Carbohidratos: Reposição de glicogénio para o próximo treino.
+                - Gorduras: Suporte hormonal para a síntese proteica.
+                """.formatted((int) macros.dailyCalories());
+
+        String diretrizInstrucoesDetalhadas = """
+                REGRAS DE FEEDBACK TÉCNICO:
+                - No campo 'details': Explica a execução técnica focando no Plano de Movimento. 
+                  (Ex: "Mantém os cotovelos a 45º do corpo para proteger o manguito rotador no plano sagital").
+                - No campo 'notas': Indica a 'Pista Mental' para máxima ativação muscular.
+                  (Ex: "Imagina que queres esmagar uma noz entre as tuas escápulas durante a remada").
+                """;
+
+
+        String diretrizCargasDinamicas = """
+                SISTEMA DINÂMICO DE CARGAS (RPE):
+                - Analisa o histórico do aluno: "%s".
+                - REGRA DE OURO: O campo 'cargaAtual' NÃO pode ser estático.
+                - Se o nível for 'sedentary' ou 'return_long': Sugere RPE 5-6 (Foco em técnica).
+                - Se o nível for 'beginner': Sugere RPE 6-7 (Moderado).
+                - Se o nível for 'intermediate': Sugere RPE 7-8 (Intenso).
+                - Se o nível for 'advanced', 'elite' ou 'athlete': Sugere RPE 9 (Alta intensidade).
+                - No campo 'cargaAtual', escreve a orientação e a justificativa (ex: "RPE 8 - Carga desafiante para 2 reps em reserva").
+                """.formatted(exerciseHistoryText);
+
+        // --- JUNÇÃO DE TODAS AS REGRAS (Fisiologia, Biomecânica e Nutrição) ---
+        String blocoDiretrizesCompletas = """
+                [PERFIL E HISTÓRICO]
+                - Experiência Anterior: %s
+                - Localização do Aluno: %s
+                
+                [REABILITAÇÃO E FISIOLOGIA]
+                %s
+                %s
+                %s
+                
+                [BIOMECÂNICA, ANATOMIA E INSTRUÇÕES]
+                %s
+                %s
+                %s
+                %s
+                %s
+                
+                [LOGÍSTICA E EQUIPAMENTO]
+                %s
+                %s
+                
+                [ESTRUTURA E REPERTÓRIO]
+                %s
+                %s
+                %s
+                
+                [ESTRUTURA DOS DIAS E NOMENCLATURA]
+                %s
+                [CONTROLO DE NOMENCLATURA]
+                %s
+                
+                [DIRETRIZES ALIMENTARES E METABÓLICAS]
+                %s
+                %s
+                """.formatted(
+                // 1 & 2: Perfil
+                exerciseHistoryText, countryText,
+                // 3, 4 & 5: Fisiologia
+                diretrizProtocolo, diretrizReabilitacao, diretrizAquecimento,
+                // 6, 7, 8 & 9: Biomecânica (Adicionei o placeholder que faltava para a diretrizInstrucoesDetalhadas)
+                diretrizBiomecanica, diretrizPlanosMovimento, diretrizAnatomiaDetalhada, diretrizInstrucoesDetalhadas, diretrizCargasDinamicas,
+                // 10 & 11: Logística
+                diretrizEquipamento, diretrizIntensidade,
+                // 12, 13 & 14: Estrutura
+                diretrizTreino, diretrizRepertorio, diretrizArrefecimento,
+                // 15 & 16: Nomenclatura
+                diretrizNomenclaturaDias, diretrizDicionario,
+                // 17 & 18: Alimentar
+                diretrizAlimentar, diretrizAlimentarDetalhada
+        );
+        String userPrompt = """
+                ATUAÇÃO: Personal Trainer e Nutricionista Senior (Portugal).
+                FOCO: Reabilitação e Performance Fisiológica.
+                
+                PERFIL DO ALUNO:
+                - %d anos, %s, %s, %.2fkg. Objetivo: %s.
+                - Patologias/Lesões: %s
+                
+                SISTEMA DE REGRAS TÉCNICAS:
+                %s
+                
+                %s
+                
+                FORMATO JSON OBRIGATÓRIO:
+                {
+                "summary": "Explicação técnica da estratégia %s.",
+                "plan": [
+                    {
+                    "day": "Dia X - [CATEGORIA]: [FOCO]",
+                    "exercises": [
+                        {
+                        "order": 1, "name": "...",
+                        "muscleGroup": "LISTAGEM COMPLETA: Agonistas, Sinergistas e Estabilizadores (ex: Peitoral Maior, Deltoide Anterior, Tríceps, Serrátil)",
+                        "movementPlane": "Sagital / Frontal / Transversal",
+                        "equipment": "Halteres / Máquina / Peso Corporal",
+                        "tempo": "%s", "sets": "3", "reps": "15", "rest": "%s",
+                        "weight": "0kg",
+                            "cargaAtual": "Adaptar conforme RPE",
+                            "videoUrl": "",
+                            "details": "Instrução técnica biomecânica focada na execução correta e plano de movimento.",
+                            "notas": "Dica de conexão mente-músculo e segurança (Pista Mental).",
+                            "date": "Data do Treino"
+                        }
+                        ]
+                    }
+                    ],
+                    "dietPlan": {
+                    "dailyCalories": %d, "imc": %.2f, "imcCategory": "%s",
+                    "macroDistribution": { "protein": "%dg", "carbs": "%dg", "fats": "%dg" },
+                    "meals": [
+                    {
+                    "time": "HH:mm",
+                    "description": "Nome da Refeição",
+                    "ingredients": ["..."],
+                    "calories": 0,
+                    "protein": 0,
+                    "carbs": 0,
+                    "fats": 0
+                    }
+                    ]
+                    }
+                }
+                """.formatted(
+                // Aluno (6 placeholders)
+                userRequest.age(), bodyTypeText, genderText, userRequest.weightKg(), objectiveText, pathologyText,
+                // Regras Agrupadas (2 placeholders: blocoDiretrizes e regrasFinais)
+                blocoDiretrizesCompletas, regrasFinais,
+                // Template JSON (10 placeholders)
+                protocol.getLabel(), protocol.getTempo(), descansoCientifico,
+                macros.dailyCalories(), macros.imc(), macros.imcCategory(),
+                macros.protein(), macros.carbs(), macros.fats()
+        );
+        return executeGeneration(userPrompt, userRequest, totalMinutos);
     }
 
     @NotNull
     private static String getString(Macros macros) {
         StringBuilder dietTable = new StringBuilder();
-        for (MealSuggestion m : macros.mealSuggestions()) { // Alterado para macros.meals() conforme o novo record
+        for (MealSuggestion m : macros.mealSuggestions()) {
             dietTable.append("- %s (%s): %d kcal [P: %dg, C: %dg, G: %dg]\n".formatted(
-                    m.name(),
-                    m.time(),
-                    (int) (macros.dailyCalories() * m.pctCalories()),
-                    (int) (macros.protein() * m.pctProtein()),
-                    (int) (macros.carbs() * m.pctCarbs()),
-                    (int) (macros.fats() * m.pctFats())
+                    m.name(), m.time(), (int) (macros.dailyCalories() * m.pctCalories()),
+                    (int) (macros.protein() * m.pctProtein()), (int) (macros.carbs() * m.pctCarbs()), (int) (macros.fats() * m.pctFats())
             ));
         }
 
         return """
-                ANÁLISE BIOMÉTRICA: %s
-                CATEGORIA DE IMC: %s
-                
-                DIRETRIZES ALIMENTARES ESTRITAS (PROIBIDO ALTERAR VALORES):
-                1. O plano deve conter EXATAMENTE estas %d refeições e valores:
+                DIRETRIZES ALIMENTARES ESTRITAS:
+                1. O plano deve conter estas %d refeições com estes valores:
                 %s
-                2. REGRA DE CÁLCULO: Para cada refeição, escolhe ingredientes que somem exatamente os valores acima.
-                3. VALIDAÇÃO: A soma final das refeições no JSON deve ser: %d kcal, %dg P, %dg C, %dg G.
-                4. FOCO NUTRICIONAL: %s
-                """.formatted(
-                macros.statusSummary(),
-                macros.imcCategory(),
-                macros.mealSuggestions().size(),
-                dietTable.toString(),
-                macros.dailyCalories(), macros.protein(), macros.carbs(), macros.fats(),
-                macros.statusSummary() // Repetimos para dar ênfase
-        );
+                2. REGRA: Escolha ingredientes que somem exatamente estes totais: %d kcal, %dg P, %dg C, %dg G.
+                """.formatted(macros.mealSuggestions().size(), dietTable.toString(), (int) macros.dailyCalories(), (int) macros.protein(), (int) macros.carbs(), (int) macros.fats());
     }
 
-
     @NotNull
-    private static String getString(UserProfileRequest userRequest, String pathologyText, Enum.TrainingProtocol protocol) {
-        String durationText = (userRequest.duration() != null && !userRequest.duration().isBlank())
-                ? userRequest.duration() : "aprox. 60 minutos";
-
-        // Lógica de mapeamento de dias conforme a frequência
-        String divisaoSugerida = switch (userRequest.frequencyPerWeek()) {
-            case 1, 2 -> "Dia 1: SUPERIOR (Empurrar/Puxar), Dia 2: INFERIOR (Pernas/Core).";
-            case 3 -> "Dia 1: SUPERIOR (Empurrar), Dia 2: INFERIOR (Pernas), Dia 3: SUPERIOR (Puxar).";
-            case 4 -> "Dia 1: PEITO/OMBRO, Dia 2: COSTAS/BÍCEPS, Dia 3: PERNAS (Quadríceps), Dia 4: POSTERIOR/CORE.";
-            case 5 -> "Dia 1: PEITO, Dia 2: COSTAS, Dia 3: PERNAS, Dia 4: OMBROS, Dia 5: BRAÇOS/CORE.";
-            default ->
-                    "Dia 1: PEITO/TRÍCEPS, Dia 2: COSTAS/BÍCEPS, Dia 3: PERNAS (Foco Quadríceps), Dia 4: OMBROS, Dia 5: PERNAS (Foco Posterior), Dia 6: FULL BODY/REABILITAÇÃO.";
+    private static String getString(UserProfileRequest userRequest, String pathologyText, Enum.TrainingProtocol protocol, String durationText, String descanso, int volumeIdeal) {
+        String divisao = switch (userRequest.frequencyPerWeek()) {
+            case 1 -> "FULL BODY: Foco em grandes grupos musculares.";
+            case 2 -> "SUPERIOR (Peito/Costas/Braços) e INFERIOR (Pernas/Core).";
+            case 3 ->
+                    "ESTRUTURA OBRIGATÓRIA: Dia 1 - PUSH (Peito, Tríceps e Ombros); Dia 2 - PULL (Costas e Bíceps); Dia 3 - LEGS (Pernas e Core).";
+            default -> "Divisão customizada por grupos isolados.";
         };
 
         return """
-                DIRETRIZES DE ESTRUTURA E BIOMECÂNICA (REGRAS CRÍTICAS):
-                1. DIVISÃO E DURAÇÃO: Exatamente %d dias por semana, sessões de %s.
-                2. COERÊNCIA ANATÓMICA (ESTRITA): É PROIBIDO incluir exercícios de membros inferiores (ex: Cadeira Extensora, Agachamento) em dias marcados como "SUPERIOR" ou "PEITO/COSTAS".
-                3. MAPA DE TREINO OBRIGATÓRIO:
-                   - %s
-                4. VARIAÇÃO DE PLANOS: Cada treino deve navegar entre o PLANO SAGITAL, FRONTAL e TRANSVERSAL para equilíbrio articular.
-                5. REABILITAÇÃO E AQUECIMENTO (ORDER 1): 
-                   - O primeiro exercício de cada dia DEVE ser específico para a patologia "%s" E para os músculos que serão treinados no dia.
-                   - Exemplo: Se o dia é PEITO e a patologia é OMBRO, o 'order 1' deve ser Mobilidade de Ombro/Manguito.
-                6. LÓGICA DO PROTOCOLO: Filtra os exercícios do protocolo %s para que apareçam apenas nos dias anatomicamente corretos.
+                REGRAS CRÍTICAS DE DIVISÃO E FISIOLOGIA:
+                1. COERÊNCIA ANATÓMICA: No Dia 1 (PUSH), é PROIBIDO incluir pernas/glúteos. Estes pertencem ao Dia 3.
+                2. DIVISÃO DO PLANO: %s
+                3. DURAÇÃO E VOLUME: O treino dura %s. Gere EXATAMENTE %d exercícios por dia.
+                4. REABILITAÇÃO: O "Order 1" de cada dia deve ser um exercício para %s.
+                5. PARÂMETROS DINÂMICOS (PROTOCOLO %s):
+                   - SÉRIES: "%s"
+                   - REPETIÇÕES: "%s"
+                   - DESCANSO: "%s" segundos
+                   - RITMO (Tempo): "%s"
                 """.formatted(
-                userRequest.frequencyPerWeek(),
-                durationText,
-                divisaoSugerida,
+                divisao, durationText, volumeIdeal,
                 pathologyText,
-                protocol.getLabel()
+                protocol.getLabel(),      // Nome do protocolo (ex: Hipertrofia)
+                protocol.getSets(),       // Puxa as séries do Enum
+                protocol.getReps(),       // Puxa as reps do Enum
+                descanso,
+                protocol.getTempo()       // Puxa o ritmo (ex: 4-2-1 ou 2-0-2)
         );
     }
 
     @NotNull
     private static String getString(String pathologyText) {
-        if (pathologyText == null || pathologyText.equalsIgnoreCase("Nenhuma") || pathologyText.isBlank()) {
-            return "";
-        }
-
         StringBuilder correcao = new StringBuilder();
-        String lowerPathology = pathologyText.toLowerCase();
+        String lower = pathologyText.toLowerCase();
 
-        // 1. JOELHO (Valgo/Varo/Estabilidade)
-        if (lowerPathology.contains("valgo") || lowerPathology.contains("joelho")) {
-            correcao.append("""
-                    - DIRETRIZ JOELHO: Foco em estabilizadores da anca (Glúteo Médio) e Vasto Medial.
-                    - GRUPOS MUSCULARES ALVO: Abdutores e Quadríceps.
-                    - OBRIGATÓRIO: Incluir exercícios no PLANO FRONTAL (ex: Clamshells ou Side-walk).
-                    """);
+        if (lower.contains("tornozelo")) {
+            correcao.append("- OPÇÕES DE REABILITAÇÃO: Mobilidade de Tornozelo com Elástico, Propriocepção Unipodal, Tibial Anterior no Smith ou Liberação Miofascial da Fáscia Plantar.\n");
         }
-
-        // 2. TORNOZELO (Instabilidade/Entorse/Mobilidade)
-        if (lowerPathology.contains("tornozelo") || lowerPathology.contains("entorse") || lowerPathology.contains("pé")) {
-            correcao.append("""
-                    - DIRETRIZ TORNOZELO: Foco em Propriocepção e Fortalecimento da cadeia inferior.
-                    - GRUPOS MUSCULARES ALVO: Tibial Anterior, Peroniais e Gastrocnémios.
-                    - OBRIGATÓRIO: Exercícios de equilíbrio e dorsiflexão.
-                    """);
+        if (lower.contains("joelho")) {
+            correcao.append("- OPÇÕES DE REABILITAÇÃO: Ativação de Vasto Medial (VMO), Clamshell (Ostra) para Glúteo Médio, ou Step-down controlado.\n");
         }
-
-        // 3. OMBRO (Manguito Rotador/Impacto)
-        if (lowerPathology.contains("ombro") || lowerPathology.contains("manguito") || lowerPathology.contains("escápula")) {
-            correcao.append("""
-                    - DIRETRIZ OMBRO: Foco na estabilidade da cintura escapular.
-                    - GRUPOS MUSCULARES ALVO: Manguito Rotador (Subescapular, Supraespinhoso, Infraespinhoso) e Serrátil Anterior.
-                    - OBRIGATÓRIO: Rotações externas e estabilização isométrica.
-                    """);
+        if (lower.contains("lombar")) {
+            correcao.append("- OPÇÕES DE REABILITAÇÃO: Deadbug para Bracing, Cat-Cow para mobilidade vertebral, ou Bird-Dog (Perdigueiro).\n");
         }
-
-        // 4. PESCOÇO / CERVICAL
-        if (lowerPathology.contains("pescoço") || lowerPathology.contains("cervical")) {
-            correcao.append("""
-                    - DIRETRIZ CERVICAL: Corrigir anteriorização e hipercifose.
-                    - GRUPOS MUSCULARES ALVO: Flexores profundos do pescoço e Trapézio Inferior/Médio.
-                    - OBRIGATÓRIO: Chin Tucks e Retração Escapular (Y-W-T).
-                    """);
-        }
-
-        // 5. COLUNA (Lombar/Hérnia)
-        if (lowerPathology.contains("lombar") || lowerPathology.contains("hérnia") || lowerPathology.contains("costas")) {
-            correcao.append("""
-                    - DIRETRIZ COLUNA: Foco em estabilização segmentar e "Bracing".
-                    - GRUPOS MUSCULARES ALVO: Transverso do abdómen, Multífidos e Eretores da espinha.
-                    - OBRIGATÓRIO: Pranchas (Plank) e Dead Bug (evitar flexão excessiva se houver dor).
-                    """);
+        if (lower.contains("ombro")) {
+            correcao.append("- OPÇÕES DE REABILITAÇÃO: Rotação Externa com Elástico, Y-Raise para Trapézio Inferior, ou Protusão de Escápula.\n");
         }
 
         return """
-                REGRAS ANATÓMICAS CRÍTICAS PARA REABILITAÇÃO:
+                REGRAS ANATÓMICAS DE REABILITAÇÃO:
                 %s
-                1. DIFERENCIAÇÃO: Nunca listes uma articulação (ex: "Tornozelo") no campo 'muscleGroup'. Usa sempre o músculo motor (ex: "Tibial", "Gémeos").
-                2. ORDEM 1: Como o aluno possui "%s", o primeiro exercício de cada dia deve ser a correção motora indicada acima.
-                3. JUSTIFICATIVA: No campo 'notas', explica a biomecânica (ex: "Fortalecimento do Tibial para estabilizar a articulação do tornozelo").
-                """.formatted(correcao.toString(), pathologyText);
+                1. VARIABILIDADE: Escolhe um exercício DIFERENTE da lista acima para o "Order 1" de cada dia de treino.
+                2. PROGRESSÃO: O foco deve ser técnico e de baixa intensidade (ativação).
+                """.formatted(correcao.toString());
     }
 
     private String defaultIfEmpty(String value, String defaultValue) {
         return (value == null || value.isBlank()) ? defaultValue : value;
     }
-    private TrainingPlanResponse executeGeneration(String prompt, UserProfileRequest userRequest) {
-        try {
-            String textResponse = chatModel.call(prompt);
-            String cleanedJson = cleanMarkdown(textResponse);
 
-            // 1. Desserialização inicial
-            // O Jackson lê o JSON da IA e preenche o objeto temporário
-            TrainingPlanResponse response = objectMapper.readValue(cleanedJson, TrainingPlanResponse.class);
+    private TrainingPlanResponse executeGeneration(String prompt, UserProfileRequest userRequest, int totalMinutos) {
+        int maxRetries = 2;
 
-            // 2. Reconstrução do Plano (Injetando links de Anatomia 3D)
-            // Usamos Streams para navegar na estrutura imutável de Records
-            List<TrainingDay> updatedPlan = response.getPlan().stream()
-                    .map(day -> {
-                        List<TrainingExercise> enrichedExercises = day.exercises().stream()
-                                .map(ex -> {
-                                    // Busca o link bonito de fibras musculares no Enum
-                                    String anatomyLink = EnumExerciseCategory.findLinkByExerciseName(ex.name());
+        for (int attempt = 0; attempt <= maxRetries; attempt++) {
+            try {
+                String textResponse = chatModel.call(prompt);
+                String cleanedJson = cleanMarkdown(textResponse);
 
-                                    // Cria uma nova instância do record com o link preenchido
-                                    return new TrainingExercise(
-                                            ex.order(),
-                                            ex.name(),
-                                            ex.muscleGroup(),
-                                            ex.equipment(),
-                                            ex.intensity(),
-                                            ex.sets(),
-                                            ex.reps(),
-                                            ex.rest(),
-                                            ex.tempo(),
-                                            ex.details(),
-                                            ex.notas(),
-                                            ex.weight(),
-                                            ex.cargaAtual(),
-                                            anatomyLink, // Link injetado aqui
-                                            ex.date()
-                                    );
-                                })
-                                .toList();
+                TrainingPlanResponse response = objectMapper.readValue(cleanedJson, TrainingPlanResponse.class);
 
-                        return new TrainingDay(day.day(), enrichedExercises);
-                    })
-                    .toList();
+                // VALIDAÇÃO DE VOLUME
+                int minExAceitavel = Math.max(5, (totalMinutos / 8));
+                boolean isVolumeValido = response.getPlan() != null && !response.getPlan().isEmpty() &&
+                        response.getPlan().stream().allMatch(d -> d.exercises() != null && d.exercises().size() >= minExAceitavel);
 
-            // 3. Retorno com todos os 5 campos exigidos pelo @AllArgsConstructor
-            return new TrainingPlanResponse(
-                    false,                        // isExistingPlan (primeiro campo da classe)
-                    response.getSummary(),        // summary
-                    updatedPlan,                  // plan (a lista que acabámos de reconstruir)
-                    response.getDietPlan(),       // dietPlan
-                    userRequest                   // userProfile (conforme solicitado)
-            );
+                if (!isVolumeValido) {
+                    throw new RuntimeException("Volume insuficiente para " + totalMinutos + " min.");
+                }
 
-        } catch (Exception e) {
-            System.err.println("Erro na geração ou no mapeamento: " + e.getMessage());
-            throw new RuntimeException("Falha ao processar plano de treino: " + e.getMessage(), e);
+                // MAPEAMENTO E ENRIQUECIMENTO DE VÍDEOS
+                List<TrainingDay> updatedPlan = response.getPlan().stream()
+                        .map(day -> {
+                            List<TrainingExercise> enrichedExercises = day.exercises().stream()
+                                    .map(ex -> {
+                                        // 1. Mapeamento do Vídeo
+                                        String anatomyLink = EnumExerciseCategory.findLinkByExerciseName(ex.name());
+                                        String finalUrl = !anatomyLink.isBlank() ? anatomyLink : "";
+
+                                        // 2. Data de hoje formatada (Ex: 2026-01-28)
+                                        String today = java.time.LocalDate.now().toString();
+
+                                        // 3. Retorna o Record com os 15 campos exatos
+                                        return new TrainingExercise(
+                                                ex.order(),
+                                                ex.name(),
+                                                ex.muscleGroup(),
+                                                ex.equipment(),
+                                                ex.intensity(),
+                                                ex.sets(),
+                                                ex.reps(),
+                                                ex.rest(),
+                                                ex.tempo(),
+                                                ex.details(),
+                                                ex.notas(),
+                                                ex.weight(),
+                                                ex.cargaAtual(),
+                                                finalUrl,
+                                                today,
+                                                ex.movementPlane()
+                                        );
+                                    }).toList();
+                            return new TrainingDay(day.day(), enrichedExercises);
+                        }).toList();
+
+                return new TrainingPlanResponse(false, response.getSummary(), updatedPlan, response.getDietPlan(), userRequest);
+
+            } catch (Exception e) {
+                if (attempt >= maxRetries) {
+                    throw new RuntimeException("Erro após " + maxRetries + " tentativas: " + e.getMessage());
+                }
+                int volumeSugestao = Math.max(6, totalMinutos / 7);
+                prompt += "\nERRO TÉCNICO: O JSON falhou ou o volume estava errado. Gera exatamente " + volumeSugestao + " exercícios com nomes universais.";
+            }
         }
+        throw new RuntimeException("Falha crítica na geração.");
     }
 
     private String cleanMarkdown(String text) {
         if (text == null || text.isBlank()) return "{}";
-
-        // Remove blocos de código
         String cleaned = text.replaceAll("(?s)```json\\s*(.*?)\\s*```", "$1").trim();
-
         int firstBrace = cleaned.indexOf("{");
         int lastBrace = cleaned.lastIndexOf("}");
-
-        if (firstBrace != -1 && lastBrace != -1) {
-            return cleaned.substring(firstBrace, lastBrace + 1);
-        }
-        return cleaned;
+        return (firstBrace != -1 && lastBrace != -1) ? cleaned.substring(firstBrace, lastBrace + 1) : cleaned;
     }
 
     private String calcularDescansoCientifico(Enum.TrainingProtocol protocol, String objective, String cargaAtual) {
-        // 1. Converter carga para número (remover 'kg' se existir)
         double peso = 0;
         try {
             peso = Double.parseDouble(cargaAtual.replaceAll("[^0-9.]", ""));
         } catch (Exception e) {
             peso = 0;
         }
+        if (objective.equalsIgnoreCase("Força")) return (peso > 80) ? "180" : "120";
+        if (objective.equalsIgnoreCase("Hipertrofia")) return (peso > 50) ? "90" : "60";
+        return "60";
+    }
 
-        // 2. Lógica FST-7 (Protocolo rígido: foco em pump)
-        if (protocol.getLabel().contains("FST-7")) {
-            // Mesmo com carga alta, o FST-7 exige descanso curto para hipóxia
-            return "30";
+    private int extrairMinutosTotais(String durationText) {
+        if (durationText == null || durationText.isBlank()) return 60;
+        try {
+            String clean = durationText.toLowerCase().trim();
+            if (clean.contains("h") || clean.contains(":")) {
+                String[] parts = clean.split("[h:]");
+                int horas = Integer.parseInt(parts[0].replaceAll("[^0-9]", ""));
+                int minutos = (parts.length > 1 && !parts[1].isEmpty())
+                        ? Integer.parseInt(parts[1].replaceAll("[^0-9]", "")) : 0;
+                return (horas * 60) + minutos;
+            }
+            return Integer.parseInt(clean.replaceAll("[^0-9]", ""));
+        } catch (Exception e) {
+            return 60;
         }
-
-        // 3. Lógica baseada em Carga vs Objetivo
-        if (objective.equalsIgnoreCase("Hipertrofia")) {
-            // Se o peso for muito elevado (ex: > 80kg num exercício composto),
-            // aumentamos o descanso para garantir qualidade na próxima série.
-            if (peso > 80) return "90";
-            if (peso > 40) return "60";
-            return "45"; // Cargas leves/isoladores
-        }
-
-        if (objective.equalsIgnoreCase("Força")) {
-            // Na força, o descanso escala drasticamente com o peso
-            if (peso > 100) return "300"; // 5 min para agachamentos/supinos pesados
-            if (peso > 50) return "180";  // 3 min
-            return "120";                // 2 min
-        }
-
-        // Fallback limpo (apenas números)
-        return protocol.getRest().replaceAll("[^0-9]", "");
     }
 }

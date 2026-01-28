@@ -16,6 +16,7 @@ public record UserProfileRequest(String bodyType,
                                  Integer frequencyPerWeek,
                                  String objective,
                                  String country,
+                                 String city,
                                  String location,
                                  String recommended,
                                  String studentName,
@@ -23,6 +24,6 @@ public record UserProfileRequest(String bodyType,
                                  String protocol,
                                  Double bodyFat,
                                  Integer mealsPerDay
-                                 ) {
+) {
 
 }

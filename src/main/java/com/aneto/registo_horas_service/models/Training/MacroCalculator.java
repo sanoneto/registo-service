@@ -118,6 +118,7 @@ public class MacroCalculator {
     }
 
     public static double calculateIMC(double weight, double heightCm) {
+        if (heightCm <= 0) return 0; // Evita divisão por zero
         double heightM = heightCm / 100;
         return weight / (heightM * heightM);
     }

@@ -128,8 +128,11 @@ public class Enum {
 
         public static TrainingProtocol fromId(String id) {
             if (id == null) return NASM_ESTABILIZACAO;
+            // Tenta encontrar pelo ID ou pelo nome do Enum
             for (TrainingProtocol protocol : values()) {
-                if (protocol.id.equalsIgnoreCase(id)) return protocol;
+                if (protocol.id.equalsIgnoreCase(id) || protocol.name().equalsIgnoreCase(id)) {
+                    return protocol;
+                }
             }
             return NASM_ESTABILIZACAO;
         }
