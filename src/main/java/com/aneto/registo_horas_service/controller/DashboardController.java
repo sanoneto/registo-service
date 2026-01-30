@@ -20,7 +20,7 @@ public class DashboardController {
 
 
     @GetMapping("/all")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('ESPECIALISTA') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('ESPECIALISTA') or (hasRole('ESTAGIARIO') or or hasRole('USER')  and #username == authentication.name)")
     public ResponseEntity<ListJogosResponse> generateJogos(
             @RequestHeader(X_USER_ID) String username) {
 

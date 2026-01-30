@@ -24,7 +24,7 @@ public class TrainingController {
 
 
     @PostMapping("/plan")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('ESPECIALISTA') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('ESPECIALISTA') or (hasRole('ESTAGIARIO') or hasRole('USER') and #username == authentication.name)")
     public ResponseEntity<TrainingPlanResponse> generatePlan(
             @RequestBody(required = false) UserProfileRequest request,
             @RequestHeader(X_USER_ID) String username,
@@ -37,7 +37,7 @@ public class TrainingController {
     }
 
     @PutMapping("/plan")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('ESPECIALISTA') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('ESPECIALISTA') or (hasRole('ESTAGIARIO') or hasRole('USER') and #username == authentication.name)")
     public ResponseEntity<?> updatePlan(
             @RequestBody TrainingPlanResponse plan,
             @RequestHeader(X_USER_ID) String username,
@@ -51,7 +51,7 @@ public class TrainingController {
     }
 
     @PostMapping("/progress")
-    @PreAuthorize("hasAnyRole('ADMIN', 'ESPECIALISTA', 'ESTAGIARIO', 'ALUNO')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ESPECIALISTA', 'ESTAGIARIO', 'USER')")
     public ResponseEntity<?> saveProgress(
             @RequestBody List<TrainingExercise> logs, // Agora o símbolo será resolvido
             @RequestHeader(X_USER_ID) String username,
@@ -62,7 +62,7 @@ public class TrainingController {
     }
 
     @GetMapping("/progress")
-    @PreAuthorize("hasAnyRole('ADMIN', 'ESPECIALISTA', 'ESTAGIARIO', 'ALUNO')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ESPECIALISTA', 'ESTAGIARIO', 'USER')")
     public ResponseEntity<List<ExerciseHistoryResponse>> getProgress(
             @RequestParam  String username,
             @RequestParam String exerciseName) {

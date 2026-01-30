@@ -138,7 +138,7 @@ public class RegistroHorasController {
 
     @Operation(summary = "Retorna o total de horas de um usuário")
     @GetMapping("/total-user-project")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('ESPECIALISTA') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('ESPECIALISTA') or (hasRole('ESTAGIARIO') or hasRole('USER') and #username == authentication.name)")
     public ResponseEntity<Double> getTotalHorasPorUser(
             @RequestParam (defaultValue = "all") String username,
             @RequestParam(defaultValue = "all") String projectName,
@@ -149,7 +149,7 @@ public class RegistroHorasController {
 
     @Operation(summary = "Retorna o total de horas de um usuário")
     @GetMapping("/monthly-summary")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('ESPECIALISTA') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('ESPECIALISTA') or (hasRole('ESTAGIARIO') or hasRole('USER') and #username == authentication.name)")
     public ResponseEntity<List<MonthlySummary>> findMonthlySummary(
             @RequestHeader(X_USER_ID) String username,
             Authentication authentication) {
@@ -159,7 +159,7 @@ public class RegistroHorasController {
 
     @Operation(summary = "Retorna o total de horas de um usuário")
     @GetMapping("/perfil")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('ESPECIALISTA') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('ESPECIALISTA') or (hasRole('ESTAGIARIO') or hasRole('USER') and #username == authentication.name)")
     public ResponseEntity<List<PerfilResponse>> getPerfil(
             @RequestHeader(X_USER_ID) String username,
             Authentication authentication) {
@@ -176,7 +176,7 @@ public class RegistroHorasController {
             @ApiResponse(responseCode = "404", description = "Nenhum registro encontrado")
     })
     @GetMapping("/Pageable/list/{name}")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('ESPECIALISTA') or (hasRole('ESTAGIARIO') and #name == authentication.name)")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('ESPECIALISTA') or (hasRole('ESTAGIARIO') or hasRole('USER') and #name == authentication.name)")
     public ResponseEntity<PageResponse<RegisterResponse>> getAllRegisterHorasUserPaginated(
             @PathVariable String name,
             @RequestParam (defaultValue = "all") String projectName,

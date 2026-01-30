@@ -27,7 +27,7 @@ public class ProfileUploadController {
     // Header injetado pelo Gateway
     private static final String X_USER_ID = "X-User-Id";
 
-    @PreAuthorize("hasRole('ADMIN') or hasRole('ESPECIALISTA') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('ESPECIALISTA') or (hasRole('ESTAGIARIO') or hasRole('USER')  and #username == authentication.name)")
     @PostMapping("/upload-profile-pic")
     public ResponseEntity<UploadResponse> uploadProfilePic(
             @RequestParam("profilePicture") MultipartFile file,

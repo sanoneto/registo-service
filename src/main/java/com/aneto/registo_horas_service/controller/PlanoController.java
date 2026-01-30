@@ -48,7 +48,7 @@ public class PlanoController {
         return ResponseEntity.noContent().build();
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN', 'ESPECIALISTA', 'ESTAGIARIO')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ESPECIALISTA', 'ESTAGIARIO','USER')")
     @GetMapping
     public ResponseEntity<Page<PlanoResponseDTO>> listarPlanos(
             @RequestParam(required = false) String nomeAluno,

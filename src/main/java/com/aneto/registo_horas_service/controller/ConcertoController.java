@@ -18,7 +18,7 @@ public class ConcertoController {
 
     private final ConcertoService concertoService;
 
-    @PreAuthorize("hasRole('ADMIN') or hasRole('ESPECIALISTA') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('ESPECIALISTA') or (hasRole('ESTAGIARIO')  or hasRole('USER') and #username == authentication.name)")
     @GetMapping("/concertos")
     public ResponseEntity<List<ConcertoDTO>> getConcertos() {
         return ResponseEntity.ok(concertoService.buscarConcertosDePortugal());
