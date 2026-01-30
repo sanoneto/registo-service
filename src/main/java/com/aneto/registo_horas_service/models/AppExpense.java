@@ -2,12 +2,12 @@ package com.aneto.registo_horas_service.models;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import org.springframework.data.annotation.CreatedDate;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "app_expenses")
+@Table(name = "app_expenses", schema = "REGISTOS")
 @Data // Se não usares Lombok, cria os Getters e Setters
 public class AppExpense {
 
@@ -19,8 +19,11 @@ public class AppExpense {
 
     private Double amount;
 
-    private LocalDateTime date;
+    @CreatedDate
+    @Column(nullable = false, updatable = false)
+    private LocalDate date;
 
-    @Column(name = "created_by")
+    private String expiryDate;
+
     private String createdBy; // Para saberes qual admin registou
 }
