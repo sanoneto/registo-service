@@ -8,7 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -31,7 +31,7 @@ public class AppExpenseController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<AppExpense> createExpense(@RequestBody AppExpense expense) {
         if (expense.getDate() == null) {
-            expense.setDate(LocalDateTime.now());
+            expense.setDate(LocalDate.now());
         }
         return ResponseEntity.ok(repository.save(expense));
     }
