@@ -56,9 +56,12 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
     @Override
     public TrainingPlanResponse getOrGeneratePlan(UserProfileRequest request, String username, String planId) {
         // 1. Determina a chave (prioriza a existente no banco, senão usa o padrão)
+        log.info(" inicio para buscarChaveDoPlano ");
         String key = buscarChaveDoPlano(planId, username, request);
+        log.info("A chave: {}", key);
 
         if (isRequestEmpty(request)) {
+            log.info("A isRequestEmpty(request) : {}", isRequestEmpty(request));
             Optional<TrainingPlanResponse> existingPlan = loadFromS3(key);
 
             if (existingPlan.isEmpty()) {
@@ -67,8 +70,9 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
             }
             return existingPlan.get();
         }
-
+        log.info("Não existe plano vamos criar : {}", key);
         TrainingPlanResponse newPlan = training.generateTrainingPlan(request);
+        log.info("marca como ja existe o plano : {}", key);
         configurarNovoPlano(newPlan, request);
         // 4. Persistência (Banco e S3)
         salvarDadosDoPlano(username, request, key, newPlan, planId, false);
@@ -140,6 +144,7 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
     // --- Métodos Auxiliares para Limpar o Fluxo Principal ---
     private String buscarChaveDoPlano(String planId, String username, UserProfileRequest request) {
         // 1. Tentativa prioritária: Pelo UUID do plano (planId)
+        log.info("dentro de buscarChaveDoPlano");
         if (planId != null && !planId.isBlank()) {
             try {
                 PlanoResponseDTO plano = planoService.getByPlanoById(UUID.fromString(planId));
@@ -174,11 +179,14 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
 
     // Criado um método auxiliar para evitar repetição de código
     private String gerarCaminhoPadrao(String username) {
+
+        log.info("dentro de gerarCaminhoPadrao");
         // Define o formato: AnoMesDia_HoraMinutoSegundo
         String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
 
-        // O caminho incluirá o username e o momento da criação
-        return String.format("%s%s/plan/%s_%s.json", S3FOLDER, username, username, timestamp);
+        String key = String.format("%s%s/plan/%s_%s.json", S3FOLDER, username, username, timestamp);
+        log.info("A key na função gerarCaminhoPadrao {}", key);
+        return key;
     }
 
     private boolean isRequestEmpty(UserProfileRequest request) {

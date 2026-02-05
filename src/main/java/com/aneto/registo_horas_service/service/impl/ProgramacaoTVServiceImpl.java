@@ -46,40 +46,52 @@ public class ProgramacaoTVServiceImpl implements ProgramacaoTVService {
     @Override
     public List<JogoTV> extrairJogos() {
         List<JogoTV> listaJogos = new ArrayList<>();
-        // URL específica de TV
-        String url = "https://www.zerozero.pt/tv.php";
+        // Alternativa: Verifique se /agenda.php ou /zapping.php funciona melhor no momento
+        String url = "https://www.zerozero.pt/zapping.php";
 
         try {
             Document doc = Jsoup.connect(url)
-                    .userAgent(getRandomUserAgent()) // Disfarce variável
-                    .header("Accept-Language", "pt-PT,pt;q=0.9")
-                    .timeout(20000) // Mais tempo para responder
+                    .userAgent(getRandomUserAgent())
+                    .header("Accept-Language", "pt-PT,pt;q=0.9,en;q=0.8")
+                    .header("Referer", "https://www.google.com/") // Ajuda a evitar o 404/403
+                    .timeout(30000)
                     .get();
 
-            // O seletor para a página /tv.php costuma ser as linhas da tabela de jogos
-            Elements linhas = doc.select(".box.agenda-tv table tr");
+            // O seletor do zerozero para jogos na TV geralmente usa a classe .zz-agenda-jogo ou tabelas dentro de .box
+            // É importante inspecionar o HTML atual, pois eles mudam as classes frequentemente.
+            Elements linhas = doc.select("table tr");
 
             for (Element linha : linhas) {
-                String canal = linha.select(".canal img").attr("title").toUpperCase();
+                // Tenta obter o título do canal da imagem ou do texto
+                String canal = linha.select("td.canal img").attr("alt").toUpperCase();
+                if (canal.isEmpty()) {
+                    canal = linha.select("td.canal").text().toUpperCase();
+                }
 
-                // Filtro direto para o que pediste
-                if (canal.contains("SPORT TV") || canal.contains("BENFICA TV") || canal.contains("DAZN")) {
-                    String equipas = linha.select(".home, .away").text(); // Captura as duas equipas
-                    String hora = linha.select(".hora").text();
+                if (isCanalDesejado(canal)) {
+                    String equipas = linha.select("td.jogo").text();
+                    String hora = linha.select("td.hora").text();
 
                     if (!equipas.isEmpty()) {
                         JogoTV jogo = new JogoTV();
-                        jogo.setEquipas(equipas.replace(" ", " vs "));
+                        jogo.setEquipas(equipas.trim());
                         jogo.setCanal(canal);
                         jogo.setHora(hora);
                         listaJogos.add(jogo);
                     }
                 }
             }
+        } catch (IOException e) {
+            log.error("Erro de conexão (Página não encontrada ou bloqueada): {}", e.getMessage());
         } catch (Exception e) {
-            log.error("Erro crítico no scraping: {}", e.getMessage());
+            log.error("Erro inesperado no scraping: {}", e.getMessage());
         }
         return listaJogos;
+    }
+
+    // Limpa o código principal
+    private boolean isCanalDesejado(String canal) {
+        return canal.contains("SPORT TV") || canal.contains("BENFICA TV") || canal.contains("DAZN") || canal.contains("ELEVEN");
     }
 
     private String getRandomUserAgent() {
