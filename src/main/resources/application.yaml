@@ -31,21 +31,21 @@ spring:
     username:  ${SPRING_RABBITMQ_USERNAME}   # Usuário padrão
     password: ${SPRING_RABBITMQ_PASSWORD}   # Password padrão
 
-  cloud:
-    vault:
-      host: localhost
-      port: 8200
-      scheme: http
-      enabled: false
-    aws:
-      credentials:
-        accessKey: ${AWS_ACCESS_KEY}
-        secretKey: ${AWS_SECRET_KEY}
-      region:
-        static: ${AWS_REGION}
-      s3:
-        bucket-name: ${AWS_S3_BUCKET_NAME}
-        folder-name: ${AWS_S3_FOLDER_NAME} # usava quando a ler gemini pa os jogos
+cloud:
+  vault:
+    host: localhost
+    port: 8200
+    scheme: http
+    enabled: false
+  aws:
+    credentials:
+      accessKey: ${AWS_ACCESS_KEY}
+      secretKey: ${AWS_SECRET_KEY}
+    region:
+      static: ${AWS_REGION}
+    s3:
+      bucket-name: ${AWS_S3_BUCKET_NAME}
+      folder-name: ${AWS_S3_FOLDER_NAME} # usava quando a ler gemini pa os jogos
 
   ai:
     openai:
