@@ -4,28 +4,34 @@ import com.aneto.registo_horas_service.dto.request.UserProfileRequest;
 import com.aneto.registo_horas_service.dto.response.*;
 import com.aneto.registo_horas_service.models.Enum;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
 @Component
+@Slf4j
 public record Training(ChatModel chatModel, ObjectMapper objectMapper) {
 
     public TrainingPlanResponse generateTrainingPlan(UserProfileRequest userRequest) {
+
+        log.info(" entri no generateTrainingPlan: ");
 
         // 1. Sanitização de entradas
         String exerciseHistoryText = defaultIfEmpty(userRequest.exerciseHistory(), "Não informado");
         String objectiveText = defaultIfEmpty(userRequest.objective(), "Manutenção de saúde e bem-estar");
         String locationText = defaultIfEmpty(userRequest.location(), "Não especificada");
         String countryText = defaultIfEmpty(userRequest.country(), "Não especificado");
-        String bodyTypeText = defaultIfEmpty(userRequest.bodyType(), "Ectomorfo");
-        String genderText = defaultIfEmpty(userRequest.gender(), "Não especificado");
+        String bodyTypeText = (userRequest.bodyType() != null) ? userRequest.bodyType().name() : "ECTOMORPH";
+        String genderText = (userRequest.gender() != null) ? userRequest.gender().name() : "MALE";
         String weightKg = defaultIfEmpty(String.valueOf(userRequest.weightKg()), "70");
 
-        String durationText = (userRequest.duration() != null && !userRequest.duration().isBlank())
-                ? userRequest.duration() : "60 minutos";
+        String durationText = (userRequest.durationPerSession() != null && !userRequest.durationPerSession().isBlank())
+                ? userRequest.durationPerSession() : "60 minutos";
 
         String protocolId = (userRequest.protocol() == null) ? "nasm_estabilizacao" : userRequest.protocol();
         Enum.TrainingProtocol protocol = Enum.TrainingProtocol.fromId(protocolId);
@@ -35,13 +41,18 @@ public record Training(ChatModel chatModel, ObjectMapper objectMapper) {
         String pathologyText = (userRequest.pathology() == null || userRequest.pathology().isBlank()) ? "Nenhuma limitação relatada" : userRequest.pathology();
 
         // 2. Cálculos Nutricionais Protocolo e Macros
+        log.info(" Cálculos Nutricionais Protocolo e Macros");
         Macros macros = MacroCalculator.calculate(
-                userRequest.weightKg(), userRequest.heightCm(), userRequest.age(),
-                userRequest.gender(), userRequest.bodyType(),
+                userRequest.weightKg(),
+                userRequest.heightCm(),
+                userRequest.age(),
+                (userRequest.gender() != null ? userRequest.gender().name() : "MALE"), // .name() em vez de .toString()
+                (userRequest.bodyType() != null ? userRequest.bodyType().name() : "MESOMORPH"),
                 userRequest.bodyFat() != null ? userRequest.bodyFat() : 15.0,
                 userRequest.mealsPerDay() != null ? userRequest.mealsPerDay() : 6
         );
         // --- SEPARAÇÃO DAS REGRAS (DIRETRIZES) ---
+        log.info("SEPARAÇÃO DAS REGRAS (DIRETRIZES");
         String descansoCientifico = calcularDescansoCientifico(protocol, objectiveText, weightKg);
 
 
@@ -382,6 +393,7 @@ public record Training(ChatModel chatModel, ObjectMapper objectMapper) {
     }
 
     private TrainingPlanResponse executeGeneration(String prompt, UserProfileRequest userRequest, int totalMinutos) {
+        log.info(" entrei no executeGeneration :{}", LocalDateTime.now(ZoneId.of("UTC")).toString());
         int maxRetries = 2;
 
         for (int attempt = 0; attempt <= maxRetries; attempt++) {
@@ -449,6 +461,7 @@ public record Training(ChatModel chatModel, ObjectMapper objectMapper) {
     }
 
     private String cleanMarkdown(String text) {
+        log.info(" entrei no calcularDescansoCientifico :{}", LocalDateTime.now(ZoneId.of("UTC")).toString());
         if (text == null || text.isBlank()) return "{}";
         String cleaned = text.replaceAll("(?s)```json\\s*(.*?)\\s*```", "$1").trim();
         int firstBrace = cleaned.indexOf("{");
@@ -457,6 +470,7 @@ public record Training(ChatModel chatModel, ObjectMapper objectMapper) {
     }
 
     private String calcularDescansoCientifico(Enum.TrainingProtocol protocol, String objective, String cargaAtual) {
+        log.info(" entrei no calcularDescansoCientifico");
         double peso = 0;
         try {
             peso = Double.parseDouble(cargaAtual.replaceAll("[^0-9.]", ""));
@@ -469,6 +483,7 @@ public record Training(ChatModel chatModel, ObjectMapper objectMapper) {
     }
 
     private int extrairMinutosTotais(String durationText) {
+        log.info(" entrei no extrairMinutosTotais");
         if (durationText == null || durationText.isBlank()) return 60;
         try {
             String clean = durationText.toLowerCase().trim();
