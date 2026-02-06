@@ -47,10 +47,10 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
     private final Training training;
     private final S3Client s3Client;
 
-    @Value("${aws.s3.bucket-name}")
+    @Value("${cloud.aws.s3.bucket-name}")
     private String bucketName;
 
-    @Value("${aws.s3.folder-name}")
+    @Value("${cloud.aws.s3.folder-name}")
     private String S3FOLDER;
 
     @Override

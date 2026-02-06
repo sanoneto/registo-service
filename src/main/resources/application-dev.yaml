@@ -58,7 +58,9 @@ spring:
   flyway:
     enabled: false
     locations: classpath:db/migration
-    baseline-on-migrate: true
+    baseline-on-migrate: false # Resolve o erro "Found non-empty schema"
+    baseline-version: 0
+
 logging:
   level:
     org.hibernate.orm.jdbc.bind: TRACE # Mostra o valor de :username no log

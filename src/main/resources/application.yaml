@@ -1,41 +1,50 @@
 spring:
   application:
     name: registo-horas-service
-  # Certifique-se de que a execução do script está habilitada
   servlet:
     multipart:
       max-file-size: 10MB
       max-request-size: 10MB
   jackson:
     deserialization:
-      fail-on-unknown-properties: false #"Se receberes um campo que não conheces, apenas ignora-o e continua
+      fail-on-unknown-properties: false
+
+  # 1. DESATIVA o SQL init para não conflitar
   sql:
     init:
-      schema-locations: classpath:schema.sql
-      mode: always
+      mode: never
+
   datasource:
     url: ${SPRING_DATASOURCE_URL}
     username: ${SPRING_DATASOURCE_USERNAME}
     password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: ${SPRING_DATASOURCE_DRIVER:org.postgresql.Driver}
+
   jpa:
     hibernate:
+      # Muda para 'none' ou 'validate' se já tiveres as tabelas criadas
       ddl-auto: update
     show-sql: true
     open-in-view: true
     database-platform: org.hibernate.dialect.PostgreSQLDialect
 
-  rabbitmq:
-    host:  ${SPRING_RABBITMQ_HOST}   # Se estiver a correr o RabbitMQ localmente
-    port: ${SPRING_RABBITMQ_PORT}           # Porta padrão do RabbitMQ
-    username:  ${SPRING_RABBITMQ_USERNAME}   # Usuário padrão
-    password: ${SPRING_RABBITMQ_PASSWORD}   # Password padrão
+  # 2. CORREÇÃO CRÍTICA DO FLYWAY
+  # Mesmo que não o uses ativamente, se a dependência existir, ele valida o esquema.
+  flyway:
+    enabled: true
+    baseline-on-migrate: true  # OBRIGATÓRIO: Resolve o erro do log
+    locations: classpath:db/migration
+    fail-on-missing-locations: false
 
+  rabbitmq:
+    host: ${SPRING_RABBITMQ_HOST}
+    port: ${SPRING_RABBITMQ_PORT}
+    username: ${SPRING_RABBITMQ_USERNAME}
+    password: ${SPRING_RABBITMQ_PASSWORD}
+
+# Secção Cloud (Nível superior)
 cloud:
   vault:
-    host: localhost
-    port: 8200
-    scheme: http
     enabled: false
   aws:
     credentials:
@@ -45,40 +54,21 @@ cloud:
       static: ${AWS_REGION}
     s3:
       bucket-name: ${AWS_S3_BUCKET_NAME}
-      folder-name: ${AWS_S3_FOLDER_NAME} # usava quando a ler gemini pa os jogos
-
+      folder-name: ${AWS_S3_FOLDER_NAME}
   ai:
     openai:
-      api-key: ${OPENAI_API_KEY} # Defina esta variável no seu ambiente
+      api-key: ${OPENAI_API_KEY}
       chat:
         options:
-          model: gpt-4o-mini # O mais rápido e barato
+          model: gpt-4o-mini
           temperature: 0.7
 
-  flyway:
-    enabled: false
-    locations: classpath:db/migration
-    baseline-on-migrate: true
 logging:
   level:
-    # Mostra o corpo da requisição e resposta da OpenAI
-    org.springframework.ai.chat.client.ChatClient: DEBUG
-    # Mostra detalhes da comunicação HTTP (opcional, mas muito detalhado)
-    org.springframework.web.client.RestTemplate: DEBUG
-    org.hibernate.orm.jdbc.bind: TRACE # Mostra o valor de :username no log
+    org.hibernate.orm.jdbc.bind: TRACE
     org.hibernate.SQL: DEBUG
-    org:
-      springframework:
-              security:
-                web:
-                  ObservationFilterChainDecorator: ERROR
-                  FilterChainProxy: ERROR
-    com:
-      aneto:
-              registo_horas_service:
-                security:
-                  GatewayAuthFilter: ERROR
     org.flywaydb: INFO
+    org.springframework.security: ERROR
   file:
     name: logs/app.log
 
@@ -90,9 +80,6 @@ management:
   endpoint:
     health:
       show-details: always
-  health:
-    mail:
-      enabled: false
 
 server:
   port: ${PORT:8083}
@@ -107,12 +94,6 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
     enabled: true
-    operations-sorter: method
-    tags-sorter: alpha
-    try-it-out-enabled: true
-    filter: true
-    display-request-duration: true
-
 
 gcp:
   project:
@@ -131,7 +112,7 @@ vapid:
     key: ${VAPID_PUBLIC_KEY}
   private:
     key: ${VAPID_PRIVATE_KEY}
-  subject:  ${VAPID_SUBJECT}
+  subject: ${VAPID_SUBJECT}
 
 telegram:
   bot:
@@ -140,36 +121,5 @@ telegram:
 
 app:
   queries:
-    monthly-summary: "SELECT 
-    TO_CHAR(data_registo, 'YYYY-MM') AS mes_e_ano, 
-    SUM(horas_trabalhadas) AS total_horas_trabalhadas 
-    FROM 
-    registos.registos_horas rh 
-    WHERE 
-    :username IS NULL OR :username = 'all' OR rh.username = :username 
-    GROUP BY 
-    mes_e_ano 
-    ORDER BY 
-    mes_e_ano DESC"
-
-    # 4. Query findTotalHoursAndRequiredHoursByUserName (A mais longa)
-    user-required-vs-total-hours: "SELECT 
-        u.username, 
-        COALESCE(tp.project_name, 'Sem Projeto') as project_name, 
-        u.email, 
-        COALESCE(tp.required_hours, 0) as required_hours, 
-        COALESCE(ROUND(CAST(SUM(r.horas_trabalhadas) AS NUMERIC), 1), 0) AS Total_horas_trabalhadas, 
-        u.profile_picture_url,
-        u.public_id,
-        u.telegram_chat_id,
-        u.mfa_enabled
-    FROM 
-        auth.tb_users u 
-    LEFT JOIN 
-        registos.registos_horas r ON u.username = r.username 
-    LEFT JOIN 
-        auth.tb_projetos tp ON u.username = tp.username 
-    WHERE 
-        u.username = :username 
-    GROUP BY 
-        u.username, u.email, tp.required_hours, tp.project_name, u.profile_picture_url, u.public_id, u.telegram_chat_id,u.mfa_enabled"
+    monthly-summary: "SELECT TO_CHAR(data_registo, 'YYYY-MM') AS mes_e_ano, SUM(horas_trabalhadas) AS total_horas_trabalhadas FROM registos.registos_horas rh WHERE :username IS NULL OR :username = 'all' OR rh.username = :username GROUP BY mes_e_ano ORDER BY mes_e_ano DESC"
+    user-required-vs-total-hours: "SELECT u.username, COALESCE(tp.project_name, 'Sem Projeto') as project_name, u.email, COALESCE(tp.required_hours, 0) as required_hours, COALESCE(ROUND(CAST(SUM(r.horas_trabalhadas) AS NUMERIC), 1), 0) AS Total_horas_trabalhadas, u.profile_picture_url, u.public_id, u.telegram_chat_id, u.mfa_enabled FROM auth.tb_users u LEFT JOIN registos.registos_horas r ON u.username = r.username LEFT JOIN auth.tb_projetos tp ON u.username = tp.username WHERE u.username = :username GROUP BY u.username, u.email, tp.required_hours, tp.project_name, u.profile_picture_url, u.public_id, u.telegram_chat_id, u.mfa_enabled"
