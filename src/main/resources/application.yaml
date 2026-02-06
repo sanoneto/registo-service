@@ -43,18 +43,18 @@ spring:
     password: ${SPRING_RABBITMQ_PASSWORD}
 
 # Secção Cloud (Nível superior)
-cloud:
-  vault:
-    enabled: false
-  aws:
-    credentials:
-      accessKey: ${AWS_ACCESS_KEY}
-      secretKey: ${AWS_SECRET_KEY}
-    region:
-      static: ${AWS_REGION}
-    s3:
-      bucket-name: ${AWS_S3_BUCKET_NAME}
-      folder-name: ${AWS_S3_FOLDER_NAME}
+  cloud:
+    vault:
+      enabled: false
+    aws:
+      credentials:
+        accessKey: ${AWS_ACCESS_KEY}
+        secretKey: ${AWS_SECRET_KEY}
+      region:
+        static: ${AWS_REGION}
+      s3:
+        bucket-name: ${AWS_S3_BUCKET_NAME}
+        folder-name: ${AWS_S3_FOLDER_NAME}
   ai:
     openai:
       api-key: ${OPENAI_API_KEY}
