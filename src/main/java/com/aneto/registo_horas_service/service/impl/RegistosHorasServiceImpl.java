@@ -177,7 +177,8 @@ public class RegistosHorasServiceImpl implements RegistosHorasService {
                             totalHorasDouble,        // Total_horas_trabalhadas
                             (String) row[5],         // profile_picture_url
                             publicId,                 // public_id (Agora convertido corretamente)
-                            (String) row[7]
+                            (String) row[7],
+                            (boolean) row[8]
                     );
                 })
                 .collect(Collectors.toList());

@@ -161,7 +161,8 @@ app:
         COALESCE(ROUND(CAST(SUM(r.horas_trabalhadas) AS NUMERIC), 1), 0) AS Total_horas_trabalhadas, 
         u.profile_picture_url,
         u.public_id,
-        u.telegram_chat_id
+        u.telegram_chat_id,
+        u.mfa_enabled
     FROM 
         auth.tb_users u 
     LEFT JOIN 
@@ -171,4 +172,4 @@ app:
     WHERE 
         u.username = :username 
     GROUP BY 
-        u.username, u.email, tp.required_hours, tp.project_name, u.profile_picture_url, u.public_id, u.telegram_chat_id"
+        u.username, u.email, tp.required_hours, tp.project_name, u.profile_picture_url, u.public_id, u.telegram_chat_id,u.mfa_enabled"
