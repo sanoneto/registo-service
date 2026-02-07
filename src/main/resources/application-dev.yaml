@@ -1,23 +1,41 @@
 spring:
   application:
     name: registo-horas-service
-  # Certifique-se de que a execução do script está habilitada
+
   servlet:
     multipart:
       max-file-size: 10MB
       max-request-size: 10MB
+
+  # Configuração de Cache corrigida para Redis
+  cache:
+    type: redis
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_HOST:6379}
+      password: ${SPRING_DATA_REDIS_PASSWORD:}
+      repositories:
+        enabled: false
+      # Configuração de TTL (24 horas)
+  redis:
+    time-to-live: 86400000
+
   jackson:
     deserialization:
-      fail-on-unknown-properties: false #"Se receberes um campo que não conheces, apenas ignora-o e continua
+      fail-on-unknown-properties: false
+
   sql:
     init:
       schema-locations: classpath:schema.sql
       mode: always
+
   datasource:
     url: ${SPRING_DATASOURCE_URL}
     username: ${SPRING_DATASOURCE_USERNAME}
     password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: ${SPRING_DATASOURCE_DRIVER:org.postgresql.Driver}
+
   jpa:
     hibernate:
       ddl-auto: update
@@ -26,14 +44,14 @@ spring:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
 
   rabbitmq:
-    host:  ${SPRING_RABBITMQ_HOST}   # Se estiver a correr o RabbitMQ localmente
-    port: ${SPRING_RABBITMQ_PORT}           # Porta padrão do RabbitMQ
-    username:  ${SPRING_RABBITMQ_USERNAME}   # Usuário padrão
-    password: ${SPRING_RABBITMQ_PASSWORD}   # Password padrão
+    host: ${SPRING_RABBITMQ_HOST:localhost}
+    port: ${SPRING_RABBITMQ_PORT:5672}
+    username: ${SPRING_RABBITMQ_USERNAME:rabbituser}
+    password: ${SPRING_RABBITMQ_PASSWORD:rabbitpass}
 
   cloud:
     vault:
-      host: localhost
+      host: ${VAULT_HOST:localhost}
       port: 8200
       scheme: http
       enabled: false
@@ -45,37 +63,29 @@ spring:
         static: ${AWS_REGION}
       s3:
         bucket-name: ${AWS_S3_BUCKET_NAME}
-        folder-name: ${AWS_S3_FOLDER_NAME} # usava quando a ler gemini pa os jogos
+        folder-name: ${AWS_S3_FOLDER_NAME}
 
   ai:
     openai:
-      api-key: ${OPENAI_API_KEY} # Defina esta variável no seu ambiente
+      api-key: ${OPENAI_API_KEY}
       chat:
         options:
-          model: gpt-4o-mini # O mais rápido e barato
+          model: gpt-4o-mini
           temperature: 0.7
 
   flyway:
     enabled: false
     locations: classpath:db/migration
-    baseline-on-migrate: false # Resolve o erro "Found non-empty schema"
+    baseline-on-migrate: false
     baseline-version: 0
 
 logging:
   level:
-    org.hibernate.orm.jdbc.bind: TRACE # Mostra o valor de :username no log
+    org.hibernate.orm.jdbc.bind: TRACE
     org.hibernate.SQL: DEBUG
-    org:
-      springframework:
-        security:
-          web:
-            ObservationFilterChainDecorator: ERROR
-            FilterChainProxy: ERROR
-    com:
-      aneto:
-        registo_horas_service:
-          security:
-            GatewayAuthFilter: ERROR
+    org.springframework.security.web.ObservationFilterChainDecorator: ERROR
+    org.springframework.security.web.FilterChainProxy: ERROR
+    com.aneto.registo_horas_service.security.GatewayAuthFilter: ERROR
     org.flywaydb: INFO
   file:
     name: logs/app.log
@@ -111,7 +121,6 @@ springdoc:
     filter: true
     display-request-duration: true
 
-
 gcp:
   project:
     id: ${GCP_PROJECT_ID}
@@ -129,7 +138,7 @@ vapid:
     key: ${VAPID_PUBLIC_KEY}
   private:
     key: ${VAPID_PRIVATE_KEY}
-  subject:  ${VAPID_SUBJECT}
+  subject: ${VAPID_SUBJECT}
 
 telegram:
   bot:
@@ -138,36 +147,15 @@ telegram:
 
 app:
   queries:
-    monthly-summary: "SELECT 
-    TO_CHAR(data_registo, 'YYYY-MM') AS mes_e_ano, 
-    SUM(horas_trabalhadas) AS total_horas_trabalhadas 
-    FROM 
-    registos.registos_horas rh 
-    WHERE 
-    :username IS NULL OR :username = 'all' OR rh.username = :username 
-    GROUP BY 
-    mes_e_ano 
-    ORDER BY 
-    mes_e_ano DESC"
+    monthly-summary: "SELECT TO_CHAR(data_registo, 'YYYY-MM') AS mes_e_ano, SUM(horas_trabalhadas) AS total_horas_trabalhadas 
+    FROM registos.registos_horas rh
+    WHERE :username IS NULL OR :username = 'all' OR rh.username = :username 
+    GROUP BY mes_e_ano ORDER BY mes_e_ano DESC"
 
-    # 4. Query findTotalHoursAndRequiredHoursByUserName (A mais longa)
-    user-required-vs-total-hours: "SELECT 
-        u.username, 
-        COALESCE(tp.project_name, 'Sem Projeto') as project_name, 
-        u.email, 
-        COALESCE(tp.required_hours, 0) as required_hours, 
-        COALESCE(ROUND(CAST(SUM(r.horas_trabalhadas) AS NUMERIC), 1), 0) AS Total_horas_trabalhadas, 
-        u.profile_picture_url,
-        u.public_id,
-        u.telegram_chat_id,
-        u.mfa_enabled
-    FROM 
-        auth.tb_users u 
-    LEFT JOIN 
-        registos.registos_horas r ON u.username = r.username 
-    LEFT JOIN 
-        auth.tb_projetos tp ON u.username = tp.username 
-    WHERE 
-        u.username = :username 
-    GROUP BY 
-        u.username, u.email, tp.required_hours, tp.project_name, u.profile_picture_url, u.public_id, u.telegram_chat_id,u.mfa_enabled"
+    user-required-vs-total-hours: "SELECT u.username, COALESCE(tp.project_name, 'Sem Projeto') as project_name,
+     u.email, COALESCE(tp.required_hours, 0) as required_hours, COALESCE(ROUND(CAST(SUM(r.horas_trabalhadas) AS NUMERIC), 1), 0) AS Total_horas_trabalhadas,
+      u.profile_picture_url, u.public_id, u.telegram_chat_id, u.mfa_enabled 
+      FROM auth.tb_users u LEFT JOIN registos.registos_horas r ON u.username = r.username 
+      LEFT JOIN auth.tb_projetos tp ON u.username = tp.username WHERE u.username = :username 
+      GROUP BY u.username, u.email, tp.required_hours, tp.project_name,
+        u.profile_picture_url, u.public_id, u.telegram_chat_id, u.mfa_enabled"

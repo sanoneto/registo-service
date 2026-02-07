@@ -1,4 +1,3 @@
-
 package com.aneto.registo_horas_service.security;
 
 import jakarta.servlet.FilterChain;
@@ -25,6 +24,16 @@ public class GatewayAuthFilter extends OncePerRequestFilter {
     private static final String USER_ID_HEADER = "X-User-Id";
     private static final String USER_ROLES_HEADER = "X-User-Roles";
 
+    /**
+     * 1. SOLUÇÃO PARA OS LOGS: Ignora rotas do Actuator.
+     * O Spring Security não executará o doFilterInternal para estas rotas.
+     */
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getServletPath();
+        return path.startsWith("/actuator");
+    }
+
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
@@ -33,7 +42,6 @@ public class GatewayAuthFilter extends OncePerRequestFilter {
         String userId = request.getHeader(USER_ID_HEADER);
         String rolesString = request.getHeader(USER_ROLES_HEADER);
 
-        log.debug("Headers recebidos - User-Id: {}, Roles: {}", userId, rolesString);
         try {
             if (userId != null && !userId.isBlank() && rolesString != null && !rolesString.isBlank()) {
 
@@ -41,7 +49,8 @@ public class GatewayAuthFilter extends OncePerRequestFilter {
                         .map(String::trim)
                         .filter(role -> !role.isEmpty())
                         .map(role -> {
-                            String trimmedRole = role.trim().toUpperCase();
+                            String trimmedRole = role.toUpperCase();
+                            // Garante o prefixo ROLE_ para compatibilidade com @PreAuthorize("hasRole('...')")
                             String normalizedRole = trimmedRole.startsWith("ROLE_")
                                     ? trimmedRole
                                     : "ROLE_" + trimmedRole;
@@ -56,20 +65,18 @@ public class GatewayAuthFilter extends OncePerRequestFilter {
                 );
 
                 SecurityContextHolder.getContext().setAuthentication(authentication);
-                log.info("Autenticação configurada para o user: {}", userId);
+                log.debug("Autenticação configurada para o user: {}", userId);
             } else {
-                // Se for uma rota que exige autenticação, isso vai causar erro no FilterChain seguinte
-                log.warn("Request sem headers de autenticação para: {}", request.getRequestURI());
+                // Agora este log só aparecerá para rotas reais de negócio que falharam
+                log.warn("Tentativa de acesso sem headers em rota protegida: {}", request.getRequestURI());
             }
 
-            // Continua a execução para o próximo filtro
             filterChain.doFilter(request, response);
 
         } catch (Exception e) {
             log.error("Erro crítico no GatewayAuthFilter: {}", e.getMessage());
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.getWriter().write("Erro na autenticação interna.");
-            // IMPORTANTE: Não chama o filterChain.doFilter(request, response) se deu erro aqui
         }
     }
 }

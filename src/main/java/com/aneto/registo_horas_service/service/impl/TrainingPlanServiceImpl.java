@@ -55,26 +55,40 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
 
     @Override
     public TrainingPlanResponse getOrGeneratePlan(UserProfileRequest request, String username, String planId) {
-        // 1. Determina a chave (prioriza a existente no banco, senão usa o padrão)
-        log.info(" inicio para buscarChaveDoPlano ");
+        // 1. Determina a chave onde o plano está (ou estará) guardado
         String key = buscarChaveDoPlano(planId, username, request);
-        log.info("A chave: {}", key);
+        log.info("Chave determinada: {}", key);
 
+        // 2. CASO A: Pedido de LEITURA (Request vazio)
+        // Se o request for vazio, apenas tentamos carregar o que já existe.
         if (isRequestEmpty(request)) {
-            log.info("A isRequestEmpty(request) : {}", isRequestEmpty(request));
-            Optional<TrainingPlanResponse> existingPlan = loadFromS3(key);
-
-            if (existingPlan.isEmpty()) {
-                log.warn("Dados insuficientes para gerar novo plano e nenhum histórico encontrado no S3 para a chave: {}", key);
-                return null; // Ou return new TrainingPlanResponse(); dependendo da sua necessidade
-            }
-            return existingPlan.get();
+            log.info("Request vazio. A carregar plano existente do S3...");
+            return loadFromS3(key).orElse(null);
         }
-        log.info("Não existe plano vamos criar : {}", key);
-        TrainingPlanResponse newPlan = training.generateTrainingPlan(request);
-        log.info("marca como ja existe o plano : {}", key);
+
+        // 3. CASO B: Pedido de GERAÇÃO (Request com dados)
+        log.info("Novo pedido de geração detetado. A verificar histórico para evitar repetição...");
+
+        // 3.1. Buscar exercícios do plano anterior para a "Lista Negra"
+        List<String> exerciciosParaEvitar = new java.util.ArrayList<>();
+        planoService.findAtivoAndConcluidoByUsername(username).ifPresent(plano -> {
+            loadFromS3(plano.link()).ifPresent(oldPlan -> {
+                if (oldPlan.getPlan() != null) {
+                    List<String> names = oldPlan.getPlan().stream()
+                            .flatMap(day -> day.exercises().stream())
+                            .map(TrainingExercise::name)
+                            .distinct()
+                            .collect(Collectors.toList());
+                    exerciciosParaEvitar.addAll(names);
+                }
+            });
+        });
+
+        // 3.2. Chamar a IA com o histórico extraído
+        TrainingPlanResponse newPlan = training.generateTrainingPlan(request, exerciciosParaEvitar);
+
+        // 4. Configurar e Persistir
         configurarNovoPlano(newPlan, request);
-        // 4. Persistência (Banco e S3)
         salvarDadosDoPlano(username, request, key, newPlan, planId, false);
 
         return newPlan;
@@ -190,7 +204,11 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
     }
 
     private boolean isRequestEmpty(UserProfileRequest request) {
-        return request == null || (request.bodyType() == null && request.objective() == null);
+        return request == null ||
+                (request.objective() == null || request.objective().isBlank()) ||
+                request.weightKg() == null ||
+                request.heightCm() == null ||
+                request.age() == null;
     }
 
     private void configurarNovoPlano(TrainingPlanResponse plan, UserProfileRequest request) {
