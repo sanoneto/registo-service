@@ -2,6 +2,7 @@ package com.aneto.registo_horas_service.models.Training;
 
 import com.aneto.registo_horas_service.dto.request.UserProfileRequest;
 import com.aneto.registo_horas_service.dto.response.*;
+import com.aneto.registo_horas_service.mapper.ExerciseVideoMapper;
 import com.aneto.registo_horas_service.models.Enum;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -56,19 +57,51 @@ public record Training(ChatModel chatModel, ObjectMapper objectMapper) {
         String descansoCientifico = calcularDescansoCientifico(protocol, objectiveText, weightKg);
 
 
+        // 1. Identificar se é um aluno "Risco Zero"
+        boolean isSedentary = "sedentary".equalsIgnoreCase(userRequest.exerciseHistory());
+
+        // 2. Ajustar o protocolo se for sedentário (Prevenção de mal-estar)
+        String protocoloEfetivo = isSedentary ? "Adaptação Anatómica (Baixa Intensidade)" : protocol.getLabel();
+        String repsEfetivas = isSedentary ? "12 a 15 (longe da falha)" : protocol.getReps();
+        String setsEfetivas = isSedentary ? "2" : protocol.getSets();
+
+        // Forçar descanso maior para iniciantes para evitar náuseas (resíntese de ATP e estabilização de pressão)
+        String descansoEfetivo = isSedentary ? "120" : calcularDescansoCientifico(protocol, objectiveText, weightKg);
+
+
+        // 3. Nova Diretriz de Segurança (ADICIONAR AO PROMPT)
+        String diretrizSegurancaIniciante = isSedentary ? """
+                [ALERTA DE SEGURANÇA: ALUNO SEDENTÁRIO]
+                - O aluno nunca treinou. É TERMINANTEMENTE PROIBIDO levar à falha concêntrica.
+                - Prioridade: Estabilidade hemodinâmica.
+                - Não usar superséries.
+                - Evitar exercícios com a cabeça abaixo do nível do coração.
+                - Foco em máquinas (maior estabilidade).
+                """ : "";
+
 
         String detalhesEquipamento = locationText.equalsIgnoreCase("Casa") ?
                 "UTILIZA APENAS: 'Peso Corporal', 'Halteres' ou 'Bandas Elásticas'. PROIBIDO o uso de máquinas de ginásio." :
                 "UTILIZA: 'Máquinas', 'Barras', 'Polias' ou 'Halteres'.";
 
+        String filtroEquipamento = isSedentary ?
+                "PREFERÊNCIA OBRIGATÓRIA: Máquinas guiadas para maior controlo motor e segurança." :
+                detalhesEquipamento;
 
         String diretrizProtocolo = """
-                DIRETRIZES TÉCNICAS E FISIOLÓGICAS (%s):
-                - Séries: %s | Repetições: %s
-                - DESCANSO CIENTÍFICO: %s segundos fixos.
-                - RITMO (Tempo): %s
-                - JUSTIFICATIVA FISIOLÓGICA: O descanso de %s é calculado para garantir a resíntese de Fosfocreatina.
-                """.formatted(protocol.getLabel(), protocol.getSets(), protocol.getReps(), descansoCientifico, protocol.getTempo(), descansoCientifico);
+        DIRETRIZES TÉCNICAS E FISIOLÓGICAS (%s):
+        - Séries: %s | Repetições: %s
+        - DESCANSO CIENTÍFICO: %s segundos fixos.
+        - RITMO (Tempo): %s
+        - JUSTIFICATIVA FISIOLÓGICA: O descanso de %s é calculado para garantir a resíntese de Fosfocreatina e estabilidade hemodinâmica.
+        """.formatted(
+                protocoloEfetivo, // %s - Nome do protocolo adaptado
+                setsEfetivas,     // %s - Sérias adaptadas
+                repsEfetivas,     // %s - Repetições adaptadas
+                descansoEfetivo,  // %s - Descanso adaptado
+                protocol.getTempo(),
+                descansoEfetivo   // %s - Justificativa com o descanso correto
+        );
 
         String diretrizBiomecanica = """
                 DIRETRIZES DE SELEÇÃO BIOMECÂNICA ESTREITAS:
@@ -95,12 +128,12 @@ public record Training(ChatModel chatModel, ObjectMapper objectMapper) {
                 """.formatted(protocol.getLabel(), objectiveText, userRequest.frequencyPerWeek());
 
         String diretrizEquipamento = """
-                LOGÍSTICA E EQUIPAMENTO:
-                - Localização atual: %s.
-                - REGRA ABSOLUTA: O campo 'equipment' no JSON deve indicar claramente o material necessário.
-                - %s
-                - VÍDEOS: Usa obrigatoriamente nomes do DICIONÁRIO para garantir o mapeamento.
-                """.formatted(locationText, detalhesEquipamento);
+        LOGÍSTICA E EQUIPAMENTO:
+        - Localização atual: %s.
+        - REGRA ABSOLUTA: O campo 'equipment' no JSON deve indicar claramente o material necessário.
+        - %s
+        - VÍDEOS: Usa obrigatoriamente nomes do DICIONÁRIO para garantir o mapeamento.
+        """.formatted(locationText, filtroEquipamento);
 
         String diretrizArrefecimento = """
                 REGRA DE ARREFECIMENTO:
@@ -128,16 +161,22 @@ public record Training(ChatModel chatModel, ObjectMapper objectMapper) {
                 getString(pathologyText) + "\n- REGRA: Proibido repetir o mesmo exercício de reabilitação em dias consecutivos.";
 
         String regrasFinais = """
-                REGRAS CRÍTICAS DE FECHAMENTO:
-                1. DURAÇÃO E VOLUME: O treino deve durar %d minutos. Para isso, gera EXATAMENTE %d exercícios por dia.
-                2. RITMO E DESCANSO: Usa obrigatoriamente Ritmo %s e Descanso %s segundos.
-                3. FORMATO: Responde APENAS o JSON puro. Proibido usar hífens em números.
-                4. FREQUÊNCIA: O JSON deve conter exatamente %d dias no array "plan".
-                5. TOTAIS DIETA: %d kcal, %dg Prot, %dg Carbs, %dg Fats.
-                """.formatted(
-                totalMinutos, volumeIdeal, protocol.getTempo(), descansoCientifico, // <--- totalMinutos e volumeIdeal
+        REGRAS CRÍTICAS DE FECHAMENTO:
+        1. DURAÇÃO E VOLUME: O treino deve durar %d minutos. Para isso, gera EXATAMENTE %d exercícios por dia.
+        2. RITMO E DESCANSO: Usa obrigatoriamente Ritmo %s e Descanso %s segundos.
+        3. FORMATO: Responde APENAS o JSON puro. Proibido usar hífens em números.
+        4. FREQUÊNCIA: O JSON deve conter exatamente %d dias no array "plan".
+        5. TOTAIS DIETA: %d kcal, %dg Prot, %dg Carbs, %dg Fats.
+        """.formatted(
+                totalMinutos,
+                volumeIdeal,
+                protocol.getTempo(),
+                descansoEfetivo, // <--- Agora usa o descanso adaptado (120 se sedentário)
                 userRequest.frequencyPerWeek(),
-                macros.dailyCalories(), macros.protein(), macros.carbs(), macros.fats()
+                macros.dailyCalories(),
+                macros.protein(),
+                macros.carbs(),
+                macros.fats()
         );
         String diretrizDicionario = """
                 DICIONÁRIO DE NOMES OBRIGATÓRIOS (Usa APENAS estes nomes exatos para garantir o vídeo):
@@ -174,7 +213,7 @@ public record Training(ChatModel chatModel, ObjectMapper objectMapper) {
                 - Proteína: Reparação das fibras dos motores primários (agonistas).
                 - Carbohidratos: Reposição de glicogénio para o próximo treino.
                 - Gorduras: Suporte hormonal para a síntese proteica.
-                """.formatted( macros.dailyCalories());
+                """.formatted(macros.dailyCalories());
 
         String diretrizInstrucoesDetalhadas = """
                 REGRAS DE FEEDBACK TÉCNICO:
@@ -189,7 +228,7 @@ public record Training(ChatModel chatModel, ObjectMapper objectMapper) {
                 SISTEMA DINÂMICO DE CARGAS (RPE):
                 - Analisa o histórico do aluno: "%s".
                 - REGRA DE OURO: O campo 'cargaAtual' NÃO pode ser estático.
-                - Se o nível for 'sedentary' ou 'return_long': Sugere RPE 5-6 (Foco em técnica).
+                - Se o nível for 'sedentary' ou 'return_long':RPE 4-5 (Esforço muito leve, foco total na respiração e técnica).
                 - Se o nível for 'beginner': Sugere RPE 6-7 (Moderado).
                 - Se o nível for 'intermediate': Sugere RPE 7-8 (Intenso).
                 - Se o nível for 'advanced', 'elite' ou 'athlete': Sugere RPE 9 (Alta intensidade).
@@ -203,6 +242,7 @@ public record Training(ChatModel chatModel, ObjectMapper objectMapper) {
                 - Localização do Aluno: %s
                 
                 [REABILITAÇÃO E FISIOLOGIA]
+                %s
                 %s
                 %s
                 %s
@@ -233,7 +273,7 @@ public record Training(ChatModel chatModel, ObjectMapper objectMapper) {
                 %s
                 """.formatted(
                 // 1 & 2: Perfil
-                exerciseHistoryText, countryText,
+                exerciseHistoryText, diretrizSegurancaIniciante,countryText,
                 // 3, 4 & 5: Fisiologia
                 diretrizProtocolo, diretrizReabilitacao, diretrizAquecimento,
                 // 6, 7, 8 & 9: Biomecânica (Adicionei o placeholder que faltava para a diretrizInstrucoesDetalhadas)
@@ -248,7 +288,7 @@ public record Training(ChatModel chatModel, ObjectMapper objectMapper) {
                 diretrizAlimentar, diretrizAlimentarDetalhada
         );
         String userPrompt = """
-                ATUAÇÃO: Personal Trainer e Nutricionista Senior (Portugal).
+                ATUAÇÃO: Personal Trainer e Nutricionista Profissional (Portugal).
                 FOCO: Reabilitação e Performance Fisiológica.
                 
                 PERFIL DO ALUNO:
@@ -412,19 +452,19 @@ public record Training(ChatModel chatModel, ObjectMapper objectMapper) {
                     throw new RuntimeException("Volume insuficiente para " + totalMinutos + " min.");
                 }
 
-                // MAPEAMENTO E ENRIQUECIMENTO DE VÍDEOS
+                // MAPEAMENTO E ENRIQUECIMENTO DE VÍDEOS E DADOS
                 List<TrainingDay> updatedPlan = response.getPlan().stream()
                         .map(day -> {
                             List<TrainingExercise> enrichedExercises = day.exercises().stream()
                                     .map(ex -> {
-                                        // 1. Mapeamento do Vídeo
-                                        String anatomyLink = EnumExerciseCategory.findLinkByExerciseName(ex.name());
-                                        String finalUrl = !anatomyLink.isBlank() ? anatomyLink : "";
+                                        // 1. Mapeamento do Vídeo utilizando o Mapper que criámos
+                                        // Se o EnumExerciseCategory for a classe onde colocaste o Map:
+                                        String finalUrl = ExerciseVideoMapper.getVideoUrl(ex.name());
 
-                                        // 2. Data de hoje formatada (Ex: 2026-01-28)
+                                        // 2. Data de hoje formatada
                                         String today = java.time.LocalDate.now().toString();
 
-                                        // 3. Retorna o Record com os 15 campos exatos
+                                        // 3. Retorna o Record TrainingExercise com os campos alinhados ao TypeScript
                                         return new TrainingExercise(
                                                 ex.order(),
                                                 ex.name(),
@@ -437,24 +477,28 @@ public record Training(ChatModel chatModel, ObjectMapper objectMapper) {
                                                 ex.tempo(),
                                                 ex.details(),
                                                 ex.notas(),
-                                                ex.weight(),
-                                                ex.cargaAtual(),
-                                                finalUrl,
-                                                today,
+                                                ex.weight(),      // Carga sugerida (weight)
+                                                ex.cargaAtual(),  // Orientação RPE
+                                                finalUrl,         // URL mapeada automaticamente
+                                                today,            // Data da geração
                                                 ex.movementPlane()
                                         );
                                     }).toList();
                             return new TrainingDay(day.day(), enrichedExercises);
                         }).toList();
 
+                // Retorno final com o perfil do utilizador para manter o estado no Frontend
                 return new TrainingPlanResponse(false, response.getSummary(), updatedPlan, response.getDietPlan(), userRequest);
 
             } catch (Exception e) {
+                log.error("Erro na tentativa {}: {}", attempt, e.getMessage());
                 if (attempt >= maxRetries) {
-                    throw new RuntimeException("Erro após " + maxRetries + " tentativas: " + e.getMessage());
+                    throw new RuntimeException("Erro após " + (maxRetries + 1) + " tentativas: " + e.getMessage());
                 }
+                // Reforço do prompt para a próxima tentativa
                 int volumeSugestao = Math.max(6, totalMinutos / 7);
-                prompt += "\nERRO TÉCNICO: O JSON falhou ou o volume estava errado. Gera exatamente " + volumeSugestao + " exercícios com nomes universais.";
+                prompt += "\nERRO TÉCNICO: O JSON falhou. Garante que geras exatamente " + volumeSugestao +
+                        " exercícios e usa apenas nomes do dicionário: Supino Plano, Leg Press 45, etc.";
             }
         }
         throw new RuntimeException("Falha crítica na geração.");
