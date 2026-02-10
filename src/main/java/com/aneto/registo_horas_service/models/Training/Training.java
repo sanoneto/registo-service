@@ -11,7 +11,9 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.stereotype.Component;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 @Component
 @Slf4j
@@ -389,19 +391,49 @@ public class Training {
         return "REABILITAÇÃO ANATÓMICA:\n" + correcao;
     }
 
+    private static final Map<String, String> EXERCISE_MAP;
+
+    static {
+        Map<String, String> map = new java.util.HashMap<>();
+
+        // Mapeamento de Sinónimos (Chave minúscula -> Nome oficial no Inventário)
+        map.put("agachamento cálice", "Agachamento Goblet");
+        map.put("agachamento goblet", "Agachamento Goblet");
+        map.put("puxada corda", "Pulldown Corda");
+        map.put("pulldown corda", "Pulldown Corda");
+        map.put("ywt", "Y-W-T");
+        map.put("y-w-t", "Y-W-T");
+        map.put("mobilidade tornozelo", "Mobilidade Tornozelo");
+        map.put("equilíbrio unipodal", "Equilíbrio Unipodal");
+        map.put("prancha", "Prancha Abdominal");
+        map.put("prancha abdominal", "Prancha Abdominal");
+        map.put("cat cow", "Cat Cow");
+        map.put("cat-cow", "Cat Cow");
+        map.put("bird dog", "Bird Dog");
+        map.put("bird-dog", "Bird Dog");
+        map.put("dead bug", "Dead Bug");
+        map.put("deadbug", "Dead Bug");
+
+        EXERCISE_MAP = Collections.unmodifiableMap(map);
+    }
+
     private String normalizeExerciseName(String aiSuggestion) {
         if (aiSuggestion == null || aiSuggestion.isBlank()) return aiSuggestion;
 
-        String normalized = aiSuggestion.trim();
-        String lower = normalized.toLowerCase();
+        // Limpeza: remove espaços extras e pontuação final comum (.,!)
+        String cleanSuggestion = aiSuggestion.trim().replaceAll("[.,!?]$", "");
+        String lowerSuggestion = cleanSuggestion.toLowerCase();
 
-        // Mapeamentos comuns baseados nos teus logs de erro
-        if (lower.equals("prancha")) return "Prancha Abdominal";
-        if (lower.contains("alongamento")) return "Y-W-T"; // Ou o exercício de mobilidade que preferires
-        if (lower.contains("cat-cow")) return "Cat Cow";
-        if (lower.contains("bird-dog")) return "Bird Dog";
-        if (lower.contains("puxada") && lower.contains("frente")) return "Puxada à Frente";
+        // Tenta encontrar no mapa de sinónimos
+        if (EXERCISE_MAP.containsKey(lowerSuggestion)) {
+            return EXERCISE_MAP.get(lowerSuggestion);
+        }
 
-        return normalized;
+        // Lógica de fallback para casos dinâmicos (ex: nomes que contêm palavras-chave)
+        if (lowerSuggestion.contains("puxada") && lowerSuggestion.contains("frente")) {
+            return "Puxada à Frente";
+        }
+
+        return cleanSuggestion;
     }
 }
