@@ -1,9 +1,13 @@
 package com.aneto.registo_horas_service.controller;
 
 import com.aneto.registo_horas_service.models.Training.RegistoTreino;
-import com.aneto.registo_horas_service.repository.RegistroTreinoRepository;
+import com.aneto.registo_horas_service.service.RegistroTreinoService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -14,17 +18,50 @@ import java.util.List;
 public class RegistroTreinoController {
 
     @Autowired
-    private RegistroTreinoRepository repository;
+    private RegistroTreinoService service;
 
+    /**
+     * Salva uma lista de registros e retorna a página correspondente.
+     */
     @PostMapping("/salvar-lista")
-    public ResponseEntity<String> salvarLista(@RequestBody List<RegistoTreino> registros) {
-        repository.saveAll(registros);
-        return ResponseEntity.ok("Registros salvos com sucesso!");
+    public ResponseEntity<Page<RegistoTreino>> salvarLista(
+            @RequestBody List<RegistoTreino> registros,
+            @PageableDefault(sort = "id", direction = Sort.Direction.ASC, size = 10) Pageable paginacao) {
+
+        // 1. Salva os registros e recebe a lista de volta
+        List<RegistoTreino> salvos = service.salvarLista(registros);
+
+        // 2. Converte a lista salva em um objeto Page
+        int start = (int) paginacao.getOffset();
+        int end = Math.min((start + paginacao.getPageSize()), salvos.size());
+
+        // Validação de segurança para garantir que o start não exceda o tamanho da lista
+        if (start > salvos.size()) {
+            return ResponseEntity.ok(new PageImpl<>(List.of(), paginacao, salvos.size()));
+        }
+
+        Page<RegistoTreino> pagina = new PageImpl<>(
+                salvos.subList(start, end),
+                paginacao,
+                salvos.size()
+        );
+
+        return ResponseEntity.ok(pagina);
     }
-    // Endpoint que o React está a chamar e a dar erro:
+
     @GetMapping("/todos")
-    public List<RegistoTreino> listarTodos() {
-        // Retorna todos os registos ordenados pela data mais recente
-        return repository.findAll(Sort.by(Sort.Direction.DESC, "data"));
+    public Page<RegistoTreino> listarTodos(
+            @RequestParam(required = false, defaultValue = "") String termo,
+            @PageableDefault(sort = "data", direction = Sort.Direction.DESC, size = 10) Pageable paginacao) {
+
+        return service.listarTodosPaginado(termo, paginacao);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> eliminarRegisto(@PathVariable Long id) {
+        if (service.eliminarRegisto(id)) {
+            return ResponseEntity.noContent().build();
+        }
+        return ResponseEntity.notFound().build();
     }
 }
