@@ -25,13 +25,14 @@ public class GatewayAuthFilter extends OncePerRequestFilter {
     private static final String USER_ROLES_HEADER = "X-User-Roles";
 
     /**
-     * 1. SOLUÇÃO PARA OS LOGS: Ignora rotas do Actuator.
-     * O Spring Security não executará o doFilterInternal para estas rotas.
+     * Ignora rotas do Actuator e Documentação para não barrar o Health Check do Coolify.
      */
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getServletPath();
-        return path.startsWith("/actuator");
+        return path.startsWith("/actuator") ||
+                path.startsWith("/swagger-ui") ||
+                path.startsWith("/v3/api-docs");
     }
 
     @Override
@@ -50,11 +51,9 @@ public class GatewayAuthFilter extends OncePerRequestFilter {
                         .filter(role -> !role.isEmpty())
                         .map(role -> {
                             String trimmedRole = role.toUpperCase();
-                            // Garante o prefixo ROLE_ para compatibilidade com @PreAuthorize("hasRole('...')")
-                            String normalizedRole = trimmedRole.startsWith("ROLE_")
-                                    ? trimmedRole
-                                    : "ROLE_" + trimmedRole;
-                            return new SimpleGrantedAuthority(normalizedRole);
+                            return trimmedRole.startsWith("ROLE_")
+                                    ? new SimpleGrantedAuthority(trimmedRole)
+                                    : new SimpleGrantedAuthority("ROLE_" + trimmedRole);
                         })
                         .collect(Collectors.toList());
 
@@ -67,14 +66,14 @@ public class GatewayAuthFilter extends OncePerRequestFilter {
                 SecurityContextHolder.getContext().setAuthentication(authentication);
                 log.debug("Autenticação configurada para o user: {}", userId);
             } else {
-                // Agora este log só aparecerá para rotas reais de negócio que falharam
-                log.warn("Tentativa de acesso sem headers em rota protegida: {}", request.getRequestURI());
+                // Log apenas para rotas que deveriam ter autenticação via Gateway
+                log.warn("Acesso sem headers de Gateway em rota protegida: {}", request.getRequestURI());
             }
 
             filterChain.doFilter(request, response);
 
         } catch (Exception e) {
-            log.error("Erro crítico no GatewayAuthFilter: {}", e.getMessage());
+            log.error("Erro crítico no GatewayAuthFilter para URI {}: {}", request.getRequestURI(), e.getMessage());
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.getWriter().write("Erro na autenticação interna.");
         }
