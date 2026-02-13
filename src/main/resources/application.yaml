@@ -12,8 +12,8 @@ spring:
     type: redis
   data:
     redis:
-      host: ${SPRING_DATA_REDIS_HOST:localhost}
-      port: ${SPRING_DATA_REDIS_HOST:6379}
+      host: ${SPRING_RABBITMQ_HOST:localhost}
+      port: ${SPRING_RABBITMQ_PORT:5672}
       password: ${SPRING_DATA_REDIS_PASSWORD:}
       repositories:
         enabled: false
@@ -101,6 +101,10 @@ management:
   health:
     mail:
       enabled: false
+    redis:
+      enabled: false  # Isso impede que o erro do Redis derrube o Health Check
+    db:
+      enabled: true
 
 server:
   port: ${PORT:8083}
