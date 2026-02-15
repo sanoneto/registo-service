@@ -3,7 +3,6 @@ package com.aneto.registo_horas_service.controller;
 import com.aneto.registo_horas_service.dto.request.EventRequest;
 import com.aneto.registo_horas_service.dto.response.EventsResponse;
 import com.aneto.registo_horas_service.service.EventsService;
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -11,14 +10,20 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Controller responsável pela gestão de eventos e integração com Google Calendar.
+ */
 @RestController
 @RequestMapping("/api/v1")
 @RequiredArgsConstructor
 @Slf4j
 public class EventoController {
+
     private final EventsService eventsService;
 
     @PostMapping("/eventos")
@@ -27,19 +32,20 @@ public class EventoController {
             @RequestHeader(value = "Authorization", required = false) String authAppToken,
             @RequestHeader(value = "X-Google-Token", required = false) String googleToken
     ) {
-        log.info("X-Google-Token: {}",googleToken);
+        log.info("Recebido pedido para criar evento. X-Google-Token presente: {}", googleToken != null);
+
         if (authAppToken == null) {
-            // Isto ajudará a depurar: se cair aqui, a Gateway está a "comer" o seu token
-            log.info("ALERTA: Header Authorization chegou nulo ao microserviço!");
+            log.warn("ALERTA: Header Authorization ausente. Verifique a Gateway ou o Interceptor do Frontend.");
         }
-        return ResponseEntity.ok(eventsService.create(eventRequest, googleToken));
+
+        EventsResponse response = eventsService.create(eventRequest, googleToken);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @GetMapping("/eventos")
-    public List<EventsResponse> listarTodos() {
-        return eventsService.listAll();
+    public ResponseEntity<List<EventsResponse>> listarTodos() {
+        return ResponseEntity.ok(eventsService.listAll());
     }
-
 
     @GetMapping("/eventos/{id}/confirmar-alerta")
     public ResponseEntity<Void> confirmarAlerta(@PathVariable UUID id) {
@@ -47,10 +53,10 @@ public class EventoController {
 
         String nomeEvento = eventsService.confirmarAlerta(id);
 
-        // Encode para evitar que espaços no nome do evento quebrem a URL
-        String nomeEncoded = java.net.URLEncoder.encode(nomeEvento, java.nio.charset.StandardCharsets.UTF_8);
+        // Encode para evitar que caracteres especiais ou espaços quebrem a URL de redirecionamento
+        String nomeEncoded = URLEncoder.encode(nomeEvento, StandardCharsets.UTF_8);
 
-        // Redireciona para o caminho público do React
+        // Redireciona o utilizador para a landing page do React
         return ResponseEntity.status(HttpStatus.FOUND)
                 .location(URI.create("https://www.sanoneto.com/alerta-confirmado?evento=" + nomeEncoded))
                 .build();
@@ -62,9 +68,8 @@ public class EventoController {
             @RequestHeader(value = "Authorization", required = false) String systemToken,
             @RequestHeader(value = "X-Google-Token", required = false) String googleToken
     ) {
-        // Log para debugar se os tokens estão a chegar
-        log.info(">>> System Token presente: {}", systemToken != null);
-        log.info(">>> Google Token presente: {}", googleToken != null);
+        log.info("Eliminando evento ID: {}. System Token: {}, Google Token: {}",
+                id, systemToken != null, googleToken != null);
 
         eventsService.deleteById(id, googleToken);
         return ResponseEntity.noContent().build();
@@ -87,7 +92,7 @@ public class EventoController {
             @RequestHeader("X-Google-Token") String googleToken,
             @RequestHeader(value = "X-User-Id", required = false) String userId) {
 
-        // Se o userId for null, pode usar o "username" do contexto de segurança do Spring se preferir
+        log.info("Iniciando sincronização Google para usuário: {}", userId);
         List<EventsResponse> novosEventos = eventsService.syncFromGoogle(googleToken, userId);
         return ResponseEntity.ok(novosEventos);
     }

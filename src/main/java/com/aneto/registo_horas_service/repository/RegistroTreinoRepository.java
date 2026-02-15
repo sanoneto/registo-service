@@ -22,7 +22,7 @@ public interface RegistroTreinoRepository extends JpaRepository<RegistoTreino, L
             String nomeSocio,
             Pageable pageable
     );
-
+    long countByPlanoPagamentoId(Long planoId);
     // Para o histórico cronológico
     List<RegistoTreino> findByNoSocioOrderByDataDesc(String noSocio);
 }

@@ -1,15 +1,11 @@
 package com.aneto.registo_horas_service.dto.response;
 
-import com.aneto.registo_horas_service.models.Training.PlanoPagamento;
-import com.aneto.registo_horas_service.models.Training.RegistoTreino;
-import lombok.Getter;
-import lombok.Setter;
-
+import lombok.Data;
 import java.util.List;
-@Getter
-@Setter
+
+@Data
 public class ComplexTrainingSaveDTO {
-    private List<PlanoPagamento> payments;
-    private List<RegistoTreino> trainings;
-    // Getters e Setters
+    // Aqui DEVEM ser DTOs, pois vêm do JSON do Front-end
+    private List<PlanoPagamentoDTO> payments;
+    private List<RegistoTreinoDTO> trainings;
 }

@@ -22,7 +22,7 @@ public class PlanoPagamento {
     private LocalDate dataPack;
     private int aulasPack;
     private double valor;
-
+    private String tipoPack;
     @Column(columnDefinition = "TEXT")
     private String assinatura;
 

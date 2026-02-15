@@ -1,5 +1,7 @@
 package com.aneto.registo_horas_service.service;
 
+import com.aneto.registo_horas_service.dto.response.PlanoPagamentoDTO;
+import com.aneto.registo_horas_service.mapper.PlanoPagamentoMapper;
 import com.aneto.registo_horas_service.models.Training.PlanoPagamento;
 import com.aneto.registo_horas_service.repository.PlanoPagamentoRepository;
 import lombok.RequiredArgsConstructor;
@@ -11,12 +13,12 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class PlanoPagamentoService {
 
-
     private final PlanoPagamentoRepository repository;
 
-    public Optional<PlanoPagamento> buscarPlanoAtivo(String noSocio) {
-        // Lógica: Retorna o último plano registado para este sócio
-        // Se usares saldo, podes filtrar por planos onde aulasPack > 0
-        return repository.findFirstByNoSocioOrderByIdDesc(noSocio);
+    private final PlanoPagamentoMapper mapper; // Injeta o mapper
+
+    public Optional<PlanoPagamentoDTO> buscarPlanoAtivo(String noSocio) {
+        return repository.findFirstByNoSocioOrderByIdDesc(noSocio)
+                .map(mapper::toPlanoPagamentoDTO); // Usa o mapper
     }
 }

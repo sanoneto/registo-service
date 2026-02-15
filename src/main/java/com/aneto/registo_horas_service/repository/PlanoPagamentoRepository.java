@@ -1,5 +1,6 @@
 package com.aneto.registo_horas_service.repository;
 
+import com.aneto.registo_horas_service.dto.response.PlanoPagamentoDTO;
 import com.aneto.registo_horas_service.models.Training.PlanoPagamento;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
