@@ -66,9 +66,10 @@ public class Training {
 
         String diretrizVariedade = """
                 [SISTEMA DE VARIAÇÃO ANTI-PLATÔ]
-                - EXERCÍCIOS JÁ REALIZADOS (NÃO REPETIR): %s.
-                - TEMA DESTE NOVO PLANO: Focar em variações biomecânicas (ex: se usou barra, use halteres; se foi estável, use unipodal).
-                - OBRIGATÓRIO: O campo 'tempo' no JSON deve ser rigorosamente '%s' para respeitar a fisiologia da fase.
+                - EXERCÍCIOS JÁ REALIZADOS (PROIBIDO REPETIR): %s.
+                - REGRA DE OURO: É estritamente proibido repetir o mesmo exercício em dias diferentes deste plano.
+                - TEMA: Focar em variações biomecânicas.
+                - RITMO OBRIGATÓRIO: O campo 'tempo' no JSON deve ser rigorosamente '%s'.
                 """.formatted(listaParaEvitar, tempoNASM);
 
         // 4. Adaptação para Sedentários (Prevenção de mal-estar)
@@ -114,9 +115,10 @@ public class Training {
                 """.formatted(protocol.getSuggestedExercises(), protocol.getForbiddenExercises(), pathologyText);
 
         String diretrizAquecimento = """
-                REGRA OBRIGATÓRIA DE AQUECIMENTO:
-                - Se houver Reabilitação, "order": 2. Caso contrário, "order": 1.
-                - Foco específico na região: %s.
+                [REGRA OBRIGATÓRIA DE AQUECIMENTO E MOBILIDADE]
+                - Se houver patologia ("%s"), o exercício de "order": 1 DEVE ser de Reabilitação/Mobilidade focado nessa área.
+                - Se não houver patologia, o "order": 1 deve ser Mobilidade Geral (ex: Cat Cow ou Y-W-T).
+                - O aquecimento prepara a articulação para o esforço subsequente.
                 """.formatted(pathologyText);
 
         String diretrizTreino = getString(userRequest, pathologyText, protocol, durationText, descansoEfetivo, volumeIdeal);
@@ -197,7 +199,7 @@ public class Training {
 
         // --- CONSTRUÇÃO DO PROMPT FINAL ---
         String blocoDiretrizesCompletas = String.join("\n",
-                diretrizVariedade, diretrizSegurancaIniciante, diretrizProtocolo, diretrizReabilitacao,
+                diretrizVariedade,diretrizAquecimento, diretrizSegurancaIniciante, diretrizProtocolo, diretrizReabilitacao,
                 diretrizBiomecanica, diretrizAnatomiaDetalhada, diretrizCargasDinamicas,
                 diretrizEquipamento, diretrizTreino, diretrizRepertorio, diretrizArrefecimento,
                 diretrizNomenclaturaDias, diretrizDicionario, diretrizAlimentar
