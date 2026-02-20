@@ -64,6 +64,15 @@ public class Training {
                 ? "Nenhum (Primeiro plano do aluno)"
                 : String.join(", ", exerciciosDoS3);
 
+        // --- NOVIDADE: DETEÇÃO DE FOCO ESPECÍFICO (EX: GLÚTEO) ---
+        boolean isGluteFocus = objectiveText.toLowerCase().contains("glúteo") || objectiveText.toLowerCase().contains("gluteo");
+        String diretrizFocoEspecial = isGluteFocus ? """
+                [FOCO PRIORITÁRIO: GLÚTEOS]
+                - O aluno deseja foco total em Glúteos.
+                - 70% dos exercícios de membros inferiores devem ser específicos para Glúteos (Grande, Médio e Mínimo).
+                - Incluir obrigatoriamente variações de Elevação Pélvica, Agachamento Búlgaro e Abduções.
+                """ : "";
+
         String diretrizVariedade = """
                 [SISTEMA DE VARIAÇÃO ANTI-PLATÔ]
                 - EXERCÍCIOS JÁ REALIZADOS (PROIBIDO REPETIR): %s.
@@ -144,13 +153,17 @@ public class Training {
                 - No campo "reps", especifica o tempo (ex: "30-60 seg").
                 """.formatted(pathologyText);
 
+        String nomenclaturaBase = isGluteFocus ? "Foco Glúteos/Inferiores" : "PUSH/PULL/LEGS (Foco Hipertrofia)";
+
         String diretrizNomenclaturaDias = """
-                REGRAS ESTRITAS DE DIVISÃO (FREQUÊNCIA %d):
-                1. NOMENCLATURA: "Dia 1 - PUSH: Peito/Ombros/Tríceps", "Dia 2 - PULL: Costas/Bíceps", "Dia 3 - LEGS: Pernas e Core".
-                2. REABILITAÇÃO DIÁRIA: Todos os dias DEVEM começar (Order 1) com um exercício para %s.
-                3. VARIABILIDADE: Cada bloco de treino deve ter exercícios 100%% únicos.
-                4. QUANTIDADE: Gera exatamente %d blocos no array "plan".
-                """.formatted(userRequest.frequencyPerWeek(), pathologyText, userRequest.frequencyPerWeek());
+        REGRAS ESTRITAS DE DIVISÃO (FREQUÊNCIA %d DIAS):
+        1. NOMENCLATURA: O campo "name" de cada bloco deve seguir o padrão: "Dia X - [FOCO]: [GRUPOS MUSCULARES]". 
+           - Use a base: %s.
+        2. REABILITAÇÃO DIÁRIA (OBRIGATÓRIO): O primeiro exercício (Order 1) de TODOS os dias deve ser obrigatoriamente para %s.
+        3. VARIABILIDADE: Proibido repetir exercícios entre os dias. Cada bloco deve ter 100%% de exercícios únicos.
+        4. ESTRUTURA: Gere exatamente %d blocos dentro do array "plan".
+        """.formatted(userRequest.frequencyPerWeek(), nomenclaturaBase, pathologyText, userRequest.frequencyPerWeek()
+        );
 
         String diretrizReabilitacao = pathologyText.contains("Nenhuma") ?
                 "Foca o primeiro exercício em mobilidade geral ou ativação dinâmica." :
@@ -198,7 +211,7 @@ public class Training {
                 """.formatted(totalMinutos, volumeIdeal, protocol.getTempo(), descansoEfetivo, macros.dailyCalories(), macros.protein(), macros.carbs(), macros.fats());
 
         // --- CONSTRUÇÃO DO PROMPT FINAL ---
-        String blocoDiretrizesCompletas = String.join("\n",
+        String blocoDiretrizesCompletas = String.join("\n", diretrizFocoEspecial,
                 diretrizVariedade,diretrizAquecimento, diretrizSegurancaIniciante, diretrizProtocolo, diretrizReabilitacao,
                 diretrizBiomecanica, diretrizAnatomiaDetalhada, diretrizCargasDinamicas,
                 diretrizEquipamento, diretrizTreino, diretrizRepertorio, diretrizArrefecimento,
