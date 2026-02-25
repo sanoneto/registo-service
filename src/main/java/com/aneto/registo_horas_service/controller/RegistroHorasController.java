@@ -38,7 +38,7 @@ public class RegistroHorasController {
             @ApiResponse(responseCode = "201", description = "Registro criado com sucesso"),
             @ApiResponse(responseCode = "401", description = "Não autorizado")
     })
-    @PreAuthorize("hasAnyRole('ADMIN', 'ESPECIALISTA') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ESPECIALISTA','USER') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
     @PostMapping
     public ResponseEntity<RegisterResponse> submeterHoras(
             @Valid @RequestBody RegisterRequest request,
@@ -49,7 +49,7 @@ public class RegistroHorasController {
     }
 
     @Operation(summary = "Busca registros de horas do usuário autenticado")
-    @PreAuthorize("hasAnyRole('ADMIN', 'ESPECIALISTA', 'ESTAGIARIO')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ESPECIALISTA', 'ESTAGIARIO','USER')")
     @GetMapping
     public ResponseEntity<List<RegisterResponse>> buscarMeusRegistros(
             @RequestHeader(X_USER_ID) String username) {
@@ -59,7 +59,7 @@ public class RegistroHorasController {
 
     @Operation(summary = "Busca um registro específico por UUID")
     @GetMapping("/{uuid}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'ESPECIALISTA') or (hasRole('ESTAGIARIO'))")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ESPECIALISTA','USER') or (hasRole('ESTAGIARIO'))")
     public ResponseEntity<RegisterResponse> getRegisterById(@PathVariable UUID uuid) {
         return registroHorasService.findAllRegisteredHours().stream()
                 .filter(r -> r.publicId().equals(uuid))
@@ -85,7 +85,7 @@ public class RegistroHorasController {
     }
 
     @Operation(summary = "Atualiza um registro existente")
-    @PreAuthorize("hasAnyRole('ADMIN', 'ESPECIALISTA') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ESPECIALISTA','USER') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
     @PutMapping("/{publicId}")
     public ResponseEntity<RegisterResponse> updateRegister(
             @PathVariable UUID publicId,
