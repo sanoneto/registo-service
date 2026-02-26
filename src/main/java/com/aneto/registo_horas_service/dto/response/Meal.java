@@ -1,17 +1,25 @@
 package com.aneto.registo_horas_service.dto.response;
 
-import com.fasterxml.jackson.annotation.JsonAlias;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import java.util.ArrayList;
 import java.util.List;
 
-@JsonIgnoreProperties(ignoreUnknown = true)
-public record Meal(
-        @JsonAlias({"time", "hour"}) String time,
-        @JsonAlias({"description", "mealName"}) String description,
-        List<String> ingredients,
-        Integer calories,
-        Integer protein,
-        Integer carbs,
-        Integer fats
-) {}
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class Meal {
+    private String time;
+    private String description;
+
+    @Builder.Default
+    private List<String> ingredients = new ArrayList<>();
+
+    private Integer calories;
+    private Integer protein;
+    private Integer carbs;
+    private Integer fats;
+}

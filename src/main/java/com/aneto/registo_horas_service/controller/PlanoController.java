@@ -1,5 +1,6 @@
 package com.aneto.registo_horas_service.controller;
 
+
 import com.aneto.registo_horas_service.dto.request.PlanoRequestDTO;
 import com.aneto.registo_horas_service.dto.response.PlanoResponseDTO;
 import com.aneto.registo_horas_service.service.PlanoService;
@@ -15,9 +16,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/planos")
@@ -26,15 +26,21 @@ public class PlanoController {
 
     private final PlanoService planoService;
 
-    @PreAuthorize("hasRole('ADMIN') or hasRole('ESPECIALISTA') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('ESPECIALISTA') or hasRole('USER') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
     @PostMapping
-    public ResponseEntity<PlanoResponseDTO> create(@RequestBody @Valid PlanoRequestDTO request) {
-        // Garantir que o Service tenha o método createPlano
-        PlanoResponseDTO response = planoService.createPlano(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    public ResponseEntity<?> create(@RequestBody @Valid PlanoRequestDTO request) {
+        planoService.createPlano(request);
+
+        // Teste: Retornar um mapa de Strings simples
+        // Se o erro continuar aqui, o problema está no seu Spring Security/Filter
+        Map<String, String> ok = new HashMap<>();
+        ok.put("status", "success");
+        ok.put("message", "Plano criado");
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(ok);
     }
 
-    @PreAuthorize("hasRole('ADMIN') or hasRole('ESPECIALISTA') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('ESPECIALISTA') or hasRole('USER') or (hasRole('ESTAGIARIO') and #username == authentication.name)")
     @GetMapping("/{id}")
     public ResponseEntity<PlanoResponseDTO> getPlanId(@PathVariable UUID id) {
         // Nome ajustado para bater com o Service
@@ -55,12 +61,18 @@ public class PlanoController {
             @PageableDefault(size = 8, sort = "nomeAluno") Pageable pageable,
             Authentication authentication) {
 
+        // O uso de Collectors.toCollection(ArrayList::new) que você fez é excelente
+        // para evitar listas imutáveis do Spring Security.
         List<String> roles = authentication.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
-                .toList();
+                .collect(Collectors.toCollection(ArrayList::new));
+
         String username = authentication.getName();
 
-        Page<PlanoResponseDTO> lista = planoService.listAllOrName(nomeAluno, pageable, roles,username);
+        // Certifique-se que o service retorna um Page<PlanoResponseDTO>
+        // e NÃO um Page<Plano> (a entidade)
+        Page<PlanoResponseDTO> lista = planoService.listAllOrName(nomeAluno, pageable, roles, username);
+
         return ResponseEntity.ok(lista);
     }
 

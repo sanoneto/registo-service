@@ -72,13 +72,13 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
         // 3.1. Buscar exercícios do plano anterior para a "Lista Negra"
         List<String> exerciciosParaEvitar = new java.util.ArrayList<>();
         planoService.findAtivoAndConcluidoByUsername(username).ifPresent(plano -> {
-            loadFromS3(plano.link()).ifPresent(oldPlan -> {
+            loadFromS3(plano.getLink()).ifPresent(oldPlan -> {
                 if (oldPlan.getPlan() != null) {
                     List<String> names = oldPlan.getPlan().stream()
-                            .flatMap(day -> day.exercises().stream())
-                            .map(TrainingExercise::name)
+                            .flatMap(day -> day.getExercises().stream())
+                            .map(TrainingExercise::getName)
                             .distinct()
-                            .collect(Collectors.toList());
+                            .toList();
                     exerciciosParaEvitar.addAll(names);
                 }
             });
@@ -112,11 +112,11 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
             return ExerciseHistoryEntity.builder()
                     .username(username)
                     .planId(planId)
-                    .exerciseName(log.name())
-                    .muscleGroup(log.muscleGroup())
-                    .weight(log.weight())
+                    .exerciseName(log.getName())
+                    .muscleGroup(log.getMuscleGroup())
+                    .weight(log.getWeight())
                     .registeredAt(LocalDateTime.now()) // Data do servidor para segurança
-                    .clientDate(log.date()) // Data que veio do telemóvel do aluno
+                    .clientDate(log.getDate()) // Data que veio do telemóvel do aluno
                     .build();
         }).collect(Collectors.toList());
 
@@ -162,8 +162,8 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
         if (planId != null && !planId.isBlank()) {
             try {
                 PlanoResponseDTO plano = planoService.getByPlanoById(UUID.fromString(planId));
-                if (plano != null && isLinkValido(plano.link())) {
-                    return plano.link();
+                if (plano != null && isLinkValido(plano.getLink())) {
+                    return plano.getLink();
                 }
             } catch (IllegalArgumentException e) {
                 log.error("ID do plano inválido: {}", planId);
@@ -175,7 +175,7 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
         log.info(" Aprocura plano ativo e concluído na base para o utilizador: {}", username);
         if (request == null) {
             return planoService.findAtivoAndConcluidoByUsername(username)
-                    .map(PlanoResponseDTO::link)
+                    .map(PlanoResponseDTO::getLink)
                     .filter(this::isLinkValido)
                     // 3. Fallback Final: Se não encontrar nada válido, gera o caminho padrão
                     .orElseGet(() -> {
@@ -205,10 +205,10 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
 
     private boolean isRequestEmpty(UserProfileRequest request) {
         return request == null ||
-                (request.objective() == null || request.objective().isBlank()) ||
-                request.weightKg() == null ||
-                request.heightCm() == null ||
-                request.age() == null;
+                (request.getObjective() == null || request.getObjective().isBlank()) ||
+                request.getWeightKg() == null ||
+                request.getHeightCm() == null ||
+                request.getAge() == null;
     }
 
     private void configurarNovoPlano(TrainingPlanResponse plan, UserProfileRequest request) {
@@ -226,15 +226,15 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
         if (planId == null || planId.isEmpty()) {
             // --- OTIMIZAÇÃO AQUI ---
             // Verificamos uma única vez se existe um nome de aluno no request
-            boolean temNomeAluno = request.studentName() != null && !request.studentName().isBlank();
+            boolean temNomeAluno = request.getStudentName() != null && !request.getStudentName().isBlank();
 
-            String nomeNoPlano = temNomeAluno ? request.studentName() : username;
+            String nomeNoPlano = temNomeAluno ? request.getStudentName() : username;
             String especialista = temNomeAluno ? username : "Sem Especialista";
-            String recommended = temNomeAluno ? request.recommended() : username;
+            String recommended = temNomeAluno ? request.getRecommended() : username;
 
             dto = new PlanoRequestDTO(
                     nomeNoPlano,
-                    request.objective(),
+                    request.getObjective(),
                     especialista,
                     Enum.EstadoPlano.ATIVO,
                     Enum.EstadoPedido.PENDENTE,
@@ -251,13 +251,13 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
             }
 
             dto = new PlanoRequestDTO(
-                    planoExistente.nomeAluno(),
-                    planoExistente.objetivo(),
+                    planoExistente.getNomeAluno(),
+                    planoExistente.getObjetivo(),
                     username,
                     Enum.EstadoPlano.ATIVO,
                     Enum.EstadoPedido.FINALIZADO,
                     key,
-                    planoExistente.recommended()
+                    planoExistente.getRecommended()
             );
             planoService.updatePlano(planId, dto);
         }

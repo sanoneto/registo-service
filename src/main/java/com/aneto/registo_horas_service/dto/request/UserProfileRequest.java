@@ -1,42 +1,53 @@
 package com.aneto.registo_horas_service.dto.request;
 
 import com.aneto.registo_horas_service.models.Training.BodyType;
-
 import com.aneto.registo_horas_service.models.Training.Gender;
 import jakarta.validation.constraints.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-public record UserProfileRequest(
-        @NotNull(message = "Tipo de corpo é obrigatório")
-        BodyType bodyType,
+/**
+ * Transformado de Record para Classe DTO para garantir compatibilidade
+ * total com a serialização do Jackson e evitar UnsupportedOperationException.
+ */
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class UserProfileRequest {
 
-        @NotNull(message = "Género é obrigatório")
-        Gender gender,
+    @NotNull(message = "Tipo de corpo é obrigatório")
+    private BodyType bodyType;
 
-        @Min(0) @Max(120)
-        Integer age,
+    @NotNull(message = "Género é obrigatório")
+    private Gender gender;
 
-        Double heightCm,
-        Double weightKg,
-        String exerciseHistory,
-        String pathology,
+    @Min(0) @Max(120)
+    private Integer age;
 
-        @NotNull(message = "A frequência deve ser informada")
-        @Min(1) @Max(7)
-        Integer frequencyPerWeek,
+    private Double heightCm;
+    private Double weightKg;
+    private String exerciseHistory;
+    private String pathology;
 
-        String objective,
-        String trainingLocation,
-        String equipmentAvailable,
-        String durationPerSession,
+    @NotNull(message = "A frequência deve ser informada")
+    @Min(1) @Max(7)
+    private Integer frequencyPerWeek;
 
-        String country,
-        String city,
-        String location,
-        String recommended,
+    private String objective;
+    private String trainingLocation;
+    private String equipmentAvailable;
+    private String durationPerSession;
 
-        String studentName,
-        String protocol,
-        Double bodyFat,
-        Integer mealsPerDay
-) {
+    private String country;
+    private String city;
+    private String location;
+    private String recommended;
+
+    private String studentName;
+    private String protocol;
+    private Double bodyFat;
+    private Integer mealsPerDay;
 }

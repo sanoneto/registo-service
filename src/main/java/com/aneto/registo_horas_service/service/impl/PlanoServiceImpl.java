@@ -9,47 +9,43 @@ import com.aneto.registo_horas_service.repository.PlanoRepository;
 import com.aneto.registo_horas_service.service.PlanoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class PlanoServiceImpl implements PlanoService {
     private final PlanoRepository repository;
-
     private final PlanoMapper mapper;
 
     @Transactional
     public PlanoResponseDTO createPlano(PlanoRequestDTO request) {
-        // Converte Request -> Entidade
-        Plano entidade = mapper.toEntity(request);
+        Plano plano = mapper.toEntity(request);
+        Plano salvo = repository.save(plano);
 
-        // Salva no banco (Gera UUID e Datas automaticamente)
-        Plano salvo = repository.save(entidade);
-
-        // Retorna o Response (Filtra links e datas automaticamente via Mapper)
+        // Usamos o mapper, mas garantimos que o retorno seja tratado
         return mapper.toResponse(salvo);
     }
 
     @Transactional(readOnly = true)
     public PlanoResponseDTO getByPlanoById(UUID id) {
-        // Busca a entidade no banco ou lança erro se não encontrar
         Plano plano = repository.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("Plano não encontrado com o ID: " + id));
 
-        // Converte Entidade -> ResponseDTO
         return mapper.toResponse(plano);
     }
 
     @Transactional
     public void deletePlano(UUID id) {
-        // Verificamos se existe antes de deletar para evitar erros
         if (!repository.existsById(id)) {
             throw new RuntimeException("Não é possível deletar: Plano não encontrado");
         }
@@ -59,71 +55,61 @@ public class PlanoServiceImpl implements PlanoService {
     @Transactional(readOnly = true)
     public Page<PlanoResponseDTO> listAllOrName(String nomeAluno, Pageable pageable, List<String> roles, String usernameLogado) {
 
-        // 1. ADMIN: Vê tudo (Pode filtrar por nome de aluno se quiser)
+        Page<Plano> entidadePage;
+
         if (roles.contains("ROLE_ADMIN")) {
-            if (nomeAluno != null && !nomeAluno.isEmpty()) {
-                return repository.findByNomeAlunoContainingIgnoreCase(nomeAluno, pageable).map(mapper::toResponse);
-            }
-            return repository.findAll(pageable).map(mapper::toResponse);
+            entidadePage = (nomeAluno != null && !nomeAluno.isEmpty())
+                    ? repository.findByNomeAlunoContainingIgnoreCase(nomeAluno, pageable)
+                    : repository.findAll(pageable);
+        } else if (roles.contains("ROLE_ESPECIALISTA")) {
+            entidadePage = repository.findForEspecialista(usernameLogado, pageable);
+        } else {
+            entidadePage = repository.findForEstagiario(usernameLogado, pageable);
         }
 
-        // 2. ESPECIALISTA: Vê os seus + os que não têm dono
-        if (roles.contains("ROLE_ESPECIALISTA")) {
-            return repository.findForEspecialista(usernameLogado, pageable)
-                    .map(mapper::toResponse);
-        }
+        // A MÁGICA: Transformamos em uma lista puramente Java, sem vínculos com o Page original do Hibernate
+        List<PlanoResponseDTO> dtoList = entidadePage.getContent()
+                .stream()
+                .map(mapper::toResponse)
+                .collect(Collectors.toCollection(ArrayList::new)); // ArrayList é sempre serializável
 
-        // 3. ESTAGIÁRIO: Vê estritamente apenas os seus
-        if (roles.contains("ROLE_ESTAGIARIO")) {
-            return repository.findForEstagiario(usernameLogado, pageable)
-                    .map(mapper::toResponse);
-        }
-
-        return Page.empty(); // Se não tiver role, retorna vazio
+        return new PageImpl<>(dtoList, pageable, entidadePage.getTotalElements());
     }
-
     @Override
+    @Transactional(readOnly = true)
     public Optional<PlanoResponseDTO> findAtivoAndConcluidoByUsername(String username) {
-        // Aqui assume-se que o seu Repository tem esta consulta
         return repository.findByNomeAlunoContainingAndEstadoPlanoAndEstadoPedido(
                 username,
-                Enum.EstadoPlano.ATIVO,        // Uso do Enum
-                Enum.EstadoPedido.FINALIZADO   // Uso do Enum
-        ).map(mapper::toResponse); // Converta para DTO antes de retornar
+                Enum.EstadoPlano.ATIVO,
+                Enum.EstadoPedido.FINALIZADO
+        ).map(mapper::toResponse);
     }
 
     @Override
     @Transactional
     public void updatePlano(String uuid, PlanoRequestDTO requestDTO) {
-        // 1. Converter a String para UUID e procurar a entidade
         UUID id = UUID.fromString(uuid);
-
-        // 2. Procurar o plano existente (lança exceção se não encontrar)
         Plano plano = repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Plano não encontrado com o ID: " + uuid));
 
-        // 3. Atualizar os campos da entidade com os dados do DTO
-        // Assumindo que a sua entidade 'Plano' tem estes setters:
-        plano.setNomeAluno(requestDTO.nomeAluno());
-        plano.setObjetivo(requestDTO.objetivo());
-        plano.setEspecialista(requestDTO.especialista());
-        plano.setEstadoPlano(requestDTO.estadoPlano());
-        plano.setEstadoPedido(requestDTO.estadoPedido());
-        plano.setLink(requestDTO.link());
+        plano.setNomeAluno(requestDTO.getNomeAluno());
+        plano.setObjetivo(requestDTO.getObjetivo());
+        plano.setEspecialista(requestDTO.getEspecialista());
+        plano.setEstadoPlano(requestDTO.getEstadoPlano());
+        plano.setEstadoPedido(requestDTO.getEstadoPedido());
+        plano.setLink(requestDTO.getLink());
 
-        // 4. Gravar as alterações
         repository.save(plano);
     }
 
     @Override
     @Transactional
     public void changeOfProgress(String planId, String username, String newStatus) {
-        // 1. Busca o plano
         Plano plano = repository.findById(UUID.fromString(planId))
                 .orElseThrow(() -> new RuntimeException("Plano não encontrado"));
 
-        // 2. Só altera se estiver PENDENTE
-        if (plano.getEstadoPedido() == Enum.EstadoPedido.PENDENTE) {
+        if (plano.getEstadoPedido() == Enum.EstadoPedido.PENDENTE ||
+                plano.getEstadoPedido() == Enum.EstadoPedido.A_PROCESSAR) {
 
             Enum.EstadoPedido proximoEstado = Enum.EstadoPedido.fromDescricao(newStatus);
             plano.setEstadoPedido(proximoEstado);
@@ -139,7 +125,11 @@ public class PlanoServiceImpl implements PlanoService {
     }
 
     private Enum.EstadoPedido converterParaEnum(String status) {
-        String formatado = status.toUpperCase().replace(" ", "_");
-        return Enum.EstadoPedido.valueOf(formatado);
+        try {
+            String formatado = status.toUpperCase().replace(" ", "_");
+            return Enum.EstadoPedido.valueOf(formatado);
+        } catch (Exception e) {
+            return Enum.EstadoPedido.PENDENTE;
+        }
     }
 }

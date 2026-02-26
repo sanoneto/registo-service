@@ -39,16 +39,29 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(body, HttpStatus.NOT_FOUND);
     }
     // Captura erros de lógica de negócio (ex: "Limite do Pack atingido")
+    // 2. Altera o handleRuntimeException para não usar o DTO ErrorResponse por enquanto
     @ExceptionHandler(RuntimeException.class)
-    public ResponseEntity<ErrorResponse> handleRuntimeException(RuntimeException e) {
+    public ResponseEntity<Map<String, Object>> handleRuntimeException(RuntimeException e) {
         log.error("Erro de lógica/negócio: {}", e.getMessage());
-        ErrorResponse error = new ErrorResponse(
-                e.getMessage(),
-                HttpStatus.BAD_REQUEST.value()
-        );
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
-    }
 
+        Map<String, Object> body = new HashMap<>();
+        body.put("message", e.getMessage());
+        body.put("status", HttpStatus.BAD_REQUEST.value());
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+    }
+    @ExceptionHandler(org.springframework.http.converter.HttpMessageNotWritableException.class)
+    public ResponseEntity<Map<String, Object>> handleJsonWritableException(org.springframework.http.converter.HttpMessageNotWritableException ex) {
+        log.error("ERRO FATAL DE SERIALIZAÇÃO JSON: {}", ex.getMessage());
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("timestamp", LocalDateTime.now().toString());
+        body.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
+        body.put("error", "Erro ao transformar resposta em JSON");
+        body.put("cause", "Provável lista imutável ou proxy do Hibernate");
+
+        return new ResponseEntity<>(body, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
     // Captura erros de argumentos inválidos enviados pelo cliente
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorResponse> handleIllegalArgumentException(IllegalArgumentException e) {
@@ -117,14 +130,16 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(error);
     }
 
-    // Erro genérico (Catch-all para erros 500)
+
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleGenericException(Exception e) {
-        log.error("ERRO CRÍTICO NÃO MAPEADO: {}", e.getMessage(), e);
-        ErrorResponse error = new ErrorResponse(
-                "Ocorreu um erro interno inesperado. Contacte o administrador.",
-                HttpStatus.INTERNAL_SERVER_ERROR.value()
-        );
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+    public ResponseEntity<Map<String, Object>> handleException(Exception e) {
+        // ESTA LINHA É A MAIS IMPORTANTE AGORA:
+        log.error("--- STACKTRACE DO ERRO REAL ---", e);
+
+        Map<String, Object> errorDetails = new HashMap<>();
+        errorDetails.put("message", "Erro ao processar JSON. Verifique o console.");
+        errorDetails.put("details", e.getMessage());
+
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorDetails);
     }
 }

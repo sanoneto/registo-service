@@ -11,6 +11,7 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -29,33 +30,33 @@ public class Training {
         log.info("Iniciando generateTrainingPlan para o utilizador.");
 
         // 1. Sanitização de entradas
-        String exerciseHistoryText = defaultIfEmpty(userRequest.exerciseHistory(), "Não informado");
-        String objectiveText = defaultIfEmpty(userRequest.objective(), "Manutenção de saúde e bem-estar");
-        String locationText = defaultIfEmpty(userRequest.location(), "Não especificada");
-        String countryText = defaultIfEmpty(userRequest.country(), "Não especificado");
-        String bodyTypeText = (userRequest.bodyType() != null) ? userRequest.bodyType().name() : "ECTOMORPH";
-        String genderText = (userRequest.gender() != null) ? userRequest.gender().name() : "MALE";
-        String weightKg = defaultIfEmpty(String.valueOf(userRequest.weightKg()), "70");
+        String exerciseHistoryText = defaultIfEmpty(userRequest.getExerciseHistory(), "Não informado");
+        String objectiveText = defaultIfEmpty(userRequest.getObjective(), "Manutenção de saúde e bem-estar");
+        String locationText = defaultIfEmpty(userRequest.getLocation(), "Não especificada");
+        String countryText = defaultIfEmpty(userRequest.getCountry(), "Não especificado");
+        String bodyTypeText = (userRequest.getBodyType() != null) ? userRequest.getBodyType().name() : "ECTOMORPH";
+        String genderText = (userRequest.getGender() != null) ? userRequest.getGender().name() : "MALE";
+        String weightKg = defaultIfEmpty(String.valueOf(userRequest.getWeightKg()), "70");
 
-        String durationText = (userRequest.durationPerSession() != null && !userRequest.durationPerSession().isBlank())
-                ? userRequest.durationPerSession() : "60 minutos";
+        String durationText = (userRequest.getDurationPerSession() != null && !userRequest.getDurationPerSession().isBlank())
+                ? userRequest.getDurationPerSession() : "60 minutos";
 
-        String protocolId = (userRequest.protocol() == null) ? "nasm_estabilizacao" : userRequest.protocol();
+        String protocolId = (userRequest.getProtocol() == null) ? "nasm_estabilizacao" : userRequest.getProtocol();
         Enum.TrainingProtocol protocol = Enum.TrainingProtocol.fromId(protocolId);
 
         int totalMinutos = extrairMinutosTotais(durationText);
         int volumeIdeal = Math.max(6, totalMinutos / 7);
-        String pathologyText = (userRequest.pathology() == null || userRequest.pathology().isBlank()) ? "Nenhuma limitação relatada" : userRequest.pathology();
+        String pathologyText = (userRequest.getPathology() == null || userRequest.getPathology().isBlank()) ? "Nenhuma limitação relatada" : userRequest.getPathology();
 
         // 2. Cálculos Nutricionais e Macros
         Macros macros = MacroCalculator.calculate(
-                userRequest.weightKg(),
-                userRequest.heightCm(),
-                userRequest.age(),
+                userRequest.getWeightKg(),
+                userRequest.getHeightCm(),
+                userRequest.getAge(),
                 genderText,
                 bodyTypeText,
-                userRequest.bodyFat() != null ? userRequest.bodyFat() : 15.0,
-                userRequest.mealsPerDay() != null ? userRequest.mealsPerDay() : 6
+                userRequest.getBodyFat() != null ? userRequest.getBodyFat() : 15.0,
+                userRequest.getMealsPerDay() != null ? userRequest.getMealsPerDay() : 6
         );
 
         // 3. Lógica de Variação (Anti-Platô) e NASM
@@ -82,7 +83,7 @@ public class Training {
                 """.formatted(listaParaEvitar, tempoNASM);
 
         // 4. Adaptação para Sedentários (Prevenção de mal-estar)
-        boolean isSedentary = "sedentary".equalsIgnoreCase(userRequest.exerciseHistory());
+        boolean isSedentary = "sedentary".equalsIgnoreCase(userRequest.getExerciseHistory());
         String protocoloEfetivo = isSedentary ? "Adaptação Anatómica (Baixa Intensidade)" : protocol.getLabel();
         String repsEfetivas = isSedentary ? "12 a 15 (longe da falha)" : protocol.getReps();
         String setsEfetivas = isSedentary ? "2" : protocol.getSets();
@@ -137,7 +138,7 @@ public class Training {
                 EXPANSÃO DE REPERTÓRIO:
                 - Escolha exercícios que respeitem o protocolo %s.
                 - Objetivo: %s. Frequência: %d dias.
-                """.formatted(protocol.getLabel(), objectiveText, userRequest.frequencyPerWeek());
+                """.formatted(protocol.getLabel(), objectiveText, userRequest.getFrequencyPerWeek());
 
         String diretrizEquipamento = """
                 LOGÍSTICA E EQUIPAMENTO:
@@ -162,7 +163,7 @@ public class Training {
         2. REABILITAÇÃO DIÁRIA (OBRIGATÓRIO): O primeiro exercício (Order 1) de TODOS os dias deve ser obrigatoriamente para %s.
         3. VARIABILIDADE: Proibido repetir exercícios entre os dias. Cada bloco deve ter 100%% de exercícios únicos.
         4. ESTRUTURA: Gere exatamente %d blocos dentro do array "plan".
-        """.formatted(userRequest.frequencyPerWeek(), nomenclaturaBase, pathologyText, userRequest.frequencyPerWeek()
+        """.formatted(userRequest.getFrequencyPerWeek(), nomenclaturaBase, pathologyText, userRequest.getFrequencyPerWeek()
         );
 
         String diretrizReabilitacao = pathologyText.contains("Nenhuma") ?
@@ -255,7 +256,7 @@ public class Training {
                   }
                 }
                 """.formatted(
-                userRequest.age(), bodyTypeText, genderText, userRequest.weightKg(), objectiveText, pathologyText,
+                userRequest.getAge(), bodyTypeText, genderText, userRequest.getWeightKg(), objectiveText, pathologyText,
                 blocoDiretrizesCompletas, regrasFinais,
                 protocol.getLabel(), protocol.getTempo(), descansoEfetivo,
                 macros.dailyCalories(), macros.imc(), macros.imcCategory(),
@@ -265,73 +266,113 @@ public class Training {
         return executeGeneration(userPrompt, userRequest, totalMinutos);
     }
 
+// ... (mantenha os imports e o início da classe iguais) ...
+
     private TrainingPlanResponse executeGeneration(String prompt, UserProfileRequest userRequest, int totalMinutos) {
         log.info("Iniciando executeGeneration no ChatModel.");
         int maxRetries = 5;
 
+        StringBuilder promptBuilder = new StringBuilder(prompt);
         for (int attempt = 0; attempt <= maxRetries; attempt++) {
             try {
-                String textResponse = chatModel.call(prompt);
+                String textResponse = chatModel.call(promptBuilder.toString());
                 String cleanedJson = cleanMarkdown(textResponse);
+
+                // 1. DESSERIALIZAÇÃO INICIAL
                 TrainingPlanResponse response = objectMapper.readValue(cleanedJson, TrainingPlanResponse.class);
 
-                // 1. VALIDAÇÃO DE VOLUME
+                // 2. VALIDAÇÃO DE VOLUME
                 int minExAceitavel = Math.max(4, (totalMinutos / 10));
                 boolean isVolumeValido = response.getPlan() != null && !response.getPlan().isEmpty() &&
-                        response.getPlan().stream().allMatch(d -> d.exercises() != null && d.exercises().size() >= minExAceitavel);
+                        response.getPlan().stream().allMatch(d -> d.getExercises() != null && d.getExercises().size() >= minExAceitavel);
 
                 if (!isVolumeValido) throw new RuntimeException("Volume insuficiente.");
 
-                // 2. MAPEAMENTO E "STRICT CHECK" DE INVENTÁRIO
+                // 3. MAPEAMENTO DE EXERCÍCIOS (FORÇANDO ARRAYLIST)
                 int finalAttempt = attempt;
-                List<TrainingDay> updatedPlan = response.getPlan().stream()
-                        .map(day -> {
-                            List<TrainingExercise> enrichedExercises = day.exercises().stream()
-                                    .map(ex -> {
-                                        // 1. NORMALIZAÇÃO PREVENTIVA (Evita que "Prancha" falhe se existir "Prancha Abdominal")
-                                        String correctedName = normalizeExerciseName(ex.name());
-                                        // Busca a URL (olha no Redis -> depois DB -> por fim gera fallback)
-                                        String finalUrl = exerciseVideoService.getVideoUrl(correctedName);
+                List<TrainingDay> updatedPlan = new ArrayList<>(); // Criamos uma lista mutável explicitamente
 
-                                        // --- STRICT CHECK ---
-                                        // Se a URL contiver 'results?search_query', a IA inventou um nome fora da lista
-                                        if (finalUrl.contains("youtube.com/results")) {
-                                            log.error("[ALERTA DE INVENTÁRIO] A IA usou '{}', que não existe na base. Tentativa: {}", ex.name(), finalAttempt);
-                                            throw new RuntimeException("Exercício inválido detectado: " + ex.name());
-                                        }
-                                        // --------------------
+                if (response.getPlan() != null) {
+                    for (TrainingDay day : response.getPlan()) {
+                        List<TrainingExercise> enrichedExercises = day.getExercises().stream()
+                                .map(ex -> {
+                                    String correctedName = normalizeExerciseName(ex.getName());
+                                    String finalUrl = exerciseVideoService.getVideoUrl(correctedName);
 
-                                        return new TrainingExercise(
-                                                ex.order(), correctedName, ex.muscleGroup(), ex.equipment(),
-                                                ex.intensity(), ex.sets(), ex.reps(), ex.rest(),
-                                                ex.tempo(), ex.details(), ex.notas(), ex.weight(),
-                                                ex.cargaAtual(), finalUrl,
-                                                java.time.LocalDate.now().toString(),
-                                                ex.movementPlane()
-                                        );
-                                    }).toList();
-                            return new TrainingDay(day.day(), enrichedExercises);
-                        }).toList();
+                                    if (finalUrl.contains("youtube.com/results")) {
+                                        log.error("[ALERTA DE INVENTÁRIO] A IA usou '{}'.", ex.getName());
+                                        throw new RuntimeException("Exercício inválido detectado: " + ex.getName());
+                                    }
+
+                                    // Usamos o Builder da CLASSE (não Record)
+                                    return TrainingExercise.builder()
+                                            .order(ex.getOrder())
+                                            .name(correctedName)
+                                            .muscleGroup(ex.getMuscleGroup())
+                                            .equipment(ex.getEquipment())
+                                            .intensity(ex.getIntensity())
+                                            .sets(ex.getSets())
+                                            .reps(ex.getReps())
+                                            .rest(ex.getRest())
+                                            .tempo(ex.getTempo())
+                                            .details(ex.getDetails())
+                                            .notas(ex.getNotas())
+                                            .weight(ex.getWeight())
+                                            .cargaAtual(ex.getCargaAtual())
+                                            .videoUrl(finalUrl)
+                                            .date(java.time.LocalDate.now().toString())
+                                            .movementPlane(ex.getMovementPlane())
+                                            .build();
+                                })
+                                .collect(java.util.stream.Collectors.toCollection(java.util.ArrayList::new));
+
+                        updatedPlan.add(new TrainingDay(day.getDay(), enrichedExercises));
+                    }
+                }
+
+                // 4. LIMPEZA DA DIETA (PONTO ONDE O ERRO PODE ESTAR)
+                DietPlan diet = response.getDietPlan();
+                if (diet != null) {
+                    // Garante que a lista de refeições é mutável
+                    if (diet.getMeals() != null) {
+                        List<Meal> mutableMeals = new ArrayList<>();
+                        for (Meal m : diet.getMeals()) {
+                            // Garante que os ingredientes dentro de cada refeição também sejam mutáveis
+                            if (m.getIngredients() != null) {
+                                m.setIngredients(new ArrayList<>(m.getIngredients()));
+                            }
+                            mutableMeals.add(m);
+                        }
+                        diet.setMeals(mutableMeals);
+                    }
+                }
 
                 log.info("Geração concluída com sucesso e validada contra inventário.");
-                return new TrainingPlanResponse(false, response.getSummary(), updatedPlan, response.getDietPlan(), userRequest);
+
+                // 5. RESPOSTA FINAL (Uso de Builder para garantir objeto limpo)
+                return TrainingPlanResponse.builder()
+                        .isExistingPlan(false)
+                        .summary(response.getSummary())
+                        .plan(updatedPlan)
+                        .dietPlan(diet)
+                        .userProfile(null) // UserProfileRequest agora é uma Classe DTO
+                        .build();
 
             } catch (Exception e) {
                 log.warn("Falha na tentativa {}/{} - Erro: {}", attempt, maxRetries, e.getMessage());
 
                 if (attempt >= maxRetries) {
                     log.error("Todas as tentativas falharam. Erro final: {}", e.getMessage());
-                    throw new RuntimeException("Falha crítica: A IA não conseguiu gerar um plano usando apenas os exercícios permitidos.");
+                    throw new RuntimeException("Falha crítica na geração do plano.");
                 }
 
-                // Reforça a instrução de restrição no prompt para a próxima tentativa
-                prompt += "\n\nERRO NA TENTATIVA ANTERIOR: " + e.getMessage() +
-                        "\nPOR FAVOR, USA APENAS OS NOMES EXATOS DO DICIONÁRIO FORNECIDO.";
+                promptBuilder.append("\n\nERRO NA TENTATIVA ANTERIOR: ").append(e.getMessage()).append("\nPOR FAVOR, USA APENAS OS NOMES EXATOS DO DICIONÁRIO FORNECIDO.");
             }
         }
+        prompt = promptBuilder.toString();
         throw new RuntimeException("Falha na geração.");
     }
-
+    // ... (mantenha o resto dos métodos auxiliares iguais) ...
     private String cleanMarkdown(String text) {
         if (text == null || text.isBlank()) return "{}";
         String cleaned = text.replaceAll("(?s)```json\\s*(.*?)\\s*```", "$1").trim();
@@ -386,7 +427,7 @@ public class Training {
 
     @NotNull
     private static String getString(UserProfileRequest userRequest, String pathologyText, Enum.TrainingProtocol protocol, String durationText, String descanso, int volumeIdeal) {
-        String divisao = switch (userRequest.frequencyPerWeek()) {
+        String divisao = switch (userRequest.getFrequencyPerWeek()) {
             case 1 -> "FULL BODY";
             case 2 -> "SUPERIOR / INFERIOR";
             case 3 -> "PUSH / PULL / LEGS";
