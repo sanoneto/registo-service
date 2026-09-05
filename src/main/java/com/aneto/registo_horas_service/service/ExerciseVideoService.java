@@ -1,5 +1,8 @@
 package com.aneto.registo_horas_service.service;
 
+import java.util.List;
+import java.util.Map;
+
 public interface ExerciseVideoService {
 
     /**
@@ -7,6 +10,7 @@ public interface ExerciseVideoService {
      */
     String getVideoUrl(String exerciseName);
 
+    Map<String, List<String>> getExerciseDictionary(); // NOVO
     /**
      * Remove a entrada do Redis para garantir sincronização.
      */

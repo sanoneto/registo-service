@@ -31,6 +31,12 @@ public class TrainingController {
             @RequestParam(value = "id", required = false) String planId) { // Adicionado o parâmetro id
 
         // Passamos o request E o planId para o serviço decidir o que fazer
+        if (request != null && request.getStudentUsername() != null) {
+            username = request.getStudentUsername();
+        }
+        if (request != null && request.getStudentName() == null) {
+            request.setStudentName(username);
+        }
         TrainingPlanResponse response = trainingPlanService.getOrGeneratePlan(request, username, planId);
 
         return ResponseEntity.ok(response);

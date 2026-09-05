@@ -47,31 +47,52 @@ public class PlanoServiceImpl implements PlanoService {
     @Transactional
     public void deletePlano(UUID id) {
         if (!repository.existsById(id)) {
-            throw new RuntimeException("Não é possível deletar: Plano não encontrado");
+            throw new RuntimeException("Não é possível Deletar: Plano não encontrado");
         }
         repository.deleteById(id);
     }
 
     @Transactional(readOnly = true)
-    public Page<PlanoResponseDTO> listAllOrName(String nomeAluno, Pageable pageable, List<String> roles, String usernameLogado) {
+    public Page<PlanoResponseDTO> listAllOrName(String nomeAluno, String estadoPlanoStr, Pageable pageable, List<String> roles, String usernameLogado) {
 
         Page<Plano> entidadePage;
+        boolean temNome = nomeAluno != null && !nomeAluno.isEmpty();
+
+        // Converte a String recebida do frontend para o Enum, ignorando valores inválidos
+        Enum.EstadoPlano estadoPlano = null;
+        if (estadoPlanoStr != null && !estadoPlanoStr.isBlank()) {
+            try {
+                estadoPlano = Enum.EstadoPlano.valueOf(estadoPlanoStr.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                estadoPlano = null; // valor inválido é tratado como "sem filtro"
+            }
+        }
+        boolean temEstado = estadoPlano != null;
 
         if (roles.contains("ROLE_ADMIN")) {
-            entidadePage = (nomeAluno != null && !nomeAluno.isEmpty())
-                    ? repository.findByNomeAlunoContainingIgnoreCase(nomeAluno, pageable)
-                    : repository.findAll(pageable);
+            if (temNome && temEstado) {
+                entidadePage = repository.findByNomeAlunoContainingIgnoreCaseAndEstadoPlano(nomeAluno, estadoPlano, pageable);
+            } else if (temNome) {
+                entidadePage = repository.findByNomeAlunoContainingIgnoreCase(nomeAluno, pageable);
+            } else if (temEstado) {
+                entidadePage = repository.findByEstadoPlano(estadoPlano, pageable);
+            } else {
+                entidadePage = repository.findAll(pageable);
+            }
         } else if (roles.contains("ROLE_ESPECIALISTA")) {
-            entidadePage = repository.findForEspecialista(usernameLogado, pageable);
+            entidadePage = temEstado
+                    ? repository.findForEspecialista(usernameLogado, estadoPlano, nomeAluno,pageable)
+                    : repository.findForEspecialista(usernameLogado,nomeAluno, pageable);
         } else {
-            entidadePage = repository.findForEstagiario(usernameLogado, pageable);
+            entidadePage = temEstado
+                    ? repository.findForEstagiario(usernameLogado, estadoPlano, pageable)
+                    : repository.findForEstagiario(usernameLogado, pageable);
         }
 
-        // A MÁGICA: Transformamos em uma lista puramente Java, sem vínculos com o Page original do Hibernate
         List<PlanoResponseDTO> dtoList = entidadePage.getContent()
                 .stream()
                 .map(mapper::toResponse)
-                .collect(Collectors.toCollection(ArrayList::new)); // ArrayList é sempre serializável
+                .collect(Collectors.toCollection(ArrayList::new));
 
         return new PageImpl<>(dtoList, pageable, entidadePage.getTotalElements());
     }

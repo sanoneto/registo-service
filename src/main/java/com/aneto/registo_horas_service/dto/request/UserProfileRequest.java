@@ -18,6 +18,8 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class UserProfileRequest {
 
+    private String studentUsername;
+
     @NotNull(message = "Tipo de corpo é obrigatório")
     private BodyType bodyType;
 

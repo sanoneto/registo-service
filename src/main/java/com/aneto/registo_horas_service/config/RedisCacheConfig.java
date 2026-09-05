@@ -1,5 +1,6 @@
 package com.aneto.registo_horas_service.config;
 
+import org.springframework.boot.autoconfigure.cache.RedisCacheManagerBuilderCustomizer;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -19,5 +20,16 @@ public class RedisCacheConfig {
                 .entryTtl(Duration.ofHours(12)) // TTL rigoroso
                 .disableCachingNullValues()     // Não guarda nulos
                 .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(new GenericJackson2JsonRedisSerializer()));
+    }
+
+    @Bean
+    public RedisCacheManagerBuilderCustomizer exerciseVideosCacheCustomizer() {
+        return builder -> builder.withCacheConfiguration(
+                "exerciseVideos",
+                RedisCacheConfiguration.defaultCacheConfig()
+                        .entryTtl(Duration.ofMinutes(20)) // menor que os 30 min do presigned URL
+                        .disableCachingNullValues()
+                        .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(new GenericJackson2JsonRedisSerializer()))
+        );
     }
 }

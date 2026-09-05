@@ -29,11 +29,13 @@ public interface PlanoRepository extends JpaRepository<Plano, UUID> {
     Page<Plano> findByNomeAlunoContainingIgnoreCase(String nomeAluno, Pageable pageable);
 
     List<Plano>  findByNomeAlunoAndEstadoPlano (String username, Enum.EstadoPlano estadoPlano);
-    @Query("SELECT p FROM Plano p WHERE p.especialista = :nome " +
+    @Query("SELECT p FROM Plano p WHERE (p.especialista = :nome " +
             "OR p.especialista IS NULL " +
             "OR p.especialista = '' " +
-            "OR p.especialista = 'Sem Especialista'")
-    Page<Plano>  findForEspecialista(@Param("nome") String nome, Pageable pageable);
+            "OR p.especialista = 'Sem Especialista') " +
+            "AND (:nomeAluno IS NULL OR :nomeAluno = '' OR LOWER(p.nomeAluno) LIKE LOWER(CONCAT('%', :nomeAluno, '%')))")
+    Page<Plano> findForEspecialista(@Param("nome") String nome, @Param("nomeAluno") String nomeAluno, Pageable pageable);
+
 
     @Query("SELECT p FROM Plano p WHERE p.nomeAluno = :nome")
     Page<Plano>  findForEstagiario(@Param("nome") String nome, Pageable pageable);
@@ -44,5 +46,23 @@ public interface PlanoRepository extends JpaRepository<Plano, UUID> {
     @Query("UPDATE Plano p SET p.estadoPlano = 'INATIVO',  p.estadoPedido= 'FECHADO'" +
             "WHERE p.nomeAluno = :username AND p.estadoPlano = 'ATIVO'")
     void inativarPlanosAtivosPorAluno(@Param("username") String username);
+
+    /*  3 novos metodo para adicionar o estado doplano   */
+
+    Page<Plano> findByNomeAlunoContainingIgnoreCaseAndEstadoPlano(
+            String nomeAluno, Enum.EstadoPlano estadoPlano, Pageable pageable);
+
+    Page<Plano> findByEstadoPlano(Enum.EstadoPlano estadoPlano, Pageable pageable);
+
+    @Query("SELECT p FROM Plano p WHERE (p.especialista = :nome " +
+            "OR p.especialista IS NULL " +
+            "OR p.especialista = '' " +
+            "OR p.especialista = 'Sem Especialista') " +
+            "AND p.estadoPlano = :estadoPlano " +
+            "AND (:nomeAluno IS NULL OR :nomeAluno = '' OR LOWER(p.nomeAluno) LIKE LOWER(CONCAT('%', :nomeAluno, '%')))")
+    Page<Plano> findForEspecialista(@Param("nome") String nome, @Param("estadoPlano") Enum.EstadoPlano estadoPlano, @Param("nomeAluno") String nomeAluno, Pageable pageable);
+
+    @Query("SELECT p FROM Plano p WHERE p.nomeAluno = :nome AND p.estadoPlano = :estadoPlano")
+    Page<Plano> findForEstagiario(@Param("nome") String nome, @Param("estadoPlano") Enum.EstadoPlano estadoPlano, Pageable pageable);
 }
 

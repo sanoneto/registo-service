@@ -58,6 +58,7 @@ public class PlanoController {
     @GetMapping
     public ResponseEntity<Page<PlanoResponseDTO>> listarPlanos(
             @RequestParam(required = false) String nomeAluno,
+            @RequestParam(required = false) String estadoPlano,
             @PageableDefault(size = 8, sort = "nomeAluno") Pageable pageable,
             Authentication authentication) {
 
@@ -71,7 +72,7 @@ public class PlanoController {
 
         // Certifique-se que o service retorna um Page<PlanoResponseDTO>
         // e NÃO um Page<Plano> (a entidade)
-        Page<PlanoResponseDTO> lista = planoService.listAllOrName(nomeAluno, pageable, roles, username);
+        Page<PlanoResponseDTO> lista = planoService.listAllOrName(nomeAluno, estadoPlano, pageable, roles, username);
 
         return ResponseEntity.ok(lista);
     }

@@ -86,7 +86,6 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
 
         // 3.2. Chamar a IA com o histórico extraído
         TrainingPlanResponse newPlan = training.generateTrainingPlan(request, exerciciosParaEvitar);
-
         // 4. Configurar e Persistir
         configurarNovoPlano(newPlan, request);
         salvarDadosDoPlano(username, request, key, newPlan, planId, false);

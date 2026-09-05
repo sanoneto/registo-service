@@ -13,8 +13,12 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Component
 @Slf4j
@@ -33,7 +37,6 @@ public class Training {
         String exerciseHistoryText = defaultIfEmpty(userRequest.getExerciseHistory(), "Não informado");
         String objectiveText = defaultIfEmpty(userRequest.getObjective(), "Manutenção de saúde e bem-estar");
         String locationText = defaultIfEmpty(userRequest.getLocation(), "Não especificada");
-        String countryText = defaultIfEmpty(userRequest.getCountry(), "Não especificado");
         String bodyTypeText = (userRequest.getBodyType() != null) ? userRequest.getBodyType().name() : "ECTOMORPH";
         String genderText = (userRequest.getGender() != null) ? userRequest.getGender().name() : "MALE";
         String weightKg = defaultIfEmpty(String.valueOf(userRequest.getWeightKg()), "70");
@@ -65,7 +68,7 @@ public class Training {
                 ? "Nenhum (Primeiro plano do aluno)"
                 : String.join(", ", exerciciosDoS3);
 
-        // --- NOVIDADE: DETEÇÃO DE FOCO ESPECÍFICO (EX: GLÚTEO) ---
+        // --- DETEÇÃO DE FOCO ESPECÍFICO (EX: GLÚTEO) ---
         boolean isGluteFocus = objectiveText.toLowerCase().contains("glúteo") || objectiveText.toLowerCase().contains("gluteo");
         String diretrizFocoEspecial = isGluteFocus ? """
                 [FOCO PRIORITÁRIO: GLÚTEOS]
@@ -125,14 +128,14 @@ public class Training {
                 """.formatted(protocol.getSuggestedExercises(), protocol.getForbiddenExercises(), pathologyText);
 
         String diretrizAquecimento = """
-                [REGRA OBRIGATÓRIA DE AQUECIMENTO E MOBILIDADE]
-                - Se houver patologia ("%s"), o exercício de "order": 1 DEVE ser de Reabilitação/Mobilidade focado nessa área.
-                - Se não houver patologia, o "order": 1 deve ser Mobilidade Geral (ex: Cat Cow ou Y-W-T).
-                - O aquecimento prepara a articulação para o esforço subsequente.
-                """.formatted(pathologyText);
+            [REGRA OBRIGATÓRIA DE AQUECIMENTO E MOBILIDADE]
+            - Se houver patologia ("%s"), o exercício de "order": 1 DEVE ser de Reabilitação/Mobilidade focado nessa área.
+            - Se não houver patologia, o "order": 1 deve ser Mobilidade Geral (ex: Cat Cow ou Y-W-T).
+            ...
+            """.formatted(pathologyText);
 
-        String diretrizTreino = getString(userRequest, pathologyText, protocol, durationText, descansoEfetivo, volumeIdeal);
-        String diretrizAlimentar = getString(macros);
+        String diretrizTreino = buildDiretrizTreino(userRequest, durationText, volumeIdeal);
+        String diretrizAlimentar = buildDiretrizAlimentar(macros);
 
         String diretrizRepertorio = """
                 EXPANSÃO DE REPERTÓRIO:
@@ -149,47 +152,45 @@ public class Training {
                 """.formatted(locationText, filtroEquipamento);
 
         String diretrizArrefecimento = """
-                REGRA DE ARREFECIMENTO:
-                - O ÚLTIMO exercício de cada dia deve ser Alongamento Estático focado em %s.
-                - No campo "reps", especifica o tempo (ex: "30-60 seg").
-                """.formatted(pathologyText);
+            REGRA DE ARREFECIMENTO:
+            - O ÚLTIMO exercício de cada dia deve ser Alongamento Estático focado em %s.
+            ...
+            """.formatted(pathologyText);
 
-        String nomenclaturaBase = isGluteFocus ? "Foco Glúteos/Inferiores" : "PUSH/PULL/LEGS (Foco Hipertrofia)";
+        String diretrizMobilidadeCondicional = """
+        [REGRA DE OURO: MOBILIDADE ESPECÍFICA SÓ COM QUEIXA CORRESPONDENTE]
+        - Exercícios de mobilidade/reabilitação ESPECÍFICOS de uma articulação (ex: "Mobilidade Tornozelo", "Rotação Externa", "Clamshell") \
+        só podem ser usados SE a patologia relatada mencionar explicitamente essa zona do corpo.
+        - Patologia relatada pelo aluno: "%s".
+        - Se a patologia for "Nenhuma limitação relatada" ou não mencionar uma articulação específica, \
+        é PROIBIDO usar "Mobilidade Tornozelo", "Rotação Externa" ou qualquer exercício de reabilitação dirigido a uma queixa que o aluno não tem.
+        - Nesse caso (sem patologia), usa APENAS mobilidade GERAL: "Cat Cow", "Y-W-T", "Dead Bug", "Bird Dog" ou "Equilíbrio Unipodal".
+        - Exemplo errado: aluno sem patologia recebe "Mobilidade Tornozelo" -> ERRO CRÍTICO.
+        - Exemplo correto: aluno com patologia "Tornozelo" recebe "Mobilidade Tornozelo" como order 1 -> CORRETO.
+        """.formatted(pathologyText);
 
-        String diretrizNomenclaturaDias = """
-        REGRAS ESTRITAS DE DIVISÃO (FREQUÊNCIA %d DIAS):
-        1. NOMENCLATURA: O campo "name" de cada bloco deve seguir o padrão: "Dia X - [FOCO]: [GRUPOS MUSCULARES]". 
-           - Use a base: %s.
-        2. REABILITAÇÃO DIÁRIA (OBRIGATÓRIO): O primeiro exercício (Order 1) de TODOS os dias deve ser obrigatoriamente para %s.
-        3. VARIABILIDADE: Proibido repetir exercícios entre os dias. Cada bloco deve ter 100%% de exercícios únicos.
-        4. ESTRUTURA: Gere exatamente %d blocos dentro do array "plan".
-        """.formatted(userRequest.getFrequencyPerWeek(), nomenclaturaBase, pathologyText, userRequest.getFrequencyPerWeek()
-        );
+        String diretrizNomenclaturaDias = buildDiretrizNomenclaturaDias(userRequest, isGluteFocus, pathologyText);
 
         String diretrizReabilitacao = pathologyText.contains("Nenhuma") ?
                 "Foca o primeiro exercício em mobilidade geral ou ativação dinâmica." :
-                getString(pathologyText) + "\n- REGRA: Proibido repetir o mesmo exercício de reabilitação em dias consecutivos.";
+                buildDiretrizReabilitacao(pathologyText) + "\n- REGRA: Proibido repetir o mesmo exercício de reabilitação em dias consecutivos.";
 
-        String diretrizDicionario = """
-                ### [REGRA DE OURO: RESTRIÇÃO RÍGIDA DE INVENTÁRIO] ###
-                O sistema de vídeo falhará se usares nomes genéricos. É OBRIGATÓRIO usar os nomes exatos do dicionário abaixo.
-                
-                [PROIBIÇÕES CRÍTICAS]
-                - NUNCA uses "Prancha" -> Usa "Prancha Abdominal".
-                - NUNCA uses "Alongamento" -> Usa "Cat Cow", "Y-W-T" ou "Mobilidade Tornozelo".
-                - NUNCA inventes variações como "Supino Reto" -> Usa "Supino Plano".
-                
-                [DICIONÁRIO OFICIAL SQL]
-                - PEITO: Supino Plano, Supino Inclinado, Peck Deck, Crossover, Flexões, Dips / Paralelas, Supino com Halteres, Aberturas com Halteres, Flexões Diamond
-                - COSTAS: Puxada à Frente, Remada Curvada, Remada Unilateral, Pulldown Corda, Remada Baixa, Elevações / Pull-ups, Puxada Pega Estreita, Remada Cavalinho
-                - PERNAS: Agachamento Livre, Leg Press 45, Cadeira Extensora, Mesa Flexora, Stiff / RDL, Gémeos em Pé, Lunge / Afundo, Elevação Pélvica, Agachamento Goblet, Agachamento Búlgaro
-                - OMBROS: Desenvolvimento, Elevação Lateral, Face Pull, Elevação Frontal, Arnold Press, Elevação Lateral Polia
-                - BRAÇOS: Rosca Direta, Tríceps Corda, Rosca Martelo, Tríceps Testa, Rosca Concentrada
-                - CORE: Dead Bug, Prancha Abdominal, Bird Dog, Prancha Lateral, Dead Bug com Carga
-                - REAB/MOBILIDADE: Cat Cow, Clamshell, Y-W-T, Rotação Externa, Mobilidade Tornozelo, Equilíbrio Unipodal
-                
-                Nota: Se um exercício for de mobilidade/reabilitação, ele DEVE ser o primeiro do treino (Order 1).
-                """;
+        // --- DICIONÁRIO DE EXERCÍCIOS (BD com fallback estático) ---
+        Map<String, List<String>> exerciseDictionary;
+        try {
+            exerciseDictionary = exerciseVideoService.getExerciseDictionary();
+        } catch (Exception e) {
+            log.error("Erro ao obter dicionário de exercícios da BD, a usar fallback estático: {}", e.getMessage());
+            exerciseDictionary = Collections.emptyMap();
+        }
+
+        if (exerciseDictionary == null || exerciseDictionary.isEmpty()) {
+            log.warn("Dicionário de exercícios da BD vazio ou indisponível — a usar fallback estático.");
+            exerciseDictionary = FALLBACK_DICTIONARY;
+        }
+
+        String diretrizDicionario = buildDiretrizDicionario(exerciseDictionary);
+
         String diretrizAnatomiaDetalhada = """
                 DETALHAMENTO ANATÓMICO:
                 - No campo 'muscleGroup', lista: Motores Primários (Agonistas), Sinergistas e Estabilizadores.
@@ -211,13 +212,16 @@ public class Training {
                 4. TOTAIS DIETA: %d kcal, %dg Prot, %dg Carbs, %dg Fats.
                 """.formatted(totalMinutos, volumeIdeal, protocol.getTempo(), descansoEfetivo, macros.dailyCalories(), macros.protein(), macros.carbs(), macros.fats());
 
-        // --- CONSTRUÇÃO DO PROMPT FINAL ---
-        String blocoDiretrizesCompletas = String.join("\n", diretrizFocoEspecial,
-                diretrizVariedade,diretrizAquecimento, diretrizSegurancaIniciante, diretrizProtocolo, diretrizReabilitacao,
-                diretrizBiomecanica, diretrizAnatomiaDetalhada, diretrizCargasDinamicas,
-                diretrizEquipamento, diretrizTreino, diretrizRepertorio, diretrizArrefecimento,
-                diretrizNomenclaturaDias, diretrizDicionario, diretrizAlimentar
-        );
+        // --- CONSTRUÇÃO DO PROMPT FINAL (blocos vazios são filtrados) ---
+        String blocoDiretrizesCompletas = Stream.of(
+                        diretrizFocoEspecial, diretrizVariedade, diretrizAquecimento, diretrizMobilidadeCondicional,
+                        diretrizSegurancaIniciante, diretrizProtocolo, diretrizReabilitacao, diretrizBiomecanica,
+                        diretrizAnatomiaDetalhada, diretrizCargasDinamicas, diretrizEquipamento, diretrizTreino,
+                        diretrizRepertorio, diretrizArrefecimento, diretrizNomenclaturaDias, diretrizDicionario,
+                        diretrizAlimentar
+                )
+                .filter(s -> s != null && !s.isBlank())
+                .collect(Collectors.joining("\n"));
 
         String userPrompt = """
                 ATUAÇÃO: Personal Trainer e Nutricionista Profissional (Portugal).
@@ -263,14 +267,38 @@ public class Training {
                 macros.protein(), macros.carbs(), macros.fats()
         );
 
-        return executeGeneration(userPrompt, userRequest, totalMinutos);
+        return executeGeneration(userPrompt, totalMinutos, exerciseDictionary, pathologyText);
     }
 
-// ... (mantenha os imports e o início da classe iguais) ...
+    @NotNull
+    private static String buildDiretrizNomenclaturaDias(UserProfileRequest userRequest, boolean isGluteFocus, String pathologyText) {
+        String nomenclaturaBase = isGluteFocus ? "Foco Glúteos/Inferiores" : "PUSH/PULL/LEGS (Foco Hipertrofia)";
 
-    private TrainingPlanResponse executeGeneration(String prompt, UserProfileRequest userRequest, int totalMinutos) {
+        return """
+        REGRAS ESTRITAS DE DIVISÃO (FREQUÊNCIA %d DIAS):
+        1. NOMENCLATURA: O campo "name" de cada bloco deve seguir o padrão: "Dia X - [FOCO]: [GRUPOS MUSCULARES]". 
+           - Use a base: %s.
+        2. REABILITAÇÃO DIÁRIA (OBRIGATÓRIO): O primeiro exercício (Order 1) de TODOS os dias deve ser obrigatoriamente para %s.
+        3. VARIABILIDADE: Proibido repetir exercícios entre os dias. Cada bloco deve ter 100%% de exercícios únicos.
+        4. ESTRUTURA: Gere exatamente %d blocos dentro do array "plan".
+        """.formatted(userRequest.getFrequencyPerWeek(), nomenclaturaBase, pathologyText, userRequest.getFrequencyPerWeek());
+    }
+
+    /**
+     * Executa a geração do plano via IA, com validação estrita do inventário
+     * de exercícios e retries com feedback específico do erro.
+     */
+    private TrainingPlanResponse executeGeneration(
+            String prompt, int totalMinutos, Map<String, List<String>> exerciseDictionary, String pathologyText) {
+
         log.info("Iniciando executeGeneration no ChatModel.");
         int maxRetries = 5;
+
+        // Calculado uma única vez por chamada (não por exercício) para eficiência
+        Set<String> validNames = flattenDictionary(
+                (exerciseDictionary == null || exerciseDictionary.isEmpty())
+                        ? FALLBACK_DICTIONARY : exerciseDictionary
+        );
 
         StringBuilder promptBuilder = new StringBuilder(prompt);
         for (int attempt = 0; attempt <= maxRetries; attempt++) {
@@ -288,74 +316,44 @@ public class Training {
 
                 if (!isVolumeValido) throw new RuntimeException("Volume insuficiente.");
 
-                // 3. MAPEAMENTO DE EXERCÍCIOS (FORÇANDO ARRAYLIST)
-                int finalAttempt = attempt;
-                List<TrainingDay> updatedPlan = new ArrayList<>(); // Criamos uma lista mutável explicitamente
+                // 3. MAPEAMENTO E VALIDAÇÃO DE INVENTÁRIO DOS EXERCÍCIOS
+                List<TrainingDay> updatedPlan = new ArrayList<>();
 
                 if (response.getPlan() != null) {
                     for (TrainingDay day : response.getPlan()) {
-                        List<TrainingExercise> enrichedExercises = day.getExercises().stream()
-                                .map(ex -> {
-                                    String correctedName = normalizeExerciseName(ex.getName());
-                                    String finalUrl = exerciseVideoService.getVideoUrl(correctedName);
+                        List<TrainingExercise> exercisesOfDay = day.getExercises() != null
+                                ? day.getExercises() : Collections.emptyList();
 
-                                    if (finalUrl.contains("youtube.com/results")) {
-                                        log.error("[ALERTA DE INVENTÁRIO] A IA usou '{}'.", ex.getName());
-                                        throw new RuntimeException("Exercício inválido detectado: " + ex.getName());
-                                    }
-
-                                    // Usamos o Builder da CLASSE (não Record)
-                                    return TrainingExercise.builder()
-                                            .order(ex.getOrder())
-                                            .name(correctedName)
-                                            .muscleGroup(ex.getMuscleGroup())
-                                            .equipment(ex.getEquipment())
-                                            .intensity(ex.getIntensity())
-                                            .sets(ex.getSets())
-                                            .reps(ex.getReps())
-                                            .rest(ex.getRest())
-                                            .tempo(ex.getTempo())
-                                            .details(ex.getDetails())
-                                            .notas(ex.getNotas())
-                                            .weight(ex.getWeight())
-                                            .cargaAtual(ex.getCargaAtual())
-                                            .videoUrl(finalUrl)
-                                            .date(java.time.LocalDate.now().toString())
-                                            .movementPlane(ex.getMovementPlane())
-                                            .build();
-                                })
-                                .collect(java.util.stream.Collectors.toCollection(java.util.ArrayList::new));
+                        List<TrainingExercise> enrichedExercises = exercisesOfDay.stream()
+                                .map(ex -> enrichExercise(ex, validNames, pathologyText))
+                                .collect(Collectors.toCollection(ArrayList::new));
 
                         updatedPlan.add(new TrainingDay(day.getDay(), enrichedExercises));
                     }
                 }
 
-                // 4. LIMPEZA DA DIETA (PONTO ONDE O ERRO PODE ESTAR)
+                // 4. LIMPEZA DA DIETA (garante listas mutáveis)
                 DietPlan diet = response.getDietPlan();
-                if (diet != null) {
-                    // Garante que a lista de refeições é mutável
-                    if (diet.getMeals() != null) {
-                        List<Meal> mutableMeals = new ArrayList<>();
-                        for (Meal m : diet.getMeals()) {
-                            // Garante que os ingredientes dentro de cada refeição também sejam mutáveis
-                            if (m.getIngredients() != null) {
-                                m.setIngredients(new ArrayList<>(m.getIngredients()));
-                            }
-                            mutableMeals.add(m);
+                if (diet != null && diet.getMeals() != null) {
+                    List<Meal> mutableMeals = new ArrayList<>();
+                    for (Meal m : diet.getMeals()) {
+                        if (m.getIngredients() != null) {
+                            m.setIngredients(new ArrayList<>(m.getIngredients()));
                         }
-                        diet.setMeals(mutableMeals);
+                        mutableMeals.add(m);
                     }
+                    diet.setMeals(mutableMeals);
                 }
 
                 log.info("Geração concluída com sucesso e validada contra inventário.");
 
-                // 5. RESPOSTA FINAL (Uso de Builder para garantir objeto limpo)
+                // 5. RESPOSTA FINAL
                 return TrainingPlanResponse.builder()
                         .isExistingPlan(false)
                         .summary(response.getSummary())
                         .plan(updatedPlan)
                         .dietPlan(diet)
-                        .userProfile(null) // UserProfileRequest agora é uma Classe DTO
+                        .userProfile(null)
                         .build();
 
             } catch (Exception e) {
@@ -366,13 +364,60 @@ public class Training {
                     throw new RuntimeException("Falha crítica na geração do plano.");
                 }
 
-                promptBuilder.append("\n\nERRO NA TENTATIVA ANTERIOR: ").append(e.getMessage()).append("\nPOR FAVOR, USA APENAS OS NOMES EXATOS DO DICIONÁRIO FORNECIDO.");
+                promptBuilder.append("\n\nERRO NA TENTATIVA ANTERIOR: ").append(e.getMessage())
+                        .append("\nCORRIGE ISTO NA PRÓXIMA RESPOSTA: usa APENAS os nomes exatos do DICIONÁRIO OFICIAL fornecido, carácter a carácter.");
             }
         }
-        prompt = promptBuilder.toString();
+
         throw new RuntimeException("Falha na geração.");
     }
-    // ... (mantenha o resto dos métodos auxiliares iguais) ...
+
+    /**
+     * Normaliza, valida contra o inventário e resolve o vídeo de um exercício.
+     * Lança exceção com mensagem específica se o nome não existir no dicionário —
+     * essa mensagem é reaproveitada no retry para guiar a IA à correção certa.
+     */
+    private TrainingExercise enrichExercise(TrainingExercise ex, Set<String> validNames, String pathologyText) {
+        String correctedName = normalizeExerciseName(ex.getName());
+
+        if (!validNames.contains(correctedName)) {
+            log.error("[ALERTA DE INVENTÁRIO] Nome fora do dicionário: '{}' (original da IA: '{}')",
+                    correctedName, ex.getName());
+            throw new RuntimeException(
+                    "Exercício fora do inventário: \"" + ex.getName() + "\". " +
+                            "Este nome não existe no DICIONÁRIO OFICIAL. Substitui por um nome válido da mesma categoria muscular."
+            );
+        }
+        validarMobilidadeCondicional(correctedName, pathologyText); // NOVA VALIDAÇÃO
+
+        String finalUrl = exerciseVideoService.getVideoUrl(correctedName);
+
+        return TrainingExercise.builder()
+                .order(ex.getOrder())
+                .name(correctedName)
+                .muscleGroup(ex.getMuscleGroup())
+                .equipment(ex.getEquipment())
+                .intensity(ex.getIntensity())
+                .sets(ex.getSets())
+                .reps(ex.getReps())
+                .rest(ex.getRest())
+                .tempo(ex.getTempo())
+                .details(ex.getDetails())
+                .notas(ex.getNotas())
+                .weight(ex.getWeight())
+                .cargaAtual(ex.getCargaAtual())
+                .videoUrl(finalUrl)
+                .date(java.time.LocalDate.now().toString())
+                .movementPlane(ex.getMovementPlane())
+                .build();
+    }
+
+    private Set<String> flattenDictionary(Map<String, List<String>> dictionary) {
+        return dictionary.values().stream()
+                .flatMap(List::stream)
+                .collect(Collectors.toCollection(HashSet::new));
+    }
+
     private String cleanMarkdown(String text) {
         if (text == null || text.isBlank()) return "{}";
         String cleaned = text.replaceAll("(?s)```json\\s*(.*?)\\s*```", "$1").trim();
@@ -382,7 +427,7 @@ public class Training {
     }
 
     private String calcularDescansoCientifico(Enum.TrainingProtocol protocol, String objective, String cargaAtual) {
-        double peso = 0;
+        double peso;
         try {
             peso = Double.parseDouble(cargaAtual.replaceAll("[^0-9.]", ""));
         } catch (Exception e) {
@@ -414,7 +459,7 @@ public class Training {
     }
 
     @NotNull
-    private static String getString(Macros macros) {
+    private static String buildDiretrizAlimentar(Macros macros) {
         StringBuilder dietTable = new StringBuilder();
         for (MealSuggestion m : macros.mealSuggestions()) {
             dietTable.append("- %s (%s): %d kcal [P: %dg, C: %dg, G: %dg]\n".formatted(
@@ -426,7 +471,7 @@ public class Training {
     }
 
     @NotNull
-    private static String getString(UserProfileRequest userRequest, String pathologyText, Enum.TrainingProtocol protocol, String durationText, String descanso, int volumeIdeal) {
+    private static String buildDiretrizTreino(UserProfileRequest userRequest, String durationText, int volumeIdeal) {
         String divisao = switch (userRequest.getFrequencyPerWeek()) {
             case 1 -> "FULL BODY";
             case 2 -> "SUPERIOR / INFERIOR";
@@ -437,7 +482,7 @@ public class Training {
     }
 
     @NotNull
-    private static String getString(String pathologyText) {
+    private static String buildDiretrizReabilitacao(String pathologyText) {
         StringBuilder correcao = new StringBuilder();
         String lower = pathologyText.toLowerCase();
         if (lower.contains("tornozelo")) correcao.append("- Mobilidade de Tornozelo, Propriocepção.\n");
@@ -447,12 +492,12 @@ public class Training {
         return "REABILITAÇÃO ANATÓMICA:\n" + correcao;
     }
 
+    // --- Sinónimos: normaliza variações comuns da IA para o nome oficial ---
     private static final Map<String, String> EXERCISE_MAP;
 
     static {
         Map<String, String> map = new java.util.HashMap<>();
 
-        // Mapeamento de Sinónimos (Chave minúscula -> Nome oficial no Inventário)
         map.put("agachamento cálice", "Agachamento Goblet");
         map.put("agachamento goblet", "Agachamento Goblet");
         map.put("puxada corda", "Pulldown Corda");
@@ -470,26 +515,131 @@ public class Training {
         map.put("dead bug", "Dead Bug");
         map.put("deadbug", "Dead Bug");
 
+        // Sinónimos para os nomes canónicos únicos escolhidos no FALLBACK_DICTIONARY
+        map.put("dips", "Dips");
+        map.put("paralelas", "Dips");
+        map.put("Dips / Paralelas", "Dips");
+        map.put("stiff", "Stiff");
+        map.put("rdl", "Stiff");
+        map.put("Stiff / RDL", "Stiff");
+        map.put("elevações", "Elevações");
+        map.put("pull-ups", "Elevações");
+        map.put("Elevações / Pull-ups", "Elevações");
+        map.put("lunge", "Lunge");
+        map.put("afundo", "Lunge");
+        map.put("Lunge / Afundo", "Lunge");
+
         EXERCISE_MAP = Collections.unmodifiableMap(map);
     }
 
     private String normalizeExerciseName(String aiSuggestion) {
         if (aiSuggestion == null || aiSuggestion.isBlank()) return aiSuggestion;
 
-        // Limpeza: remove espaços extras e pontuação final comum (.,!)
         String cleanSuggestion = aiSuggestion.trim().replaceAll("[.,!?]$", "");
         String lowerSuggestion = cleanSuggestion.toLowerCase();
 
-        // Tenta encontrar no mapa de sinónimos
         if (EXERCISE_MAP.containsKey(lowerSuggestion)) {
             return EXERCISE_MAP.get(lowerSuggestion);
         }
 
-        // Lógica de fallback para casos dinâmicos (ex: nomes que contêm palavras-chave)
         if (lowerSuggestion.contains("puxada") && lowerSuggestion.contains("frente")) {
             return "Puxada à Frente";
         }
 
         return cleanSuggestion;
+    }
+
+    // --- Fallback estático usado quando a BD está indisponível ou vazia ---
+    private static final Map<String, List<String>> FALLBACK_DICTIONARY;
+
+    static {
+        Map<String, List<String>> map = new java.util.LinkedHashMap<>();
+
+        map.put("PEITO", List.of(
+                "Supino Plano", "Supino Inclinado", "Peck Deck", "Crossover",
+                "Flexões", "Dips", "Supino com Halteres", "Aberturas com Halteres", "Flexões Diamond"
+        ));
+        map.put("COSTAS", List.of(
+                "Puxada à Frente", "Remada Curvada", "Remada Unilateral", "Pulldown Corda",
+                "Remada Baixa", "Elevações", "Puxada Pega Estreita", "Remada Cavalinho"
+        ));
+        map.put("PERNAS", List.of(
+                "Agachamento Livre", "Leg Press 45", "Cadeira Extensora", "Mesa Flexora",
+                "Stiff", "Gémeos em Pé", "Lunge", "Elevação Pélvica", "Agachamento Goblet", "Agachamento Búlgaro"
+        ));
+        map.put("OMBROS", List.of(
+                "Desenvolvimento", "Elevação Lateral", "Face Pull", "Elevação Frontal",
+                "Arnold Press", "Elevação Lateral Polia"
+        ));
+        map.put("BRAÇOS", List.of(
+                "Rosca Direta", "Tríceps Corda", "Rosca Martelo", "Tríceps Testa", "Rosca Concentrada"
+        ));
+        map.put("CORE", List.of(
+                "Dead Bug", "Prancha Abdominal", "Bird Dog", "Prancha Lateral", "Dead Bug com Carga"
+        ));
+        map.put("REAB/MOBILIDADE", List.of(
+                "Cat Cow", "Clamshell", "Y-W-T", "Rotação Externa", "Mobilidade Tornozelo", "Equilíbrio Unipodal"
+        ));
+
+        FALLBACK_DICTIONARY = Collections.unmodifiableMap(map);
+    }
+
+    private String buildDiretrizDicionario(Map<String, List<String>> dictionary) {
+        StringBuilder sb = new StringBuilder("""
+                ### [REGRA DE OURO: RESTRIÇÃO RÍGIDA DE INVENTÁRIO] ###
+                O sistema de vídeo FALHARÁ se usares um nome fora deste dicionário. \
+                É OBRIGATÓRIO copiar o nome EXATO (incluindo acentuação e maiúsculas/minúsculas) \
+                de um dos exercícios listados abaixo — nunca inventes, combines, traduzas ou abrevies nomes.
+
+                [ERROS COMUNS A EVITAR — exemplos reais de falhas anteriores]
+                - "Prancha" -> usa "Prancha Abdominal"
+                - "Supino Reto" -> usa "Supino Plano"
+                - "Alongamento" -> usa "Cat Cow", "Y-W-T" ou "Mobilidade Tornozelo"
+                - "Dips / Paralelas" -> usa apenas "Dips"
+
+                [REGRAS DE CORRESPONDÊNCIA EXATA]
+                - Copia o nome literalmente da lista, carácter a carácter.
+                - Não uses sinónimos, traduções livres, plurais ou variações estéticas do nome.
+                - Se nenhum exercício da lista servir perfeitamente para o grupo muscular pretendido, escolhe o mais próximo disponível NA MESMA CATEGORIA — nunca inventes um nome novo.
+
+                [DICIONÁRIO OFICIAL DE EXERCÍCIOS DISPONÍVEIS]
+                """);
+
+        dictionary.forEach((categoria, nomes) ->
+                sb.append("- ").append(categoria.toUpperCase())
+                        .append(": ").append(String.join(", ", nomes))
+                        .append("\n")
+        );
+
+        sb.append("""
+                
+                Nota: Se um exercício for de mobilidade/reabilitação (categoria REAB/MOBILIDADE), \
+                ele DEVE ser o primeiro exercício do treino (Order 1).
+                """);
+
+        return sb.toString();
+    }
+
+    private static final Map<String, String> MOBILIDADE_ESPECIFICA_PARA_PATOLOGIA = Map.of(
+            "Mobilidade Tornozelo", "tornozelo",
+            "Rotação Externa", "ombro",
+            "Clamshell", "joelho"
+    );
+
+    private void validarMobilidadeCondicional(String exerciseName, String pathologyText) {
+        String palavraChave = MOBILIDADE_ESPECIFICA_PARA_PATOLOGIA.get(exerciseName);
+        if (palavraChave != null) {
+            boolean patologiaCorresponde = pathologyText != null
+                    && pathologyText.toLowerCase().contains(palavraChave);
+
+            if (!patologiaCorresponde) {
+                throw new RuntimeException(
+                        "Exercício de mobilidade específica \"" + exerciseName +
+                                "\" usado sem a patologia correspondente (\"" + palavraChave +
+                                "\"). O aluno relatou: \"" + pathologyText + "\". " +
+                                "Usa mobilidade GERAL em vez disso (Cat Cow, Y-W-T, Dead Bug, Bird Dog, Equilíbrio Unipodal)."
+                );
+            }
+        }
     }
 }
