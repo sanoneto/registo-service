@@ -11,12 +11,7 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -128,11 +123,13 @@ public class Training {
                 """.formatted(protocol.getSuggestedExercises(), protocol.getForbiddenExercises(), pathologyText);
 
         String diretrizAquecimento = """
-            [REGRA OBRIGATÓRIA DE AQUECIMENTO E MOBILIDADE]
-            - Se houver patologia ("%s"), o exercício de "order": 1 DEVE ser de Reabilitação/Mobilidade focado nessa área.
-            - Se não houver patologia, o "order": 1 deve ser Mobilidade Geral (ex: Cat Cow ou Y-W-T).
-            ...
-            """.formatted(pathologyText);
+                [REGRA OBRIGATÓRIA DE AQUECIMENTO E MOBILIDADE]
+                - Se houver patologia ("%s"), o exercício de "order": 1 DEVE ser de Reabilitação/Mobilidade focado nessa área (categoria REABILITAÇÃO do dicionário).
+                - Se não houver patologia, o "order": 1 deve ser Mobilidade Geral, escolhida da categoria MOBILIDADE do dicionário.
+                - RELAÇÃO COM O DIA: sempre que possível, escolhe o aquecimento relacionado com o grupo muscular treinado nesse dia. Ex: dia de COSTAS -> "Y-W-T" ou "Open Books" (mobilidade escapular/torácica); dia de PERNAS -> "Knee-to-Wall" ou "Cossack Squat"; dia de PEITO/OMBROS sem opção específica -> usa mobilidade geral como "Cat Cow".
+                - VARIEDADE OBRIGATÓRIA: NÃO uses sempre o mesmo exercício de mobilidade em todos os dias.
+                - É PROIBIDO usar o mesmo exercício de aquecimento em dois dias CONSECUTIVOS.
+                """.formatted(pathologyText);
 
         String diretrizTreino = buildDiretrizTreino(userRequest, durationText, volumeIdeal);
         String diretrizAlimentar = buildDiretrizAlimentar(macros);
@@ -152,22 +149,24 @@ public class Training {
                 """.formatted(locationText, filtroEquipamento);
 
         String diretrizArrefecimento = """
-            REGRA DE ARREFECIMENTO:
-            - O ÚLTIMO exercício de cada dia deve ser Alongamento Estático focado em %s.
-            ...
-            """.formatted(pathologyText);
+                REGRA DE ARREFECIMENTO:
+                - O ÚLTIMO exercício de cada dia deve ser um exercício da categoria ALONGAMENTO do DICIONÁRIO OFICIAL, focado em %s.
+                - RELAÇÃO COM O DIA: escolhe o alongamento relacionado com o grupo muscular treinado nesse dia. Ex: dia de COSTAS -> "Alongamento do músculo grande dorsal"; dia de PERNAS -> "Flexores da Anca", "Alongamento borboleta", "Walking Lunges with Reach" ou "Frankenstein Walk".
+                - VARIEDADE OBRIGATÓRIA: NÃO uses sempre o mesmo exercício de arrefecimento em todos os dias.
+                - É PROIBIDO usar o mesmo exercício de arrefecimento em dois dias CONSECUTIVOS.
+                """.formatted(pathologyText);
 
         String diretrizMobilidadeCondicional = """
-        [REGRA DE OURO: MOBILIDADE ESPECÍFICA SÓ COM QUEIXA CORRESPONDENTE]
-        - Exercícios de mobilidade/reabilitação ESPECÍFICOS de uma articulação (ex: "Mobilidade Tornozelo", "Rotação Externa", "Clamshell") \
-        só podem ser usados SE a patologia relatada mencionar explicitamente essa zona do corpo.
-        - Patologia relatada pelo aluno: "%s".
-        - Se a patologia for "Nenhuma limitação relatada" ou não mencionar uma articulação específica, \
-        é PROIBIDO usar "Mobilidade Tornozelo", "Rotação Externa" ou qualquer exercício de reabilitação dirigido a uma queixa que o aluno não tem.
-        - Nesse caso (sem patologia), usa APENAS mobilidade GERAL: "Cat Cow", "Y-W-T", "Dead Bug", "Bird Dog" ou "Equilíbrio Unipodal".
-        - Exemplo errado: aluno sem patologia recebe "Mobilidade Tornozelo" -> ERRO CRÍTICO.
-        - Exemplo correto: aluno com patologia "Tornozelo" recebe "Mobilidade Tornozelo" como order 1 -> CORRETO.
-        """.formatted(pathologyText);
+                [REGRA DE OURO: MOBILIDADE ESPECÍFICA SÓ COM QUEIXA CORRESPONDENTE]
+                - Exercícios de mobilidade/reabilitação ESPECÍFICOS de uma articulação (ex: "Rotação Externa", "Clamshell") \
+                só podem ser usados SE a patologia relatada mencionar explicitamente essa zona do corpo.
+                - Patologia relatada pelo aluno: "%s".
+                - Se a patologia for "Nenhuma limitação relatada" ou não mencionar uma articulação específica, \
+                é PROIBIDO usar "Rotação Externa", "Clamshell" ou qualquer exercício de reabilitação dirigido a uma queixa que o aluno não tem.
+                - Nesse caso (sem patologia), usa APENAS mobilidade GERAL: "Cat Cow", "Y-W-T", "Open Books", "Knee-to-Wall", "Cossack Squat" ou "Equilíbrio Unipodal".
+                - Exemplo errado: aluno sem patologia recebe "Rotação Externa" -> ERRO CRÍTICO.
+                - Exemplo correto: aluno com patologia "Ombro" recebe "Rotação Externa" como order 1 -> CORRETO.
+                """.formatted(pathologyText);
 
         String diretrizNomenclaturaDias = buildDiretrizNomenclaturaDias(userRequest, isGluteFocus, pathologyText);
 
@@ -267,29 +266,37 @@ public class Training {
                 macros.protein(), macros.carbs(), macros.fats()
         );
 
-        return executeGeneration(userPrompt, totalMinutos, exerciseDictionary, pathologyText);
+        return executeGeneration(userPrompt, totalMinutos, exerciseDictionary, pathologyText, exerciciosDoS3);
     }
 
     @NotNull
-    private static String buildDiretrizNomenclaturaDias(UserProfileRequest userRequest, boolean isGluteFocus, String pathologyText) {
-        String nomenclaturaBase = isGluteFocus ? "Foco Glúteos/Inferiores" : "PUSH/PULL/LEGS (Foco Hipertrofia)";
+    private String buildDiretrizNomenclaturaDias(UserProfileRequest userRequest, boolean isGluteFocus, String pathologyText) {
+        List<String> sequencia = gerarSequenciaDivisao(userRequest.getFrequencyPerWeek(), isGluteFocus);
+
+        StringBuilder listaDias = new StringBuilder();
+        for (int i = 0; i < sequencia.size(); i++) {
+            listaDias.append("   - Dia ").append(i + 1).append(" - ").append(sequencia.get(i)).append("\n");
+        }
 
         return """
-        REGRAS ESTRITAS DE DIVISÃO (FREQUÊNCIA %d DIAS):
-        1. NOMENCLATURA: O campo "name" de cada bloco deve seguir o padrão: "Dia X - [FOCO]: [GRUPOS MUSCULARES]". 
-           - Use a base: %s.
-        2. REABILITAÇÃO DIÁRIA (OBRIGATÓRIO): O primeiro exercício (Order 1) de TODOS os dias deve ser obrigatoriamente para %s.
-        3. VARIABILIDADE: Proibido repetir exercícios entre os dias. Cada bloco deve ter 100%% de exercícios únicos.
-        4. ESTRUTURA: Gere exatamente %d blocos dentro do array "plan".
-        """.formatted(userRequest.getFrequencyPerWeek(), nomenclaturaBase, pathologyText, userRequest.getFrequencyPerWeek());
+                REGRAS ESTRITAS DE DIVISÃO (FREQUÊNCIA %d DIAS):
+                1. NOMENCLATURA OBRIGATÓRIA: Usa EXATAMENTE estes nomes de dia, NESTA ORDEM, sem alterar texto, categoria ou sequência:
+                %s
+                2. PROIBIDO REPETIR A MESMA CATEGORIA (PUSH/PULL/LEGS/SUPERIORES/INFERIORES) EM DIAS CONSECUTIVOS. A sequência acima já garante isso — não a modifiques.
+                3. REABILITAÇÃO DIÁRIA (OBRIGATÓRIO): O primeiro exercício (Order 1) de TODOS os dias deve ser obrigatoriamente para %s.
+                4. VARIABILIDADE: Proibido repetir exercícios entre os dias. Cada bloco deve ter 100%% de exercícios únicos.
+                5. ESTRUTURA: Gere exatamente %d blocos dentro do array "plan", correspondendo 1:1 à lista acima.
+                """.formatted(userRequest.getFrequencyPerWeek(), listaDias, pathologyText, userRequest.getFrequencyPerWeek());
     }
 
     /**
      * Executa a geração do plano via IA, com validação estrita do inventário
      * de exercícios e retries com feedback específico do erro.
      */
+
     private TrainingPlanResponse executeGeneration(
-            String prompt, int totalMinutos, Map<String, List<String>> exerciseDictionary, String pathologyText) {
+            String prompt, int totalMinutos, Map<String, List<String>> exerciseDictionary,
+            String pathologyText, List<String> exerciciosAnteriores) {
 
         log.info("Iniciando executeGeneration no ChatModel.");
         int maxRetries = 5;
@@ -299,6 +306,32 @@ public class Training {
                 (exerciseDictionary == null || exerciseDictionary.isEmpty())
                         ? FALLBACK_DICTIONARY : exerciseDictionary
         );
+
+        // --- Opções disponíveis por categoria (para variedade e correspondência de grupo) ---
+        Set<String> categoriasAquecimento = Set.of("MOBILIDADE", "REABILITAÇÃO");
+        List<String> opcoesAquecimento = exerciseDictionary.entrySet().stream()
+                .filter(e -> categoriasAquecimento.stream().anyMatch(cat -> e.getKey().equalsIgnoreCase(cat)))
+                .flatMap(e -> e.getValue().stream())
+                .distinct()
+                .collect(Collectors.toList());
+        boolean exigirVariedadeAquecimento = opcoesAquecimento.size() >= 2;
+
+        Set<String> categoriasArrefecimento = Set.of("ALONGAMENTO");
+        List<String> opcoesArrefecimento = exerciseDictionary.entrySet().stream()
+                .filter(e -> categoriasArrefecimento.stream().anyMatch(cat -> e.getKey().equalsIgnoreCase(cat)))
+                .flatMap(e -> e.getValue().stream())
+                .distinct()
+                .collect(Collectors.toList());
+        boolean exigirVariedadeArrefecimento = opcoesArrefecimento.size() >= 2;
+
+        log.info("Variedade disponível — Aquecimento: {} opções (exigir variedade: {}) | Arrefecimento: {} opções (exigir variedade: {})",
+                opcoesAquecimento.size(), exigirVariedadeAquecimento, opcoesArrefecimento.size(), exigirVariedadeArrefecimento);
+
+        // Normaliza a lista de exercícios do plano anterior para comparação consistente
+        Set<String> nomesAnteriores = (exerciciosAnteriores == null ? List.<String>of() : exerciciosAnteriores)
+                .stream()
+                .map(this::normalizeExerciseName)
+                .collect(Collectors.toCollection(HashSet::new));
 
         StringBuilder promptBuilder = new StringBuilder(prompt);
         for (int attempt = 0; attempt <= maxRetries; attempt++) {
@@ -316,23 +349,107 @@ public class Training {
 
                 if (!isVolumeValido) throw new RuntimeException("Volume insuficiente.");
 
-                // 3. MAPEAMENTO E VALIDAÇÃO DE INVENTÁRIO DOS EXERCÍCIOS
-                List<TrainingDay> updatedPlan = new ArrayList<>();
-
-                if (response.getPlan() != null) {
-                    for (TrainingDay day : response.getPlan()) {
-                        List<TrainingExercise> exercisesOfDay = day.getExercises() != null
-                                ? day.getExercises() : Collections.emptyList();
-
-                        List<TrainingExercise> enrichedExercises = exercisesOfDay.stream()
-                                .map(ex -> enrichExercise(ex, validNames, pathologyText))
-                                .collect(Collectors.toCollection(ArrayList::new));
-
-                        updatedPlan.add(new TrainingDay(day.getDay(), enrichedExercises));
+                // 3. VALIDAÇÃO DE SEQUÊNCIA (sem repetição de categoria em dias consecutivos)
+                String categoriaAnterior = null;
+                for (TrainingDay day : response.getPlan()) {
+                    String categoriaAtual = extrairCategoriaDia(day.getDay());
+                    if (categoriaAtual != null && categoriaAtual.equalsIgnoreCase(categoriaAnterior)) {
+                        throw new RuntimeException(
+                                "Repetição de categoria de treino em dias consecutivos: \"" + categoriaAtual +
+                                        "\" apareceu duas vezes seguidas (dia \"" + day.getDay() + "\"). " +
+                                        "Segue rigorosamente a ordem de dias fornecida nas diretrizes de nomenclatura, sem repetir a mesma categoria em dias seguidos."
+                        );
                     }
+                    categoriaAnterior = categoriaAtual;
                 }
 
-                // 4. LIMPEZA DA DIETA (garante listas mutáveis)
+                // 4. MAPEAMENTO + VALIDAÇÃO DE INVENTÁRIO + UNICIDADE/VARIEDADE + CORRESPONDÊNCIA DE GRUPO
+                List<TrainingDay> updatedPlan = new ArrayList<>();
+                Set<String> nomesUsadosNoPlano = new HashSet<>(); // apenas para exercícios de TRABALHO (meio do treino)
+                String aquecimentoAnterior = null;
+                String arrefecimentoAnterior = null;
+                boolean pathologyEspecifica = pathologyText != null && !pathologyText.contains("Nenhuma");
+
+                for (TrainingDay day : response.getPlan()) {
+                    List<TrainingExercise> exercisesOfDay = day.getExercises() != null
+                            ? day.getExercises() : Collections.emptyList();
+
+                    List<TrainingExercise> enrichedExercises = new ArrayList<>();
+                    int totalExDoDia = exercisesOfDay.size();
+                    Set<String> gruposDoDia = extrairGruposMuscularesDoDia(day.getDay());
+
+                    for (int i = 0; i < totalExDoDia; i++) {
+                        TrainingExercise ex = exercisesOfDay.get(i);
+                        TrainingExercise enriched = enrichExercise(ex, validNames, pathologyText);
+
+                        boolean isAquecimento = (i == 0);
+                        boolean isArrefecimento = (i == totalExDoDia - 1);
+
+                        if (isAquecimento) {
+                            if (!pathologyEspecifica) {
+                                // 4a. Variedade: não repetir em dias consecutivos
+                                if (exigirVariedadeAquecimento && enriched.getName().equalsIgnoreCase(aquecimentoAnterior)) {
+                                    throw new RuntimeException(
+                                            "Exercício de aquecimento repetido em dias consecutivos: \"" + enriched.getName() +
+                                                    "\". Escolhe um exercício de mobilidade diferente do DICIONÁRIO para este dia (há várias opções disponíveis)."
+                                    );
+                                }
+                                // 4b. Correspondência de grupo muscular com o foco do dia
+                                if (!grupoMuscularCorresponde(enriched.getName(), gruposDoDia)
+                                        && existeOpcaoMelhorParaGrupo(gruposDoDia, opcoesAquecimento, enriched.getName(), pathologyText)) {
+                                    throw new RuntimeException(
+                                            "Aquecimento desalinhado com o foco do dia: \"" + enriched.getName() +
+                                                    "\" não é adequado ao dia \"" + day.getDay() + "\". " +
+                                                    "Escolhe um exercício de mobilidade do DICIONÁRIO relacionado com o grupo muscular treinado nesse dia."
+                                    );
+                                }
+                            }
+                            aquecimentoAnterior = enriched.getName();
+
+                        } else if (isArrefecimento) {
+                            // 4c. Variedade: não repetir em dias consecutivos
+                            if (exigirVariedadeArrefecimento && enriched.getName().equalsIgnoreCase(arrefecimentoAnterior)) {
+                                throw new RuntimeException(
+                                        "Exercício de arrefecimento repetido em dias consecutivos: \"" + enriched.getName() +
+                                                "\". Escolhe um exercício de alongamento diferente do DICIONÁRIO para este dia."
+                                );
+                            }
+                            // 4d. Correspondência de grupo muscular com o foco do dia
+                            if (!grupoMuscularCorresponde(enriched.getName(), gruposDoDia)
+                                    && existeOpcaoMelhorParaGrupo(gruposDoDia, opcoesArrefecimento, enriched.getName(), pathologyText)) {
+                                throw new RuntimeException(
+                                        "Arrefecimento desalinhado com o foco do dia: \"" + enriched.getName() +
+                                                "\" não é adequado ao dia \"" + day.getDay() + "\". " +
+                                                "Escolhe um exercício de alongamento do DICIONÁRIO relacionado com o grupo muscular treinado nesse dia."
+                                );
+                            }
+                            arrefecimentoAnterior = enriched.getName();
+
+                        } else {
+                            // Exercícios de TRABALHO: unicidade total no plano + anti-platô vs plano anterior
+                            if (!nomesUsadosNoPlano.add(enriched.getName())) {
+                                throw new RuntimeException(
+                                        "Exercício repetido no plano: \"" + enriched.getName() +
+                                                "\" já foi usado noutro dia. É proibido repetir o mesmo exercício de TRABALHO em dias diferentes " +
+                                                "(aquecimento e arrefecimento seguem regras próprias). Substitui por uma variação diferente da mesma categoria muscular."
+                                );
+                            }
+                            if (nomesAnteriores.contains(enriched.getName())) {
+                                throw new RuntimeException(
+                                        "Exercício repetido do plano anterior: \"" + enriched.getName() +
+                                                "\" já foi usado no plano anterior deste aluno e deve ser evitado (anti-platô). " +
+                                                "Substitui por uma variação diferente da mesma categoria muscular."
+                                );
+                            }
+                        }
+
+                        enrichedExercises.add(enriched);
+                    }
+
+                    updatedPlan.add(new TrainingDay(day.getDay(), enrichedExercises));
+                }
+
+                // 5. LIMPEZA DA DIETA (garante listas mutáveis)
                 DietPlan diet = response.getDietPlan();
                 if (diet != null && diet.getMeals() != null) {
                     List<Meal> mutableMeals = new ArrayList<>();
@@ -345,9 +462,9 @@ public class Training {
                     diet.setMeals(mutableMeals);
                 }
 
-                log.info("Geração concluída com sucesso e validada contra inventário.");
+                log.info("Geração concluída com sucesso, validada contra inventário, sequência de dias, variedade e correspondência de grupo muscular.");
 
-                // 5. RESPOSTA FINAL
+                // 6. RESPOSTA FINAL
                 return TrainingPlanResponse.builder()
                         .isExistingPlan(false)
                         .summary(response.getSummary())
@@ -365,11 +482,72 @@ public class Training {
                 }
 
                 promptBuilder.append("\n\nERRO NA TENTATIVA ANTERIOR: ").append(e.getMessage())
-                        .append("\nCORRIGE ISTO NA PRÓXIMA RESPOSTA: usa APENAS os nomes exatos do DICIONÁRIO OFICIAL fornecido, carácter a carácter.");
+                        .append("\nCORRIGE ISTO NA PRÓXIMA RESPOSTA: usa APENAS os nomes exatos do DICIONÁRIO OFICIAL fornecido, carácter a carácter, nunca repitas um exercício já usado neste plano ou no plano anterior do aluno, e escolhe aquecimento/arrefecimento coerentes com o grupo muscular do dia.");
             }
         }
 
         throw new RuntimeException("Falha na geração.");
+    }
+
+    /**
+     * Deteta o(s) grupo(s) muscular(es) do dia a partir do texto completo do "day"
+     * (ex: "Dia 5 - PULL: Costas e Bíceps" -> {COSTAS, BRAÇOS}).
+     */
+    private Set<String> extrairGruposMuscularesDoDia(String dayLabel) {
+        if (dayLabel == null) return Set.of();
+        String lower = dayLabel.toLowerCase();
+        Set<String> grupos = new HashSet<>();
+        for (Map.Entry<String, Set<String>> entry : GRUPO_MUSCULAR_KEYWORDS.entrySet()) {
+            for (String keyword : entry.getValue()) {
+                if (lower.contains(keyword)) {
+                    grupos.add(entry.getKey());
+                    break;
+                }
+            }
+        }
+        return grupos;
+    }
+
+    /**
+     * Verifica se um exercício de mobilidade/alongamento é adequado ao(s) grupo(s) do dia.
+     * Exercícios não mapeados (gerais) são sempre aceites. Se não foi possível determinar
+     * o grupo do dia, também aceita (evita falsos positivos).
+     */
+    private boolean grupoMuscularCorresponde(String exerciseName, Set<String> gruposDoDia) {
+        Set<String> gruposAlvo = GRUPO_ALVO_EXERCICIO_MOBILIDADE.get(exerciseName);
+        if (gruposAlvo == null) return true; // exercício genérico, serve para qualquer dia
+        if (gruposDoDia.isEmpty()) return true; // não foi possível determinar o grupo do dia
+        return !Collections.disjoint(gruposAlvo, gruposDoDia);
+    }
+
+    /**
+     * Verifica se existe, na lista de opções da categoria (aquecimento ou arrefecimento),
+     * pelo menos um exercício ESPECIFICAMENTE adequado ao(s) grupo(s) do dia — usado para
+     * só exigir correção quando realmente existir alternativa melhor no dicionário.
+     */
+    private boolean existeOpcaoMelhorParaGrupo(Set<String> gruposDoDia, List<String> opcoesDaCategoria,
+                                               String exercicioEscolhido, String pathologyText) {
+        if (gruposDoDia.isEmpty()) return false;
+        return opcoesDaCategoria.stream()
+                .filter(nome -> !nome.equalsIgnoreCase(exercicioEscolhido))
+                .filter(nome -> {
+                    // Exclui opções que exigem uma patologia que o aluno não tem
+                    String palavraChave = MOBILIDADE_ESPECIFICA_PARA_PATOLOGIA.get(nome);
+                    if (palavraChave == null) return true; // não é pathology-gated, pode ser sugerida
+                    return pathologyText != null && pathologyText.toLowerCase().contains(palavraChave);
+                })
+                .anyMatch(nome -> {
+                    Set<String> gruposAlvo = GRUPO_ALVO_EXERCICIO_MOBILIDADE.get(nome);
+                    return gruposAlvo != null && !Collections.disjoint(gruposAlvo, gruposDoDia);
+                });
+    }
+
+    private String extrairCategoriaDia(String dayLabel) {
+        if (dayLabel == null) return null;
+        int idxTraco = dayLabel.indexOf('-');
+        int idxDoisPontos = dayLabel.indexOf(':');
+        if (idxTraco == -1 || idxDoisPontos == -1 || idxDoisPontos <= idxTraco) return null;
+        return dayLabel.substring(idxTraco + 1, idxDoisPontos).trim();
     }
 
     /**
@@ -470,14 +648,57 @@ public class Training {
         return "DIRETRIZES ALIMENTARES:\n" + dietTable + "\nEscolha ingredientes que somem estes totais.";
     }
 
+    /**
+     * Gera a sequência de divisões de treino (splits) para a frequência semanal,
+     * garantindo que nunca há o mesmo grupo muscular em dias consecutivos.
+     */
+    private List<String> gerarSequenciaDivisao(int frequencia, boolean isGluteFocus) {
+        List<String> sequencia = new ArrayList<>();
+
+        if (frequencia <= 1) {
+            sequencia.add("FULL BODY: Corpo Inteiro");
+            return sequencia;
+        }
+
+        if (frequencia == 2) {
+            String[] ciclo = {
+                    "SUPERIORES: Peito, Costas, Ombros e Braços",
+                    "INFERIORES: Pernas e Glúteos"
+            };
+            for (int i = 0; i < frequencia; i++) sequencia.add(ciclo[i % ciclo.length]);
+            return sequencia;
+        }
+
+        // Ciclo ordenado para que o primeiro e o último elemento nunca coincidam
+        // na mesma categoria quando o ciclo dá a volta (importante para 4, 5, 6... dias)
+        List<String> ciclo = isGluteFocus
+                ? List.of(
+                "LEGS: Glúteos e Posterior de Coxa",
+                "PUSH: Peito, Ombros e Tríceps",
+                "LEGS: Quadríceps e Glúteos",
+                "PULL: Costas e Bíceps"
+        )
+                : List.of(
+                "PUSH: Peito, Ombros e Tríceps",
+                "PULL: Costas e Bíceps",
+                "LEGS: Quadríceps, Posterior e Glúteos"
+        );
+
+        for (int i = 0; i < frequencia; i++) {
+            sequencia.add(ciclo.get(i % ciclo.size()));
+        }
+        return sequencia;
+    }
+
     @NotNull
-    private static String buildDiretrizTreino(UserProfileRequest userRequest, String durationText, int volumeIdeal) {
-        String divisao = switch (userRequest.getFrequencyPerWeek()) {
-            case 1 -> "FULL BODY";
-            case 2 -> "SUPERIOR / INFERIOR";
-            case 3 -> "PUSH / PULL / LEGS";
-            default -> "Divisão customizada";
-        };
+    private String buildDiretrizTreino(UserProfileRequest userRequest, String durationText, int volumeIdeal) {
+        boolean isGluteFocus = userRequest.getObjective() != null &&
+                (userRequest.getObjective().toLowerCase().contains("glúteo") ||
+                        userRequest.getObjective().toLowerCase().contains("gluteo"));
+
+        List<String> sequencia = gerarSequenciaDivisao(userRequest.getFrequencyPerWeek(), isGluteFocus);
+        String divisao = String.join(" -> ", sequencia);
+
         return "REGRAS DE DIVISÃO: " + divisao + " | Duração: " + durationText + " | Volume: " + volumeIdeal + " ex/dia.";
     }
 
@@ -504,7 +725,8 @@ public class Training {
         map.put("pulldown corda", "Pulldown Corda");
         map.put("ywt", "Y-W-T");
         map.put("y-w-t", "Y-W-T");
-        map.put("mobilidade tornozelo", "Mobilidade Tornozelo");
+        map.put("mobilidade tornozelo", "Knee-to-Wall");
+        map.put("tornozelo", "Knee-to-Wall");
         map.put("equilíbrio unipodal", "Equilíbrio Unipodal");
         map.put("prancha", "Prancha Abdominal");
         map.put("prancha abdominal", "Prancha Abdominal");
@@ -531,6 +753,29 @@ public class Training {
 
         EXERCISE_MAP = Collections.unmodifiableMap(map);
     }
+
+    // Palavras-chave para identificar o(s) grupo(s) muscular(es) do dia a partir do texto "day" (ex: "Dia 3 - PULL: Costas e Bíceps")
+    private static final Map<String, Set<String>> GRUPO_MUSCULAR_KEYWORDS = Map.of(
+            "PEITO", Set.of("peito", "supino", "crossover", "peck", "flex"),
+            "COSTAS", Set.of("costas", "dorsal", "remada", "puxada", "pull"),
+            "PERNAS", Set.of("pernas", "perna", "quadríceps", "quadriceps", "isquio", "gluteo", "glúteo", "agachamento", "leg", "coxa", "anca", "tornozelo", "gémeo", "gemeo"),
+            "OMBROS", Set.of("ombro", "deltoide", "lateral", "desenvolvimento", "arnold"),
+            "BRAÇOS", Set.of("braço", "braco", "tríceps", "triceps", "bíceps", "biceps", "rosca")
+    );
+
+    // Mapeia exercícios de mobilidade/alongamento específicos para o(s) grupo(s) muscular(es) que servem.
+// Exercícios NÃO listados aqui são considerados GERAIS e servem para qualquer dia (ex: "Cat Cow").
+    private static final Map<String, Set<String>> GRUPO_ALVO_EXERCICIO_MOBILIDADE = Map.ofEntries(
+            Map.entry("Knee-to-Wall", Set.of("PERNAS")),
+            Map.entry("Cossack Squat", Set.of("PERNAS")),
+            Map.entry("Y-W-T", Set.of("COSTAS", "OMBROS")),
+            Map.entry("Open Books", Set.of("COSTAS", "OMBROS")),
+            Map.entry("Flexores da Anca", Set.of("PERNAS")),
+            Map.entry("Alongamento borboleta", Set.of("PERNAS")),
+            Map.entry("Alongamento do músculo grande dorsal", Set.of("COSTAS")),
+            Map.entry("Walking Lunges with Reach", Set.of("PERNAS")),
+            Map.entry("Frankenstein Walk", Set.of("PERNAS"))
+    );
 
     private String normalizeExerciseName(String aiSuggestion) {
         if (aiSuggestion == null || aiSuggestion.isBlank()) return aiSuggestion;
@@ -578,7 +823,10 @@ public class Training {
                 "Dead Bug", "Prancha Abdominal", "Bird Dog", "Prancha Lateral", "Dead Bug com Carga"
         ));
         map.put("REAB/MOBILIDADE", List.of(
-                "Cat Cow", "Clamshell", "Y-W-T", "Rotação Externa", "Mobilidade Tornozelo", "Equilíbrio Unipodal"
+                "Cat Cow", "Clamshell", "Y-W-T", "Rotação Externa", "Knee-to-Wall", "Cossack Squat", "Equilíbrio Unipodal"
+        ));
+        map.put("ALONGAMENTO", List.of(
+                "Alongamento Estático", "Alongamento Dinâmico", "Foam Roller", "Alongamento Isquiotibiais", "Alongamento Peitoral"
         ));
 
         FALLBACK_DICTIONARY = Collections.unmodifiableMap(map);
@@ -590,18 +838,18 @@ public class Training {
                 O sistema de vídeo FALHARÁ se usares um nome fora deste dicionário. \
                 É OBRIGATÓRIO copiar o nome EXATO (incluindo acentuação e maiúsculas/minúsculas) \
                 de um dos exercícios listados abaixo — nunca inventes, combines, traduzas ou abrevies nomes.
-
+                
                 [ERROS COMUNS A EVITAR — exemplos reais de falhas anteriores]
                 - "Prancha" -> usa "Prancha Abdominal"
                 - "Supino Reto" -> usa "Supino Plano"
                 - "Alongamento" -> usa "Cat Cow", "Y-W-T" ou "Mobilidade Tornozelo"
                 - "Dips / Paralelas" -> usa apenas "Dips"
-
+                
                 [REGRAS DE CORRESPONDÊNCIA EXATA]
                 - Copia o nome literalmente da lista, carácter a carácter.
                 - Não uses sinónimos, traduções livres, plurais ou variações estéticas do nome.
                 - Se nenhum exercício da lista servir perfeitamente para o grupo muscular pretendido, escolhe o mais próximo disponível NA MESMA CATEGORIA — nunca inventes um nome novo.
-
+                
                 [DICIONÁRIO OFICIAL DE EXERCÍCIOS DISPONÍVEIS]
                 """);
 
@@ -621,7 +869,6 @@ public class Training {
     }
 
     private static final Map<String, String> MOBILIDADE_ESPECIFICA_PARA_PATOLOGIA = Map.of(
-            "Mobilidade Tornozelo", "tornozelo",
             "Rotação Externa", "ombro",
             "Clamshell", "joelho"
     );
