@@ -26,7 +26,8 @@ public class Training {
 
     public TrainingPlanResponse generateTrainingPlan(UserProfileRequest userRequest, List<String> exerciciosDoS3) {
 
-        log.info("Iniciando generateTrainingPlan para o utilizador.");
+        log.info("Iniciando generateTrainingPlan para o utilizador. Tem relatório médico? {}",
+                (userRequest.getMedicalReportText() != null && !userRequest.getMedicalReportText().isBlank()));
 
         // 1. Sanitização de entradas
         String exerciseHistoryText = defaultIfEmpty(userRequest.getExerciseHistory(), "Não informado");
@@ -44,7 +45,22 @@ public class Training {
 
         int totalMinutos = extrairMinutosTotais(durationText);
         int volumeIdeal = Math.max(6, totalMinutos / 7);
-        String pathologyText = (userRequest.getPathology() == null || userRequest.getPathology().isBlank()) ? "Nenhuma limitação relatada" : userRequest.getPathology();
+
+        String pathologyDeclarada = (userRequest.getPathology() == null || userRequest.getPathology().isBlank())
+                ? "Nenhuma limitação relatada" : userRequest.getPathology();
+
+        PatologiaInferida patologiaInferida = inferirPatologiaDoRelatorio(userRequest.getMedicalReportText());
+        String pathologyInferidaRelatorio = (patologiaInferida == null) ? null : patologiaInferida.categorias();
+
+        String pathologyText = (pathologyInferidaRelatorio == null)
+                ? pathologyDeclarada
+                : pathologyDeclarada.contains("Nenhuma")
+                ? pathologyInferidaRelatorio
+                : pathologyDeclarada + ", " + pathologyInferidaRelatorio;
+
+        log.info("Patologia efetiva usada no prompt: '{}' (declarada: '{}', inferida do relatório: '{}', termos literais encontrados: '{}')",
+                pathologyText, pathologyDeclarada, pathologyInferidaRelatorio,
+                patologiaInferida == null ? "nenhum" : String.join(", ", patologiaInferida.termosEncontrados()));
 
         // 2. Cálculos Nutricionais e Macros
         Macros macros = MacroCalculator.calculate(
@@ -209,7 +225,14 @@ public class Training {
                 2. RITMO E DESCANSO: Ritmo %s e Descanso %s segundos.
                 3. FORMATO: Responde APENAS o JSON puro.
                 4. TOTAIS DIETA: %d kcal, %dg Prot, %dg Carbs, %dg Fats.
+                5. FORMATO NUMÉRICO: Todos os números no JSON usam OBRIGATORIAMENTE ponto decimal (ex: 25.5), NUNCA vírgula (25,5).
                 """.formatted(totalMinutos, volumeIdeal, protocol.getTempo(), descansoEfetivo, macros.dailyCalories(), macros.protein(), macros.carbs(), macros.fats());
+
+        String medicalReportText = userRequest.getMedicalReportText(); // pode ser null
+        String diretrizRelatorioMedico = buildDiretrizRelatorioMedico(medicalReportText, pathologyText);
+        log.info("Diretriz de relatório médico incluída no prompt? {} (tamanho: {} chars)",
+                !diretrizRelatorioMedico.isBlank(), diretrizRelatorioMedico.length());
+
 
         // --- CONSTRUÇÃO DO PROMPT FINAL (blocos vazios são filtrados) ---
         String blocoDiretrizesCompletas = Stream.of(
@@ -217,7 +240,7 @@ public class Training {
                         diretrizSegurancaIniciante, diretrizProtocolo, diretrizReabilitacao, diretrizBiomecanica,
                         diretrizAnatomiaDetalhada, diretrizCargasDinamicas, diretrizEquipamento, diretrizTreino,
                         diretrizRepertorio, diretrizArrefecimento, diretrizNomenclaturaDias, diretrizDicionario,
-                        diretrizAlimentar
+                        diretrizAlimentar, diretrizRelatorioMedico
                 )
                 .filter(s -> s != null && !s.isBlank())
                 .collect(Collectors.joining("\n"));
@@ -266,7 +289,8 @@ public class Training {
                 macros.protein(), macros.carbs(), macros.fats()
         );
 
-        return executeGeneration(userPrompt, totalMinutos, exerciseDictionary, pathologyText, exerciciosDoS3);
+        boolean temRelatorioMedico = medicalReportText != null && !medicalReportText.isBlank();
+        return executeGeneration(userPrompt, totalMinutos, exerciseDictionary, pathologyText, exerciciosDoS3, temRelatorioMedico);
     }
 
     @NotNull
@@ -296,10 +320,10 @@ public class Training {
 
     private TrainingPlanResponse executeGeneration(
             String prompt, int totalMinutos, Map<String, List<String>> exerciseDictionary,
-            String pathologyText, List<String> exerciciosAnteriores) {
+            String pathologyText, List<String> exerciciosAnteriores, boolean temRelatorioMedico) {
 
         log.info("Iniciando executeGeneration no ChatModel.");
-        int maxRetries = 5;
+        int maxRetries = 8;
 
         // Calculado uma única vez por chamada (não por exercício) para eficiência
         Set<String> validNames = flattenDictionary(
@@ -330,11 +354,17 @@ public class Training {
         // Normaliza a lista de exercícios do plano anterior para comparação consistente
         Set<String> nomesAnteriores = (exerciciosAnteriores == null ? List.<String>of() : exerciciosAnteriores)
                 .stream()
-                .map(this::normalizeExerciseName)
+                .map(nome -> normalizeExerciseName(nome, validNames))   // lambda em vez de method reference
                 .collect(Collectors.toCollection(HashSet::new));
+
+        // Calculado uma única vez por chamada (não muda entre tentativas) — usado tanto na
+        // validação de exercícios "custom" como no feedback de erro dos retries
+        boolean pathologyEspecifica = (pathologyText != null && !pathologyText.contains("Nenhuma"))
+                || temRelatorioMedico;
 
         StringBuilder promptBuilder = new StringBuilder(prompt);
         for (int attempt = 0; attempt <= maxRetries; attempt++) {
+            Set<String> nomesUsadosNestaTentativa = new HashSet<>(); // <<< declarado no topo do corpo do for, fora do try
             try {
                 String textResponse = chatModel.call(promptBuilder.toString());
                 String cleanedJson = cleanMarkdown(textResponse);
@@ -365,10 +395,10 @@ public class Training {
 
                 // 4. MAPEAMENTO + VALIDAÇÃO DE INVENTÁRIO + UNICIDADE/VARIEDADE + CORRESPONDÊNCIA DE GRUPO
                 List<TrainingDay> updatedPlan = new ArrayList<>();
-                Set<String> nomesUsadosNoPlano = new HashSet<>(); // apenas para exercícios de TRABALHO (meio do treino)
                 String aquecimentoAnterior = null;
                 String arrefecimentoAnterior = null;
-                boolean pathologyEspecifica = pathologyText != null && !pathologyText.contains("Nenhuma");
+                int totalCustomNoPlano = 0; // >>> NOVO: contador global de exercícios custom no plano inteiro
+                final int LIMITE_CUSTOM_TOTAL = 3; // subiu de 2 para 3, cobre os dois motivos
 
                 for (TrainingDay day : response.getPlan()) {
                     List<TrainingExercise> exercisesOfDay = day.getExercises() != null
@@ -377,13 +407,70 @@ public class Training {
                     List<TrainingExercise> enrichedExercises = new ArrayList<>();
                     int totalExDoDia = exercisesOfDay.size();
                     Set<String> gruposDoDia = extrairGruposMuscularesDoDia(day.getDay());
+                    int customsNoDia = 0; // >>> NOVO: contador de exercícios custom neste dia
 
                     for (int i = 0; i < totalExDoDia; i++) {
                         TrainingExercise ex = exercisesOfDay.get(i);
-                        TrainingExercise enriched = enrichExercise(ex, validNames, pathologyText);
-
                         boolean isAquecimento = (i == 0);
                         boolean isArrefecimento = (i == totalExDoDia - 1);
+
+                        // >>> NOVO BLOCO: tratamento de exercícios CUSTOM (fora do dicionário)
+                        if (ex.isCustom()) {
+
+                            if (!pathologyEspecifica) {
+                                throw new RuntimeException(
+                                        "Exercício \"" + ex.getName() + "\" marcado como custom, mas o aluno não tem patologia relatada. " +
+                                                "'custom' só é permitido quando ligado a uma patologia real."
+                                );
+                            }
+
+                            customsNoDia++;
+                            totalCustomNoPlano++;
+
+                            if (customsNoDia > 1) {
+                                throw new RuntimeException(
+                                        "Mais de 1 exercício custom no mesmo dia (\"" + day.getDay() + "\"). Limite é 1 por dia."
+                                );
+                            }
+                            if (totalCustomNoPlano > LIMITE_CUSTOM_TOTAL) {
+                                throw new RuntimeException(
+                                        "Mais de " + LIMITE_CUSTOM_TOTAL + " exercícios custom no plano inteiro. Limite total é " + LIMITE_CUSTOM_TOTAL + "."
+                                );
+                            }
+
+                            // Normaliza minimamente, SEM validar contra o dicionário e SEM procurar vídeo
+                            TrainingExercise enrichedCustom = ex.toBuilder()
+                                    .videoUrl("")
+                                    .date(java.time.LocalDate.now().toString())
+                                    .build();
+
+                            // >>> NOVO: log separado para revisão humana / possível promoção ao dicionário oficial
+                            log.warn("[EXERCÍCIO CUSTOM] Dia: '{}' | Nome: '{}' | Patologia: '{}' | Justificação: '{}'",
+                                    day.getDay(), enrichedCustom.getName(), pathologyText, enrichedCustom.getNotas());
+
+
+                            // Mantém as variáveis de controlo de posição atualizadas,
+                            // para que a validação de dias seguintes continue coerente
+                            if (isAquecimento) {
+                                aquecimentoAnterior = enrichedCustom.getName();
+                            } else if (isArrefecimento) {
+                                arrefecimentoAnterior = enrichedCustom.getName();
+                            } else {
+                                // Exercício de trabalho custom: ainda entra na verificação de unicidade do plano
+                                if (!nomesUsadosNestaTentativa.add(enrichedCustom.getName())) {
+                                    throw new RuntimeException(
+                                            "Exercício custom repetido no plano: \"" + enrichedCustom.getName() + "\"."
+                                    );
+                                }
+                            }
+
+                            enrichedExercises.add(enrichedCustom);
+                            continue; // salta todo o fluxo de validação normal abaixo
+                        }
+                        // <<< FIM DO BLOCO NOVO
+
+                        // fluxo normal (dicionário obrigatório) — inalterado
+                        TrainingExercise enriched = enrichExercise(ex, validNames, pathologyText);
 
                         if (isAquecimento) {
                             if (!pathologyEspecifica) {
@@ -405,41 +492,51 @@ public class Training {
                                 }
                             }
                             aquecimentoAnterior = enriched.getName();
-
                         } else if (isArrefecimento) {
-                            // 4c. Variedade: não repetir em dias consecutivos
-                            if (exigirVariedadeArrefecimento && enriched.getName().equalsIgnoreCase(arrefecimentoAnterior)) {
-                                throw new RuntimeException(
-                                        "Exercício de arrefecimento repetido em dias consecutivos: \"" + enriched.getName() +
-                                                "\". Escolhe um exercício de alongamento diferente do DICIONÁRIO para este dia."
-                                );
-                            }
-                            // 4d. Correspondência de grupo muscular com o foco do dia
-                            if (!grupoMuscularCorresponde(enriched.getName(), gruposDoDia)
-                                    && existeOpcaoMelhorParaGrupo(gruposDoDia, opcoesArrefecimento, enriched.getName(), pathologyText)) {
-                                throw new RuntimeException(
-                                        "Arrefecimento desalinhado com o foco do dia: \"" + enriched.getName() +
-                                                "\" não é adequado ao dia \"" + day.getDay() + "\". " +
-                                                "Escolhe um exercício de alongamento do DICIONÁRIO relacionado com o grupo muscular treinado nesse dia."
-                                );
+                            if (!pathologyEspecifica) {   // <<< ADICIONAR esta condição
+                                // 4c. Variedade: não repetir em dias consecutivos
+                                if (exigirVariedadeArrefecimento && enriched.getName().equalsIgnoreCase(arrefecimentoAnterior)) {
+                                    throw new RuntimeException(
+                                            "Exercício de arrefecimento repetido em dias consecutivos: \"" + enriched.getName() +
+                                                    "\". Escolhe um exercício de alongamento diferente do DICIONÁRIO para este dia."
+                                    );
+                                }
+                                // 4d. Correspondência de grupo muscular com o foco do dia
+                                if (!grupoMuscularCorresponde(enriched.getName(), gruposDoDia)
+                                        && existeOpcaoMelhorParaGrupo(gruposDoDia, opcoesArrefecimento, enriched.getName(), pathologyText)) {
+                                    throw new RuntimeException(
+                                            "Arrefecimento desalinhado com o foco do dia: \"" + enriched.getName() +
+                                                    "\" não é adequado ao dia \"" + day.getDay() + "\". " +
+                                                    "Escolhe um exercício de alongamento do DICIONÁRIO relacionado com o grupo muscular treinado nesse dia."
+                                    );
+                                }
                             }
                             arrefecimentoAnterior = enriched.getName();
-
                         } else {
                             // Exercícios de TRABALHO: unicidade total no plano + anti-platô vs plano anterior
-                            if (!nomesUsadosNoPlano.add(enriched.getName())) {
-                                throw new RuntimeException(
-                                        "Exercício repetido no plano: \"" + enriched.getName() +
-                                                "\" já foi usado noutro dia. É proibido repetir o mesmo exercício de TRABALHO em dias diferentes " +
-                                                "(aquecimento e arrefecimento seguem regras próprias). Substitui por uma variação diferente da mesma categoria muscular."
-                                );
-                            }
-                            if (nomesAnteriores.contains(enriched.getName())) {
-                                throw new RuntimeException(
-                                        "Exercício repetido do plano anterior: \"" + enriched.getName() +
-                                                "\" já foi usado no plano anterior deste aluno e deve ser evitado (anti-platô). " +
-                                                "Substitui por uma variação diferente da mesma categoria muscular."
-                                );
+                            boolean repetidoNoPlano = !nomesUsadosNestaTentativa.add(enriched.getName());
+                            boolean repetidoNoHistorico = !repetidoNoPlano && nomesAnteriores.contains(enriched.getName());
+
+                            if (repetidoNoPlano || repetidoNoHistorico) {
+                                String categoria = encontrarCategoria(enriched.getName(), exerciseDictionary);
+                                String substituto = obterSubstitutoValido(categoria, exerciseDictionary,
+                                        nomesUsadosNestaTentativa, nomesAnteriores);
+
+                                if (substituto != null) {
+                                    log.warn("[AUTO-SUBSTITUIÇÃO] '{}' -> '{}' (categoria: {}, motivo: {})",
+                                            enriched.getName(), substituto, categoria,
+                                            repetidoNoPlano ? "duplicado no plano" : "usado no plano anterior");
+
+                                    enriched = enrichExercise(
+                                            ex.toBuilder().name(substituto).build(), validNames, pathologyText);
+                                    nomesUsadosNestaTentativa.add(enriched.getName());
+                                } else {
+                                    // Sem alternativa disponível: aí sim, lança exceção (vai para custom ou retry)
+                                    throw new RuntimeException(
+                                            "Exercício repetido sem alternativa disponível na categoria \"" + categoria +
+                                                    "\": \"" + enriched.getName() + "\"."
+                                    );
+                                }
                             }
                         }
 
@@ -473,6 +570,7 @@ public class Training {
                         .userProfile(null)
                         .build();
 
+                // CÓDIGO ATUAL — ainda o append genérico antigo:
             } catch (Exception e) {
                 log.warn("Falha na tentativa {}/{} - Erro: {}", attempt, maxRetries, e.getMessage());
 
@@ -480,9 +578,9 @@ public class Training {
                     log.error("Todas as tentativas falharam. Erro final: {}", e.getMessage());
                     throw new RuntimeException("Falha crítica na geração do plano.");
                 }
-
-                promptBuilder.append("\n\nERRO NA TENTATIVA ANTERIOR: ").append(e.getMessage())
-                        .append("\nCORRIGE ISTO NA PRÓXIMA RESPOSTA: usa APENAS os nomes exatos do DICIONÁRIO OFICIAL fornecido, carácter a carácter, nunca repitas um exercício já usado neste plano ou no plano anterior do aluno, e escolhe aquecimento/arrefecimento coerentes com o grupo muscular do dia.");
+                promptBuilder.append(buildFeedbackDeErro(
+                        e.getMessage(), nomesUsadosNestaTentativa,
+                        pathologyEspecifica, exerciseDictionary, nomesAnteriores));
             }
         }
 
@@ -556,7 +654,7 @@ public class Training {
      * essa mensagem é reaproveitada no retry para guiar a IA à correção certa.
      */
     private TrainingExercise enrichExercise(TrainingExercise ex, Set<String> validNames, String pathologyText) {
-        String correctedName = normalizeExerciseName(ex.getName());
+        String correctedName = normalizeExerciseName(ex.getName(), validNames);
 
         if (!validNames.contains(correctedName)) {
             log.error("[ALERTA DE INVENTÁRIO] Nome fora do dicionário: '{}' (original da IA: '{}')",
@@ -601,9 +699,14 @@ public class Training {
         String cleaned = text.replaceAll("(?s)```json\\s*(.*?)\\s*```", "$1").trim();
         int firstBrace = cleaned.indexOf("{");
         int lastBrace = cleaned.lastIndexOf("}");
-        return (firstBrace != -1 && lastBrace != -1) ? cleaned.substring(firstBrace, lastBrace + 1) : cleaned;
-    }
+        cleaned = (firstBrace != -1 && lastBrace != -1) ? cleaned.substring(firstBrace, lastBrace + 1) : cleaned;
 
+        // Corrige vírgulas decimais dentro de valores numéricos (ex: 25,5 -> 25.5),
+        // sem tocar em vírgulas que separam elementos de array/objeto
+        cleaned = cleaned.replaceAll("(?<=:\\s?)(\\d+),(\\d+)(?=[,\\}\\s])", "$1.$2");
+
+        return cleaned;
+    }
     private String calcularDescansoCientifico(Enum.TrainingProtocol protocol, String objective, String cargaAtual) {
         double peso;
         try {
@@ -634,6 +737,100 @@ public class Training {
 
     private String defaultIfEmpty(String value, String defaultValue) {
         return (value == null || value.isBlank()) ? defaultValue : value;
+    }
+
+    private String buildFeedbackDeErro(String erro, Set<String> nomesUsadosNoPlano,
+                                       boolean permiteCustom,
+                                       Map<String, List<String>> exerciseDictionary,
+                                       Set<String> nomesAnteriores) {
+
+        String listaUsados = nomesUsadosNoPlano.isEmpty()
+                ? "(nenhum ainda)"
+                : String.join(", ", nomesUsadosNoPlano);
+
+        boolean erroDeAntiPlato = erro != null &&
+                (erro.contains("já foi usado no plano anterior") || erro.contains("fora do inventário"));
+
+        String dicaCustom = "";
+
+        if (erroDeAntiPlato) {
+            String nomeFalhado = extrairNomeExercicioDoErro(erro);
+            String categoria = encontrarCategoria(nomeFalhado, exerciseDictionary);
+
+            if (categoria != null) {
+                Set<String> disponiveis = new HashSet<>(exerciseDictionary.getOrDefault(categoria, List.of()));
+                disponiveis.removeAll(nomesAnteriores);
+                disponiveis.removeAll(nomesUsadosNoPlano);
+
+                if (!disponiveis.isEmpty()) {
+                    dicaCustom = """
+                        
+                        OPÇÕES VÁLIDAS RESTANTES NA CATEGORIA "%s" (escolhe OBRIGATORIAMENTE uma destas, 
+                        copiando o nome EXATO — não precisas de "custom"):
+                        %s
+                        """.formatted(categoria, String.join(", ", disponiveis));
+                } else if (permiteCustom) {
+                    dicaCustom = """
+                        
+                        AÇÃO OBRIGATÓRIA: a categoria "%s" está ESGOTADA (todas as opções do dicionário já 
+                        foram usadas neste plano ou em planos anteriores deste aluno). É OBRIGATÓRIO usar 
+                        "custom": true para o próximo exercício desta categoria. Formato exato:
+                        {
+                          "custom": true,
+                          "name": "<nome do exercício, pode ser fora do dicionário>",
+                          "videoUrl": "",
+                          "notas": "<justificação técnica concreta>"
+                        }
+                        Limite: máx. 1 "custom" por dia, 3 no total do plano.
+                        """.formatted(categoria);
+                } else {
+                    dicaCustom = """
+                        
+                        ATENÇÃO: a categoria "%s" está ESGOTADA no dicionário para este aluno e "custom" não é 
+                        permitido (sem patologia relatada). Reduz o número de exercícios desta categoria no plano 
+                        ou reaproveita um exercício de uma categoria adjacente compatível (ex.: PEITO -> OMBROS).
+                        """.formatted(categoria);
+                }
+            }
+        }
+
+        return """
+            
+            ERRO NA TENTATIVA ANTERIOR: %s
+            
+            EXERCÍCIOS DE TRABALHO JÁ USADOS NESTE PLANO (NÃO REPETIR): %s
+            %s
+            CORRIGE ISTO NA PRÓXIMA RESPOSTA E GERA O PLANO COMPLETO DE NOVO, respeitando 
+            TODAS as regras anteriores, não só a última mencionada.
+            """.formatted(erro, listaUsados, dicaCustom);
+    }
+
+    @NotNull
+    private String buildDiretrizRelatorioMedico(String medicalReportText, String pathologyText) {
+        if (medicalReportText == null || medicalReportText.isBlank()) {
+            return ""; // filtrado pelo Stream — sem impacto quando não há ficheiro
+        }
+
+        return """
+                [RELATÓRIO MÉDICO ANEXADO PELO ALUNO]
+                - O aluno anexou um relatório médico/exame. Usa-o como CONTEXTO ADICIONAL DE SEGURANÇA, 
+                  em complemento (nunca substituição) da patologia já declarada: "%s".
+                - NÃO FAÇAS NOVOS DIAGNÓSTICOS OU INTERPRETAÇÕES CLÍNICAS — usa apenas achados 
+                  explicitamente escritos no relatório para tornar a seleção de exercícios mais segura.
+                - Se o relatório mencionar qualquer achado na coluna lombar (ex: hérnia discal, 
+                  protrusão discal, retrolistese, discopatia, radiculopatia, conflito com raiz nervosa), 
+                  aplica as mesmas restrições já usadas para patologia lombar: evita flexão lombar sob 
+                  carga, evita impacto/saltos, evita cargas axiais elevadas, prioriza estabilização 
+                  (Dead Bug, Bird Dog, Prancha Abdominal) em vez de exercícios de flexão de tronco.
+                - Se mencionar achados no ombro, joelho ou anca, aplica lógica equivalente: prioriza 
+                  estabilidade e amplitude segura nessa articulação em vez de sobrecarga.
+                - Se o relatório não tiver relação óbvia com exercício físico, ignora-o e usa apenas 
+                  a patologia declarada.
+                - CONTEÚDO DO RELATÓRIO (pode estar truncado):
+                \"\"\"
+                %s
+                \"\"\"
+                """.formatted(pathologyText, medicalReportText);
     }
 
     @NotNull
@@ -777,14 +974,20 @@ public class Training {
             Map.entry("Frankenstein Walk", Set.of("PERNAS"))
     );
 
-    private String normalizeExerciseName(String aiSuggestion) {
+    private String normalizeExerciseName(String aiSuggestion, Set<String> validNames) {
         if (aiSuggestion == null || aiSuggestion.isBlank()) return aiSuggestion;
 
         String cleanSuggestion = aiSuggestion.trim().replaceAll("[.,!?]$", "");
         String lowerSuggestion = cleanSuggestion.toLowerCase();
 
         if (EXERCISE_MAP.containsKey(lowerSuggestion)) {
-            return EXERCISE_MAP.get(lowerSuggestion);
+            String candidato = EXERCISE_MAP.get(lowerSuggestion);
+            // só aceita o sinónimo se ele realmente existir no dicionário ATUAL (BD ou fallback)
+            if (validNames.contains(candidato)) {
+                return candidato;
+            }
+            // caso contrário, devolve o nome original tal como veio, para o erro ser claro e útil
+            log.warn("Sinónimo '{}' -> '{}' ignorado: alvo não existe no dicionário atual.", lowerSuggestion, candidato);
         }
 
         if (lowerSuggestion.contains("puxada") && lowerSuggestion.contains("frente")) {
@@ -801,32 +1004,60 @@ public class Training {
         Map<String, List<String>> map = new java.util.LinkedHashMap<>();
 
         map.put("PEITO", List.of(
-                "Supino Plano", "Supino Inclinado", "Peck Deck", "Crossover",
-                "Flexões", "Dips", "Supino com Halteres", "Aberturas com Halteres", "Flexões Diamond"
+                "Supino Plano", "Supino Inclinado", "Supino Declinado",
+                "Supino Plano com Halteres", "Supino Inclinado com Halteres", "Supino Declinado com Halteres",
+                "Peck Deck", "Crossover", "Crossover Baixo para Cima",
+                "Flexões", "Flexões Diamond", "Flexões com Pés Elevados",
+                "Dips", "Aberturas com Halteres", "Aberturas Inclinadas com Halteres",
+                "Supino Máquina", "Pullover com Halter", "Chest Press Máquina"
         ));
         map.put("COSTAS", List.of(
-                "Puxada à Frente", "Remada Curvada", "Remada Unilateral", "Pulldown Corda",
-                "Remada Baixa", "Elevações", "Puxada Pega Estreita", "Remada Cavalinho"
+                "Puxada à Frente", "Puxada Pega Estreita", "Puxada Pega Neutra",
+                "Remada Curvada", "Remada Curvada com Halteres", "Remada Unilateral",
+                "Pulldown Corda", "Remada Baixa", "Remada Cavalinho",
+                "Elevações", "Remada Máquina", "Remada T-Bar",
+                "Face Pull", "Encolhimentos com Halteres", "Extensão Lombar",
+                "Puxada com Corda Neutra", "Remada Invertida"
         ));
         map.put("PERNAS", List.of(
-                "Agachamento Livre", "Leg Press 45", "Cadeira Extensora", "Mesa Flexora",
-                "Stiff", "Gémeos em Pé", "Lunge", "Elevação Pélvica", "Agachamento Goblet", "Agachamento Búlgaro"
+                "Agachamento Livre", "Agachamento Goblet", "Agachamento Búlgaro",
+                "Agachamento Sumô", "Leg Press 45", "Hack Squat",
+                "Cadeira Extensora", "Mesa Flexora", "Cadeira Flexora em Pé",
+                "Stiff", "Stiff Unilateral", "Elevação Pélvica",
+                "Elevação Pélvica Unilateral", "Lunge", "Lunge Reverso",
+                "Gémeos em Pé", "Gémeos Sentado", "Abdução de Anca na Máquina",
+                "Adução de Anca na Máquina", "Step Up"
         ));
         map.put("OMBROS", List.of(
-                "Desenvolvimento", "Elevação Lateral", "Face Pull", "Elevação Frontal",
-                "Arnold Press", "Elevação Lateral Polia"
+                "Desenvolvimento", "Desenvolvimento com Halteres", "Arnold Press",
+                "Elevação Lateral", "Elevação Lateral Polia", "Elevação Lateral Máquina",
+                "Elevação Frontal", "Elevação Frontal com Barra", "Face Pull",
+                "Remada Alta", "Crucifixo Invertido", "Crucifixo Invertido na Máquina",
+                "Desenvolvimento Máquina", "Encolhimentos com Barra"
         ));
         map.put("BRAÇOS", List.of(
-                "Rosca Direta", "Tríceps Corda", "Rosca Martelo", "Tríceps Testa", "Rosca Concentrada"
+                "Rosca Direta", "Rosca Direta com Barra EZ", "Rosca Martelo",
+                "Rosca Concentrada", "Rosca Scott", "Rosca Alternada com Halteres",
+                "Tríceps Corda", "Tríceps Pulley", "Tríceps Testa",
+                "Tríceps Testa com Halter", "Tríceps Francês", "Mergulho no Banco",
+                "Tríceps Coice com Halter", "Rosca no Cabo"
         ));
         map.put("CORE", List.of(
-                "Dead Bug", "Prancha Abdominal", "Bird Dog", "Prancha Lateral", "Dead Bug com Carga"
+                "Dead Bug", "Dead Bug com Carga", "Prancha Abdominal",
+                "Prancha Lateral", "Bird Dog", "Abdominal na Polia",
+                "Elevação de Pernas Suspenso", "Abdominal na Bola Suíça", "Russian Twist",
+                "Prancha com Toque no Ombro"
         ));
         map.put("REAB/MOBILIDADE", List.of(
-                "Cat Cow", "Clamshell", "Y-W-T", "Rotação Externa", "Knee-to-Wall", "Cossack Squat", "Equilíbrio Unipodal"
+                "Cat Cow", "Clamshell", "Y-W-T", "Rotação Externa",
+                "Knee-to-Wall", "Cossack Squat", "Equilíbrio Unipodal",
+                "Open Books", "Bird Dog Isométrico", "Mobilidade Torácica"
         ));
         map.put("ALONGAMENTO", List.of(
-                "Alongamento Estático", "Alongamento Dinâmico", "Foam Roller", "Alongamento Isquiotibiais", "Alongamento Peitoral"
+                "Alongamento Estático", "Alongamento Dinâmico", "Foam Roller",
+                "Alongamento Isquiotibiais", "Alongamento Peitoral",
+                "Alongamento do músculo grande dorsal", "Flexores da Anca",
+                "Alongamento borboleta", "Walking Lunges with Reach", "Frankenstein Walk"
         ));
 
         FALLBACK_DICTIONARY = Collections.unmodifiableMap(map);
@@ -843,6 +1074,7 @@ public class Training {
                 - "Prancha" -> usa "Prancha Abdominal"
                 - "Supino Reto" -> usa "Supino Plano"
                 - "Alongamento" -> usa "Cat Cow", "Y-W-T" ou "Mobilidade Tornozelo"
+                - "Cadeira Flexora" -> usa "Mesa Flexora"
                 - "Dips / Paralelas" -> usa apenas "Dips"
                 
                 [REGRAS DE CORRESPONDÊNCIA EXATA]
@@ -863,6 +1095,21 @@ public class Training {
                 
                 Nota: Se um exercício for de mobilidade/reabilitação (categoria REAB/MOBILIDADE), \
                 ele DEVE ser o primeiro exercício do treino (Order 1).
+                """);
+
+        sb.append("""
+                
+                [EXCEÇÃO CONTROLADA: EXERCÍCIO FORA DO INVENTÁRIO]
+                - Podes propor um exercício fora desta lista em dois casos:
+                  (a) É ESTRITAMENTE ESSENCIAL para a patologia relatada e não existe opção adequada no dicionário; ou
+                  (b) É CLARAMENTE SUPERIOR a qualquer opção do dicionário para o objetivo específico do aluno 
+                      (ex: melhor ativação do grupo muscular alvo, melhor progressão biomecânica).
+                - Nestes casos: marca "custom": true no JSON, deixa "videoUrl": "" e explica em "notas" 
+                  de forma CONCRETA porque nenhuma opção do dicionário serve (mínimo 1 frase técnica, 
+                  nunca genérica como "é melhor" sem justificação).
+                - LIMITE ABSOLUTO: no máximo 1 exercício "custom" por dia, e 3 no total do plano.
+                - PRIORIDADE: usa sempre o dicionário primeiro. "custom" é EXCEÇÃO, não regra — 
+                  se existir uma opção razoável no dicionário, usa-a em vez de "custom".
                 """);
 
         return sb.toString();
@@ -888,5 +1135,94 @@ public class Training {
                 );
             }
         }
+    }
+
+    private static final Map<String, String> ACHADOS_MEDICOS_PARA_PATOLOGIA = Map.ofEntries(
+            Map.entry("retrolistese", "Lesão Lombar"),
+            Map.entry("discopatia", "Lesão Lombar"),
+            Map.entry("protrusão discal", "Hérnia de Disco"),
+            Map.entry("protrusao discal", "Hérnia de Disco"),
+            Map.entry("hérnia discal", "Hérnia de Disco"),
+            Map.entry("hernia discal", "Hérnia de Disco"),
+            Map.entry("radicular", "Lesão Lombar"),
+            Map.entry("lombar", "Lesão Lombar"),
+            Map.entry("espondilose", "Lesão Lombar"),
+            Map.entry("espondilólise", "Lesão Lombar"),
+            Map.entry("escoliose", "Lesão Lombar"),
+            Map.entry("manguito rotador", "Lesão Ombro"),
+            Map.entry("bursite subacromial", "Lesão Ombro"),
+            Map.entry("tendinite do supraespinhoso", "Lesão Ombro"),
+            Map.entry("capsulite adesiva", "Lesão Ombro"),
+            Map.entry("luxação do ombro", "Lesão Ombro"),
+            Map.entry("menisco", "Lesão Joelho"),
+            Map.entry("ligamento cruzado", "Lesão Joelho"),
+            Map.entry("condromalácia", "Lesão Joelho"),
+            Map.entry("condromalacia", "Lesão Joelho"),
+            Map.entry("tendinite patelar", "Lesão Joelho"),
+            Map.entry("síndrome patelofemoral", "Lesão Joelho"),
+            Map.entry("entorse", "Lesão tornozelo"),
+            Map.entry("fascite plantar", "Lesão tornozelo"),
+            Map.entry("tendinite de aquiles", "Lesão tornozelo"),
+            Map.entry("tendinite do tendão de aquiles", "Lesão tornozelo"),
+            Map.entry("epicondilite", "Lesão Cotovelo"),
+            Map.entry("túnel cárpico", "Lesão Punho"),
+            Map.entry("tunel carpico", "Lesão Punho")
+    );
+
+    private PatologiaInferida inferirPatologiaDoRelatorio(String medicalReportText) {
+        if (medicalReportText == null || medicalReportText.isBlank()) return null;
+        String lower = medicalReportText.toLowerCase();
+
+        // Agrupa os termos encontrados por categoria, preservando a ordem de deteção
+        LinkedHashMap<String, List<String>> categoriaParaTermos = new LinkedHashMap<>();
+        for (Map.Entry<String, String> entry : ACHADOS_MEDICOS_PARA_PATOLOGIA.entrySet()) {
+            if (lower.contains(entry.getKey())) {
+                categoriaParaTermos
+                        .computeIfAbsent(entry.getValue(), k -> new ArrayList<>())
+                        .add(entry.getKey());
+            }
+        }
+
+        if (categoriaParaTermos.isEmpty()) return null;
+
+        String categoriasJuntas = String.join(", ", categoriaParaTermos.keySet());
+        Set<String> todosTermos = categoriaParaTermos.values().stream()
+                .flatMap(List::stream)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+
+        return new PatologiaInferida(categoriasJuntas, todosTermos);
+    }
+
+    private static final java.util.regex.Pattern NOME_EXERCICIO_PATTERN =
+            java.util.regex.Pattern.compile("\"([^\"]+)\"");
+
+    private String extrairNomeExercicioDoErro(String erro) {
+        if (erro == null) return null;
+        java.util.regex.Matcher m = NOME_EXERCICIO_PATTERN.matcher(erro);
+        return m.find() ? m.group(1) : null;
+    }
+
+    private String encontrarCategoria(String nomeExercicio, Map<String, List<String>> dictionary) {
+        if (nomeExercicio == null) return null;
+        for (Map.Entry<String, List<String>> entry : dictionary.entrySet()) {
+            if (entry.getValue().stream().anyMatch(n -> n.equalsIgnoreCase(nomeExercicio))) {
+                return entry.getKey();
+            }
+        }
+        return null;
+    }
+    /**
+     * Tenta obter um exercício de substituição válido da mesma categoria,
+     * evitando repetições no plano atual e no histórico do aluno.
+     * Devolve null se não houver alternativa disponível.
+     */
+    private String obterSubstitutoValido(String categoria, Map<String, List<String>> dictionary,
+                                         Set<String> nomesUsadosNestaTentativa, Set<String> nomesAnteriores) {
+        if (categoria == null) return null;
+        return dictionary.getOrDefault(categoria, List.of()).stream()
+                .filter(nome -> !nomesUsadosNestaTentativa.contains(nome))
+                .filter(nome -> !nomesAnteriores.contains(nome))
+                .findFirst()
+                .orElse(null);
     }
 }

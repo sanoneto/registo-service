@@ -6,7 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Data
-@Builder
+@Builder(toBuilder = true)
 @NoArgsConstructor
 @AllArgsConstructor
 public class TrainingExercise {
@@ -26,6 +26,7 @@ public class TrainingExercise {
     private String videoUrl;
     private String date;
     private String movementPlane;
+    private boolean custom; // default false
 
     // Removido o método 'public Object videoUrl(String linkByExerciseName)'
     // que existia no record, pois ele causava confusão na serialização do Jackson.

@@ -52,4 +52,5 @@ public class UserProfileRequest {
     private String protocol;
     private Double bodyFat;
     private Integer mealsPerDay;
+    private String medicalReportText; // null se o aluno não anexou nada
 }
