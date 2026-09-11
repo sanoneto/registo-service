@@ -30,7 +30,7 @@ public class Training {
                 (userRequest.getMedicalReportText() != null && !userRequest.getMedicalReportText().isBlank()));
 
         // 1. Sanitização de entradas
-        String exerciseHistoryText = defaultIfEmpty(userRequest.getExerciseHistory(), "Não informado");
+        String exerciseHistoryText = sanitizarExerciseHistory(userRequest.getExerciseHistory());
         String objectiveText = defaultIfEmpty(userRequest.getObjective(), "Manutenção de saúde e bem-estar");
         String locationText = defaultIfEmpty(userRequest.getLocation(), "Não especificada");
         String bodyTypeText = (userRequest.getBodyType() != null) ? userRequest.getBodyType().name() : "ECTOMORPH";
@@ -61,6 +61,9 @@ public class Training {
         log.info("Patologia efetiva usada no prompt: '{}' (declarada: '{}', inferida do relatório: '{}', termos literais encontrados: '{}')",
                 pathologyText, pathologyDeclarada, pathologyInferidaRelatorio,
                 patologiaInferida == null ? "nenhum" : String.join(", ", patologiaInferida.termosEncontrados()));
+
+        boolean pathologyEspecifica = !pathologyText.contains("Nenhuma") || userRequest.getMedicalReportText() != null
+                && !userRequest.getMedicalReportText().isBlank();
 
         // 2. Cálculos Nutricionais e Macros
         Macros macros = MacroCalculator.calculate(
@@ -138,14 +141,29 @@ public class Training {
                 5. COERÊNCIA: PUSH (Peito/Ombros/Tríceps), LEGS (Quadríceps/Isquios/Glúteos).
                 """.formatted(protocol.getSuggestedExercises(), protocol.getForbiddenExercises(), pathologyText);
 
-        String diretrizAquecimento = """
+        String diretrizAquecimento = pathologyEspecifica ? """
                 [REGRA OBRIGATÓRIA DE AQUECIMENTO E MOBILIDADE]
-                - Se houver patologia ("%s"), o exercício de "order": 1 DEVE ser de Reabilitação/Mobilidade focado nessa área (categoria REABILITAÇÃO do dicionário).
-                - Se não houver patologia, o "order": 1 deve ser Mobilidade Geral, escolhida da categoria MOBILIDADE do dicionário.
-                - RELAÇÃO COM O DIA: sempre que possível, escolhe o aquecimento relacionado com o grupo muscular treinado nesse dia. Ex: dia de COSTAS -> "Y-W-T" ou "Open Books" (mobilidade escapular/torácica); dia de PERNAS -> "Knee-to-Wall" ou "Cossack Squat"; dia de PEITO/OMBROS sem opção específica -> usa mobilidade geral como "Cat Cow".
-                - VARIEDADE OBRIGATÓRIA: NÃO uses sempre o mesmo exercício de mobilidade em todos os dias.
+                - O aluno TEM patologia/limitação relatada ("%s"). O exercício de "order": 1
+                  DEVE ser de Reabilitação/Mobilidade focado nessa área (categoria REABILITAÇÃO
+                  do dicionário).
+                - RELAÇÃO COM O DIA: sempre que possível, escolhe o aquecimento relacionado com
+                  o grupo muscular treinado nesse dia.
+                - VARIEDADE OBRIGATÓRIA: NÃO uses sempre o mesmo exercício de mobilidade em
+                  todos os dias.
                 - É PROIBIDO usar o mesmo exercício de aquecimento em dois dias CONSECUTIVOS.
-                """.formatted(pathologyText);
+                """.formatted(pathologyText)
+                : """
+                [REGRA OBRIGATÓRIA DE AQUECIMENTO E MOBILIDADE]
+                - O aluno NÃO tem patologia relatada. O "order": 1 deve ser Mobilidade Geral,
+                  escolhida EXCLUSIVAMENTE da categoria MOBILIDADE do dicionário.
+                - RELAÇÃO COM O DIA: sempre que possível, escolhe o aquecimento relacionado com
+                  o grupo muscular treinado nesse dia. Ex: dia de COSTAS -> "Y-W-T" ou
+                  "Open Books"; dia de PERNAS -> "Knee-to-Wall" ou "Cossack Squat"; dia de
+                  PEITO/OMBROS sem opção específica -> usa mobilidade geral como "Cat Cow".
+                - VARIEDADE OBRIGATÓRIA: NÃO uses sempre o mesmo exercício de mobilidade em
+                  todos os dias.
+                - É PROIBIDO usar o mesmo exercício de aquecimento em dois dias CONSECUTIVOS.
+                """;
 
         String diretrizTreino = buildDiretrizTreino(userRequest, durationText, volumeIdeal);
         String diretrizAlimentar = buildDiretrizAlimentar(macros);
@@ -290,7 +308,8 @@ public class Training {
         );
 
         boolean temRelatorioMedico = medicalReportText != null && !medicalReportText.isBlank();
-        return executeGeneration(userPrompt, totalMinutos, exerciseDictionary, pathologyText, exerciciosDoS3, temRelatorioMedico);
+     //   log.info("prompt -enviado : {}", userPrompt);
+        return executeGeneration(userPrompt, totalMinutos, exerciseDictionary, pathologyText, exerciciosDoS3, pathologyEspecifica);
     }
 
     @NotNull
@@ -320,7 +339,7 @@ public class Training {
 
     private TrainingPlanResponse executeGeneration(
             String prompt, int totalMinutos, Map<String, List<String>> exerciseDictionary,
-            String pathologyText, List<String> exerciciosAnteriores, boolean temRelatorioMedico) {
+            String pathologyText, List<String> exerciciosAnteriores, boolean pathologyEspecifica) {
 
         log.info("Iniciando executeGeneration no ChatModel.");
         int maxRetries = 8;
@@ -357,10 +376,6 @@ public class Training {
                 .map(nome -> normalizeExerciseName(nome, validNames))   // lambda em vez de method reference
                 .collect(Collectors.toCollection(HashSet::new));
 
-        // Calculado uma única vez por chamada (não muda entre tentativas) — usado tanto na
-        // validação de exercícios "custom" como no feedback de erro dos retries
-        boolean pathologyEspecifica = (pathologyText != null && !pathologyText.contains("Nenhuma"))
-                || temRelatorioMedico;
 
         StringBuilder promptBuilder = new StringBuilder(prompt);
         for (int attempt = 0; attempt <= maxRetries; attempt++) {
@@ -1224,5 +1239,25 @@ public class Training {
                 .filter(nome -> !nomesAnteriores.contains(nome))
                 .findFirst()
                 .orElse(null);
+    }
+
+    // Padrão simples: identificadores de código costumam ser snake_case ou
+    // camelCase sem espaços e sem acentuação. Um histórico real de exercício
+    // (ex: "sedentary", "beginner", "3 anos de ginásio") é texto legível.
+    // Isto é uma rede de segurança — a causa raiz deve ser corrigida na
+    // origem dos dados (DTO/controller que preenche exerciseHistory).
+    private static final java.util.regex.Pattern PADRAO_IDENTIFICADOR_SUSPEITO =
+            java.util.regex.Pattern.compile("^[a-z]+(_[a-z]+)+$");
+
+    private String sanitizarExerciseHistory(String valor) {
+        if (valor == null || valor.isBlank()) return "Não informado";
+
+        if (PADRAO_IDENTIFICADOR_SUSPEITO.matcher(valor.trim()).matches()
+                && !valor.equalsIgnoreCase("sedentary")) { // "sedentary" é um valor válido conhecido
+            log.warn("[DADOS SUSPEITOS] exerciseHistory parece um identificador de código, não texto legível: '{}'. " +
+                    "Verificar a origem deste valor no DTO/controller.", valor);
+            return "Não informado";
+        }
+        return valor;
     }
 }
