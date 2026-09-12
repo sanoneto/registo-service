@@ -28,8 +28,10 @@ import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -39,6 +41,12 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class TrainingPlanServiceImpl implements TrainingPlanService {
     private static final Logger log = LoggerFactory.getLogger(TrainingPlanServiceImpl.class);
+
+    // Se o aluno passar mais do que este número de dias sem gerar um plano novo,
+    // reiniciamos o ciclo de periodização na semana 1 em vez de continuar a
+    // contagem antiga — evita cair diretamente numa semana de deload (ou
+    // assumir progressão) depois de uma pausa longa.
+    private static final int DIAS_LIMITE_PARA_REINICIAR_CICLO = 14;
 
     private final ObjectMapper objectMapper;
     private final PlanoService planoService;
@@ -69,9 +77,12 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
         // 3. CASO B: Pedido de GERAÇÃO (Request com dados)
         log.info("Novo pedido de geração detetado. A verificar histórico para evitar repetição...");
 
-        // 3.1. Buscar exercícios do plano anterior para a "Lista Negra"
+        // 3.1. Busca o plano ativo/concluído anterior (usado para a "Lista Negra"
+        // de exercícios E para calcular a semana do ciclo de periodização)
+        Optional<PlanoResponseDTO> planoAnteriorOpt = planoService.findAtivoAndConcluidoByUsername(username);
+
         List<String> exerciciosParaEvitar = new java.util.ArrayList<>();
-        planoService.findAtivoAndConcluidoByUsername(username).ifPresent(plano -> {
+        planoAnteriorOpt.ifPresent(plano -> {
             loadFromS3(plano.getLink()).ifPresent(oldPlan -> {
                 if (oldPlan.getPlan() != null) {
                     List<String> names = oldPlan.getPlan().stream()
@@ -84,11 +95,17 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
             });
         });
 
-        // 3.2. Chamar a IA com o histórico extraído
-        TrainingPlanResponse newPlan = training.generateTrainingPlan(request, exerciciosParaEvitar);
+        // 3.2. PERIODIZAÇÃO: calcula em que semana do ciclo este novo plano entra
+        int weekNumber = calcularProximaSemanaCiclo(planoAnteriorOpt, username);
+        boolean isDeloadWeek = weekNumber % 4 == 0;
+        log.info("Utilizador {} — semana de ciclo calculada: {} (deload: {})", username, weekNumber, isDeloadWeek);
+
+        // 3.3. Chamar a IA com o histórico extraído e a semana calculada
+        TrainingPlanResponse newPlan = training.generateTrainingPlan(request, exerciciosParaEvitar, weekNumber);
+
         // 4. Configurar e Persistir
         configurarNovoPlano(newPlan, request);
-        salvarDadosDoPlano(username, request, key, newPlan, planId, false);
+        salvarDadosDoPlano(username, request, key, newPlan, planId, false, weekNumber, isDeloadWeek);
 
         return newPlan;
     }
@@ -97,8 +114,25 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
     public void updatePlan(TrainingPlanResponse newPlan, String username, String planId) {
         String key = buscarChaveDoPlano(planId, username, null);
         configurarNovoPlano(newPlan, newPlan.getUserProfile());
+
+        // Isto NÃO é uma nova geração — mantém a semana/deload já registados
+        // no plano existente, em vez de recalcular.
+        int semanaCiclo = 1;
+        boolean isDeload = false;
+        if (planId != null && !planId.isBlank()) {
+            try {
+                PlanoResponseDTO existente = planoService.getByPlanoById(UUID.fromString(planId));
+                if (existente != null) {
+                    semanaCiclo = existente.getSemanaCiclo();
+                    isDeload = existente.isDeload();
+                }
+            } catch (Exception e) {
+                log.warn("Não foi possível recuperar semanaCiclo/deload do plano {} — a usar valores default.", planId);
+            }
+        }
+
         // 4. Persistência (Banco e S3)
-        salvarDadosDoPlano(username, newPlan.getUserProfile(), key, newPlan, planId, true);
+        salvarDadosDoPlano(username, newPlan.getUserProfile(), key, newPlan, planId, true, semanaCiclo, isDeload);
     }
 
     @Override
@@ -155,6 +189,52 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
 
 
     // --- Métodos Auxiliares para Limpar o Fluxo Principal ---
+
+    /**
+     * PERIODIZAÇÃO: calcula a semana do ciclo de treino a usar no próximo
+     * plano gerado. Baseia-se no plano ATIVO+FINALIZADO anterior do aluno:
+     * - Se não existir plano anterior -> semana 1 (início do ciclo).
+     * - Se o aluno esteve sem gerar plano novo por mais de
+     *   DIAS_LIMITE_PARA_REINICIAR_CICLO dias -> reinicia na semana 1
+     *   (evita cair diretamente numa semana de deload após uma pausa longa).
+     * - Caso contrário -> semanaCiclo do plano anterior + 1.
+     */
+    private int calcularProximaSemanaCiclo(Optional<PlanoResponseDTO> planoAnteriorOpt, String username) {
+        if (planoAnteriorOpt.isEmpty()) {
+            return 1;
+        }
+
+        PlanoResponseDTO anterior = planoAnteriorOpt.get();
+
+        // dataUpdate reflete a última vez que este plano foi tocado (criação ou
+        // atualização); usamos como referência de "quando o aluno gerou/usou
+        // pela última vez um plano". Se vier vazio, cai para dataCreate.
+        String dataReferenciaStr = (anterior.getDataUpdate() != null && !anterior.getDataUpdate().isBlank())
+                ? anterior.getDataUpdate() : anterior.getDataCreate();
+
+        if (dataReferenciaStr == null || dataReferenciaStr.isBlank()) {
+            log.warn("Plano anterior de {} sem data de referência válida — a reiniciar ciclo.", username);
+            return 1;
+        }
+
+        try {
+            LocalDate dataReferencia = LocalDate.parse(dataReferenciaStr);
+            long diasDesdeUltimoPlano = ChronoUnit.DAYS.between(dataReferencia, LocalDate.now());
+
+            if (diasDesdeUltimoPlano > DIAS_LIMITE_PARA_REINICIAR_CICLO) {
+                log.info("Utilizador {} esteve {} dias sem gerar plano novo — a reiniciar ciclo de periodização.",
+                        username, diasDesdeUltimoPlano);
+                return 1;
+            }
+
+            return anterior.getSemanaCiclo() + 1;
+        } catch (Exception e) {
+            log.warn("Não foi possível interpretar a data de referência ('{}') do plano anterior de {} — a reiniciar ciclo.",
+                    dataReferenciaStr, username);
+            return 1;
+        }
+    }
+
     private String buscarChaveDoPlano(String planId, String username, UserProfileRequest request) {
         // 1. Tentativa prioritária: Pelo UUID do plano (planId)
         log.info("dentro de buscarChaveDoPlano");
@@ -215,7 +295,8 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
         plan.setUserProfile(request);
     }
 
-    private void salvarDadosDoPlano(String username, UserProfileRequest request, String key, TrainingPlanResponse plan, String planId, boolean update) {
+    private void salvarDadosDoPlano(String username, UserProfileRequest request, String key, TrainingPlanResponse plan,
+                                    String planId, boolean update, int semanaCiclo, boolean isDeload) {
         PlanoRequestDTO dto;
 
         if (update) {
@@ -231,15 +312,17 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
             String especialista = temNomeAluno ? username : "Sem Especialista";
             String recommended = temNomeAluno ? request.getRecommended() : username;
 
-            dto = new PlanoRequestDTO(
-                    nomeNoPlano,
-                    request.getObjective(),
-                    especialista,
-                    Enum.EstadoPlano.ATIVO,
-                    Enum.EstadoPedido.PENDENTE,
-                    key,
-                    recommended
-            );
+            dto = PlanoRequestDTO.builder()
+                    .nomeAluno(nomeNoPlano)
+                    .objetivo(request.getObjective())
+                    .especialista(especialista)
+                    .estadoPlano(Enum.EstadoPlano.ATIVO)
+                    .estadoPedido(Enum.EstadoPedido.PENDENTE)
+                    .link(key)
+                    .recommended(recommended)
+                    .semanaCiclo(semanaCiclo)
+                    .deload(isDeload)
+                    .build();
             planoService.createPlano(dto);
             // -----------------------
         } else {
@@ -249,15 +332,17 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
                 throw new RuntimeException("Plano não encontrado para o ID: " + planId);
             }
 
-            dto = new PlanoRequestDTO(
-                    planoExistente.getNomeAluno(),
-                    planoExistente.getObjetivo(),
-                    username,
-                    Enum.EstadoPlano.ATIVO,
-                    Enum.EstadoPedido.FINALIZADO,
-                    key,
-                    planoExistente.getRecommended()
-            );
+            dto = PlanoRequestDTO.builder()
+                    .nomeAluno(planoExistente.getNomeAluno())
+                    .objetivo(planoExistente.getObjetivo())
+                    .especialista(username)
+                    .estadoPlano(Enum.EstadoPlano.ATIVO)
+                    .estadoPedido(Enum.EstadoPedido.FINALIZADO)
+                    .link(key)
+                    .recommended(planoExistente.getRecommended())
+                    .semanaCiclo(semanaCiclo)
+                    .deload(isDeload)
+                    .build();
             planoService.updatePlano(planId, dto);
         }
 

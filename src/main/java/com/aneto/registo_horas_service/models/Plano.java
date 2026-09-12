@@ -46,4 +46,14 @@ public class Plano {
     private LocalDate dataUpdate;
 
     private String recommended;
+
+    // >>> NOVO: periodização de treino (deload automático a cada 4ª semana)
+    // Semana do ciclo de treino em que este plano foi gerado (1, 2, 3, 4...).
+    @Column(name = "semana_ciclo")
+    private int semanaCiclo = 1;
+
+    // Indica se este plano específico foi gerado como semana de deload
+    // (volume/intensidade reduzidos para recuperação).
+    @Column(name = "deload")
+    private boolean deload;
 }

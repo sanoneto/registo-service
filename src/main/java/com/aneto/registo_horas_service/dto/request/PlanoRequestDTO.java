@@ -40,4 +40,10 @@ public class PlanoRequestDTO {
     private String link;
 
     private String recommended;
+
+    // >>> NOVO: periodização de treino
+    @Builder.Default
+    private int semanaCiclo = 1;
+
+    private boolean deload;
 }

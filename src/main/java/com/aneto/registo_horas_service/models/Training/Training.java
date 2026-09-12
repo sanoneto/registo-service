@@ -8,7 +8,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.ai.openai.api.ResponseFormat;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
@@ -25,6 +30,20 @@ public class Training {
     private final ExerciseVideoService exerciseVideoService;
 
     public TrainingPlanResponse generateTrainingPlan(UserProfileRequest userRequest, List<String> exerciciosDoS3) {
+        // Sem contagem de semana disponível: assume semana 1 (sem deload).
+        // Para ativar a periodização automática (deload a cada 4 semanas), o chamador
+        // deve invocar generateTrainingPlan(userRequest, exerciciosDoS3, semanaAtual).
+        return generateTrainingPlan(userRequest, exerciciosDoS3, 1);
+    }
+
+    /**
+     * @param weekNumber Número da semana do ciclo de treino do aluno (1, 2, 3, 4...).
+     *                    A cada 4ª semana (4, 8, 12...) o sistema aplica automaticamente
+     *                    uma semana de DELOAD (volume e intensidade reduzidos) para
+     *                    prevenir overreaching e platôs. Se o caller não tiver esta
+     *                    informação, usar generateTrainingPlan(userRequest, exerciciosDoS3).
+     */
+    public TrainingPlanResponse generateTrainingPlan(UserProfileRequest userRequest, List<String> exerciciosDoS3, int weekNumber) {
 
         log.info("Iniciando generateTrainingPlan para o utilizador. Tem relatório médico? {}",
                 (userRequest.getMedicalReportText() != null && !userRequest.getMedicalReportText().isBlank()));
@@ -44,7 +63,14 @@ public class Training {
         Enum.TrainingProtocol protocol = Enum.TrainingProtocol.fromId(protocolId);
 
         int totalMinutos = extrairMinutosTotais(durationText);
-        int volumeIdeal = Math.max(6, totalMinutos / 7);
+        int volumeIdealBase = Math.max(6, totalMinutos / 7);
+
+        // --- PERIODIZAÇÃO: deload automático a cada 4ª semana ---
+        boolean isDeloadWeek = weekNumber > 0 && weekNumber % 4 == 0;
+        int volumeIdeal = isDeloadWeek ? Math.max(4, (int) Math.round(volumeIdealBase * 0.7)) : volumeIdealBase;
+
+        log.info("Semana {} do ciclo. Semana de deload? {} (volume base: {}, volume aplicado: {})",
+                weekNumber, isDeloadWeek, volumeIdealBase, volumeIdeal);
 
         String pathologyDeclarada = (userRequest.getPathology() == null || userRequest.getPathology().isBlank())
                 ? "Nenhuma limitação relatada" : userRequest.getPathology();
@@ -99,12 +125,30 @@ public class Training {
                 - RITMO OBRIGATÓRIO: O campo 'tempo' no JSON deve ser rigorosamente '%s'.
                 """.formatted(listaParaEvitar, tempoNASM);
 
-        // 4. Adaptação para Sedentários (Prevenção de mal-estar)
+        // 4. Adaptação para Sedentários (Prevenção de mal-estar) e Deload (Periodização)
         boolean isSedentary = "sedentary".equalsIgnoreCase(userRequest.getExerciseHistory());
-        String protocoloEfetivo = isSedentary ? "Adaptação Anatómica (Baixa Intensidade)" : protocol.getLabel();
-        String repsEfetivas = isSedentary ? "12 a 15 (longe da falha)" : protocol.getReps();
-        String setsEfetivas = isSedentary ? "2" : protocol.getSets();
-        String descansoEfetivo = isSedentary ? "120" : calcularDescansoCientifico(protocol, objectiveText, weightKg);
+
+        String protocoloEfetivo;
+        String repsEfetivas;
+        String setsEfetivas;
+        String descansoEfetivo;
+
+        if (isSedentary) {
+            protocoloEfetivo = "Adaptação Anatómica (Baixa Intensidade)";
+            repsEfetivas = "12 a 15 (longe da falha)";
+            setsEfetivas = "2";
+            descansoEfetivo = "120";
+        } else if (isDeloadWeek) {
+            protocoloEfetivo = "Deload (Redução Programada de Carga - Semana " + weekNumber + ")";
+            repsEfetivas = protocol.getReps();
+            setsEfetivas = "2";
+            descansoEfetivo = calcularDescansoDeload(protocol, objectiveText, weightKg);
+        } else {
+            protocoloEfetivo = protocol.getLabel();
+            repsEfetivas = protocol.getReps();
+            setsEfetivas = protocol.getSets();
+            descansoEfetivo = calcularDescansoCientifico(protocol, objectiveText, weightKg);
+        }
 
         String diretrizSegurancaIniciante = isSedentary ? """
                 [ALERTA DE SEGURANÇA: ALUNO SEDENTÁRIO]
@@ -113,6 +157,23 @@ public class Training {
                 - Evitar exercícios com a cabeça abaixo do nível do coração.
                 - Foco em máquinas (maior estabilidade).
                 """ : "";
+
+        String diretrizPeriodizacao = isDeloadWeek ? """
+                [SEMANA DE DELOAD - RECUPERAÇÃO PROGRAMADA (Semana %d do ciclo)]
+                - Esta é uma semana de DELOAD programado, não um treino normal.
+                - OBJETIVO FISIOLÓGICO: permitir recuperação neuromuscular e do sistema nervoso
+                  central, prevenindo overreaching e platôs de longo prazo.
+                - VOLUME: gera EXATAMENTE %d exercícios por dia (reduzido face ao habitual).
+                - INTENSIDADE: RPE máximo 5-6 em todas as séries (longe da falha). Séries: 2.
+                - PROIBIDO usar superséries, dropsets ou qualquer técnica de intensificação.
+                - NÃO incluir finalizador metabólico/anaeróbio esta semana, mesmo que o
+                  objetivo do aluno normalmente o permita.
+                - Mantém a técnica, a variedade e a estrutura normal dos dias, mas o foco
+                  desta semana é qualidade de movimento e recuperação, não sobrecarga.
+                - No campo 'notas' de pelo menos um exercício por dia, refere brevemente que
+                  esta é uma semana de deload/recuperação, para o aluno perceber a mudança de
+                  intensidade e não estranhar.
+                """.formatted(weekNumber, volumeIdeal) : "";
 
         String detalhesEquipamento = locationText.equalsIgnoreCase("Casa") ?
                 "UTILIZA APENAS: 'Peso Corporal', 'Halteres' ou 'Bandas Elásticas'. PROIBIDO o uso de máquinas de ginásio." :
@@ -190,6 +251,36 @@ public class Training {
                 - É PROIBIDO usar o mesmo exercício de arrefecimento em dois dias CONSECUTIVOS.
                 """.formatted(pathologyText);
 
+        // --- FINALIZADOR ANAERÓBIO/METABÓLICO (condicional, nunca para sedentários ou com patologia) ---
+        String objectiveLower = objectiveText.toLowerCase();
+        boolean objetivoCompativel = objectiveLower.contains("emagrec")
+                || objectiveLower.contains("perda de gordura")
+                || objectiveLower.contains("definição")
+                || objectiveLower.contains("definicao")
+                || objectiveLower.contains("condicionamento")
+                || objectiveLower.contains("resistência")
+                || objectiveLower.contains("resistencia")
+                || objectiveLower.contains("hipertrofia");
+
+        boolean permiteFinalizador = !isSedentary && !pathologyEspecifica && !isDeloadWeek && objetivoCompativel && totalMinutos >= 40;
+
+        String diretrizFinalizador = permiteFinalizador ? """
+                [FINALIZADOR METABÓLICO/ANAERÓBIO]
+                - Adiciona UM exercício FINAL de condicionamento metabólico em cada dia, na
+                  categoria FINALIZADOR do DICIONÁRIO OFICIAL.
+                - POSIÇÃO: é o PENÚLTIMO exercício do dia (imediatamente antes do
+                  alongamento/arrefecimento final).
+                - FORMATO: intervalado e curto — indica no campo 'details' um esquema tipo
+                  "30-45seg trabalho / 15-20seg descanso, 3-4 rondas" ou equivalente (AMRAP,
+                  EMOM), adaptado ao exercício escolhido.
+                - OBJETIVO: maximizar o EPOC (consumo de oxigénio pós-exercício) e a queima
+                  calórica adicional, sem comprometer a recuperação dos exercícios de força
+                  anteriores.
+                - VARIEDADE: não repetir o mesmo finalizador em dias consecutivos.
+                - RESTRIÇÃO ABSOLUTA: NUNCA usar este bloco se o aluno for sedentário ou tiver
+                  qualquer patologia/limitação relatada (não se aplica neste caso).
+                """ : "";
+
         String diretrizMobilidadeCondicional = """
                 [REGRA DE OURO: MOBILIDADE ESPECÍFICA SÓ COM QUEIXA CORRESPONDENTE]
                 - Exercícios de mobilidade/reabilitação ESPECÍFICOS de uma articulação (ex: "Rotação Externa", "Clamshell") \
@@ -257,7 +348,7 @@ public class Training {
                         diretrizFocoEspecial, diretrizVariedade, diretrizAquecimento, diretrizMobilidadeCondicional,
                         diretrizSegurancaIniciante, diretrizProtocolo, diretrizReabilitacao, diretrizBiomecanica,
                         diretrizAnatomiaDetalhada, diretrizCargasDinamicas, diretrizEquipamento, diretrizTreino,
-                        diretrizRepertorio, diretrizArrefecimento, diretrizNomenclaturaDias, diretrizDicionario,
+                        diretrizRepertorio, diretrizFinalizador, diretrizPeriodizacao, diretrizArrefecimento, diretrizNomenclaturaDias, diretrizDicionario,
                         diretrizAlimentar, diretrizRelatorioMedico
                 )
                 .filter(s -> s != null && !s.isBlank())
@@ -308,8 +399,8 @@ public class Training {
         );
 
         boolean temRelatorioMedico = medicalReportText != null && !medicalReportText.isBlank();
-     //   log.info("prompt -enviado : {}", userPrompt);
-        return executeGeneration(userPrompt, totalMinutos, exerciseDictionary, pathologyText, exerciciosDoS3, pathologyEspecifica);
+        //   log.info("prompt -enviado : {}", userPrompt);
+        return executeGeneration(userPrompt, totalMinutos, exerciseDictionary, pathologyText, exerciciosDoS3, pathologyEspecifica, permiteFinalizador, userRequest.getWeightKg());
     }
 
     @NotNull
@@ -339,7 +430,8 @@ public class Training {
 
     private TrainingPlanResponse executeGeneration(
             String prompt, int totalMinutos, Map<String, List<String>> exerciseDictionary,
-            String pathologyText, List<String> exerciciosAnteriores, boolean pathologyEspecifica) {
+            String pathologyText, List<String> exerciciosAnteriores, boolean pathologyEspecifica,
+            boolean permiteFinalizador, Double weightKg) {
 
         log.info("Iniciando executeGeneration no ChatModel.");
         int maxRetries = 8;
@@ -367,8 +459,22 @@ public class Training {
                 .collect(Collectors.toList());
         boolean exigirVariedadeArrefecimento = opcoesArrefecimento.size() >= 2;
 
-        log.info("Variedade disponível — Aquecimento: {} opções (exigir variedade: {}) | Arrefecimento: {} opções (exigir variedade: {})",
-                opcoesAquecimento.size(), exigirVariedadeAquecimento, opcoesArrefecimento.size(), exigirVariedadeArrefecimento);
+        Set<String> categoriasFinalizador = Set.of("FINALIZADOR");
+        List<String> opcoesFinalizador = exerciseDictionary.entrySet().stream()
+                .filter(e -> categoriasFinalizador.stream().anyMatch(cat -> e.getKey().equalsIgnoreCase(cat)))
+                .flatMap(e -> e.getValue().stream())
+                .distinct()
+                .collect(Collectors.toList());
+        boolean exigirVariedadeFinalizador = opcoesFinalizador.size() >= 2;
+        // Se o aluno for elegível mas o dicionário não tiver categoria FINALIZADOR, desativa a exigência
+        boolean finalizadorDisponivel = permiteFinalizador && !opcoesFinalizador.isEmpty();
+        if (permiteFinalizador && opcoesFinalizador.isEmpty()) {
+            log.warn("Finalizador anaeróbio elegível para este aluno mas categoria FINALIZADOR ausente/vazia no dicionário — a ignorar validação.");
+        }
+
+        log.info("Variedade disponível — Aquecimento: {} opções (exigir variedade: {}) | Arrefecimento: {} opções (exigir variedade: {}) | Finalizador: {} opções (elegível: {})",
+                opcoesAquecimento.size(), exigirVariedadeAquecimento, opcoesArrefecimento.size(), exigirVariedadeArrefecimento,
+                opcoesFinalizador.size(), finalizadorDisponivel);
 
         // Normaliza a lista de exercícios do plano anterior para comparação consistente
         Set<String> nomesAnteriores = (exerciciosAnteriores == null ? List.<String>of() : exerciciosAnteriores)
@@ -377,11 +483,28 @@ public class Training {
                 .collect(Collectors.toCollection(HashSet::new));
 
 
+        // --- STRUCTURED OUTPUT: força o OpenAI a devolver sempre JSON sintaticamente
+        // válido (sem markdown fences, sem chavetas por fechar, sem vírgulas a mais).
+        // Isto elimina a categoria de retries causados por erro de FORMATO, deixando
+        // as tentativas restantes só para erros de REGRA DE NEGÓCIO (que continuam a
+        // ser validados abaixo, exercício a exercício).
+        // Nota: response_format=json_object exige que a palavra "JSON" apareça no
+        // prompt — o nosso já a tem ("FORMATO JSON OBRIGATÓRIO", "Responde APENAS o
+        // JSON puro"), por isso não precisa de ajuste adicional.
+        OpenAiChatOptions jsonModeOptions = OpenAiChatOptions.builder()
+                .withResponseFormat(ResponseFormat.builder()
+                        .type(ResponseFormat.Type.JSON_OBJECT)
+                        .build())
+                .build();
+
         StringBuilder promptBuilder = new StringBuilder(prompt);
         for (int attempt = 0; attempt <= maxRetries; attempt++) {
             Set<String> nomesUsadosNestaTentativa = new HashSet<>(); // <<< declarado no topo do corpo do for, fora do try
             try {
-                String textResponse = chatModel.call(promptBuilder.toString());
+                Prompt promptComJsonMode = new Prompt(
+                        new UserMessage(promptBuilder.toString()), jsonModeOptions);
+                ChatResponse chatResponse = chatModel.call(promptComJsonMode);
+                String textResponse = chatResponse.getResult().getOutput().getContent();
                 String cleanedJson = cleanMarkdown(textResponse);
 
                 // 1. DESSERIALIZAÇÃO INICIAL
@@ -412,6 +535,7 @@ public class Training {
                 List<TrainingDay> updatedPlan = new ArrayList<>();
                 String aquecimentoAnterior = null;
                 String arrefecimentoAnterior = null;
+                String finalizadorAnterior = null; // >>> NOVO: controlo de variedade do finalizador anaeróbio
                 int totalCustomNoPlano = 0; // >>> NOVO: contador global de exercícios custom no plano inteiro
                 final int LIMITE_CUSTOM_TOTAL = 3; // subiu de 2 para 3, cobre os dois motivos
 
@@ -428,6 +552,9 @@ public class Training {
                         TrainingExercise ex = exercisesOfDay.get(i);
                         boolean isAquecimento = (i == 0);
                         boolean isArrefecimento = (i == totalExDoDia - 1);
+                        // Finalizador é o penúltimo exercício, só é válido se o dia tiver pelo menos
+                        // 3 exercícios (para não colidir com o aquecimento) e o aluno for elegível.
+                        boolean isFinalizador = finalizadorDisponivel && totalExDoDia >= 3 && (i == totalExDoDia - 2);
 
                         // >>> NOVO BLOCO: tratamento de exercícios CUSTOM (fora do dicionário)
                         if (ex.isCustom()) {
@@ -527,6 +654,32 @@ public class Training {
                                 }
                             }
                             arrefecimentoAnterior = enriched.getName();
+                        } else if (isFinalizador) {
+                            // 4e. Segurança: nunca aceitar finalizador se o aluno não for elegível
+                            if (!finalizadorDisponivel) {
+                                throw new RuntimeException(
+                                        "Exercício finalizador \"" + enriched.getName() + "\" não deveria existir: " +
+                                                "o aluno é sedentário, tem patologia relatada ou o objetivo não é compatível com " +
+                                                "condicionamento metabólico. Remove este exercício do dia."
+                                );
+                            }
+                            // 4f. Deve pertencer à categoria FINALIZADOR do dicionário
+                            String categoriaFinalizador = encontrarCategoria(enriched.getName(), exerciseDictionary);
+                            if (categoriaFinalizador == null || !categoriaFinalizador.equalsIgnoreCase("FINALIZADOR")) {
+                                throw new RuntimeException(
+                                        "O penúltimo exercício do dia (\"" + enriched.getName() + "\") deveria ser um " +
+                                                "finalizador metabólico da categoria FINALIZADOR do dicionário, mas pertence a \"" +
+                                                categoriaFinalizador + "\". Escolhe um exercício da categoria FINALIZADOR."
+                                );
+                            }
+                            // 4g. Variedade: não repetir em dias consecutivos
+                            if (exigirVariedadeFinalizador && enriched.getName().equalsIgnoreCase(finalizadorAnterior)) {
+                                throw new RuntimeException(
+                                        "Exercício finalizador repetido em dias consecutivos: \"" + enriched.getName() +
+                                                "\". Escolhe um finalizador diferente do DICIONÁRIO para este dia."
+                                );
+                            }
+                            finalizadorAnterior = enriched.getName();
                         } else {
                             // Exercícios de TRABALHO: unicidade total no plano + anti-platô vs plano anterior
                             boolean repetidoNoPlano = !nomesUsadosNestaTentativa.add(enriched.getName());
@@ -558,7 +711,10 @@ public class Training {
                         enrichedExercises.add(enriched);
                     }
 
-                    updatedPlan.add(new TrainingDay(day.getDay(), enrichedExercises));
+                    List<TrainingExercise> exercisesComEstimativa = anexarEstimativaCalorica(
+                            enrichedExercises, exerciseDictionary, weightKg, totalMinutos);
+
+                    updatedPlan.add(new TrainingDay(day.getDay(), exercisesComEstimativa));
                 }
 
                 // 5. LIMPEZA DA DIETA (garante listas mutáveis)
@@ -600,6 +756,72 @@ public class Training {
         }
 
         throw new RuntimeException("Falha na geração.");
+    }
+
+    // Valores MET (Metabolic Equivalent of Task) aproximados por categoria de exercício,
+    // usados apenas para dar ao aluno uma ESTIMATIVA de gasto calórico da sessão.
+    // Não substitui medição real (frequência cardíaca, VO2), é apenas indicativo.
+    private static final Map<String, Double> MET_POR_CATEGORIA = Map.ofEntries(
+            Map.entry("PEITO", 5.0),
+            Map.entry("COSTAS", 5.0),
+            Map.entry("PERNAS", 6.0),
+            Map.entry("OMBROS", 4.5),
+            Map.entry("BRAÇOS", 4.0),
+            Map.entry("CORE", 4.0),
+            Map.entry("REAB/MOBILIDADE", 2.5),
+            Map.entry("MOBILIDADE", 2.5),
+            Map.entry("REABILITAÇÃO", 2.5),
+            Map.entry("ALONGAMENTO", 2.0),
+            Map.entry("FINALIZADOR", 8.0)
+    );
+    private static final double MET_DEFAULT = 4.5; // fallback para categorias desconhecidas/custom
+
+    /**
+     * Estima o gasto calórico de uma sessão de treino a partir da fórmula padrão
+     * kcal = MET * 3.5 * pesoKg / 200 * minutos, usando o MET médio dos exercícios
+     * do dia (ponderado por número de exercícios de cada categoria).
+     * É uma estimativa aproximada, não uma medição clínica.
+     */
+    private Integer estimarCaloriasSessao(List<TrainingExercise> exercises, Map<String, List<String>> dictionary,
+                                          Double weightKg, int totalMinutosSessao) {
+        if (exercises == null || exercises.isEmpty() || weightKg == null || weightKg <= 0) return null;
+
+        double somaMet = 0;
+        int contados = 0;
+        for (TrainingExercise ex : exercises) {
+            String categoria = encontrarCategoria(ex.getName(), dictionary);
+            double met = (categoria != null && MET_POR_CATEGORIA.containsKey(categoria.toUpperCase()))
+                    ? MET_POR_CATEGORIA.get(categoria.toUpperCase())
+                    : MET_DEFAULT;
+            somaMet += met;
+            contados++;
+        }
+        if (contados == 0) return null;
+
+        double metMedio = somaMet / contados;
+        double kcal = metMedio * 3.5 * weightKg / 200.0 * totalMinutosSessao;
+        return (int) Math.round(kcal);
+    }
+
+    /**
+     * Anexa a estimativa de calorias da sessão à nota do último exercício do dia
+     * (o alongamento/arrefecimento), de forma visível mas não intrusiva para o aluno.
+     */
+    private List<TrainingExercise> anexarEstimativaCalorica(List<TrainingExercise> enrichedExercises,
+                                                            Map<String, List<String>> dictionary,
+                                                            Double weightKg, int totalMinutosSessao) {
+        Integer kcalEstimadas = estimarCaloriasSessao(enrichedExercises, dictionary, weightKg, totalMinutosSessao);
+        if (kcalEstimadas == null || enrichedExercises.isEmpty()) return enrichedExercises;
+
+        int ultimoIndex = enrichedExercises.size() - 1;
+        TrainingExercise ultimo = enrichedExercises.get(ultimoIndex);
+        String notaOriginal = (ultimo.getNotas() == null || ultimo.getNotas().isBlank()) ? "" : ultimo.getNotas().trim() + " ";
+        String notaComEstimativa = notaOriginal + "Estimativa de gasto calórico desta sessão: ~" + kcalEstimadas + " kcal.";
+
+        TrainingExercise atualizado = ultimo.toBuilder().notas(notaComEstimativa).build();
+        List<TrainingExercise> resultado = new ArrayList<>(enrichedExercises);
+        resultado.set(ultimoIndex, atualizado);
+        return resultado;
     }
 
     /**
@@ -709,6 +931,10 @@ public class Training {
                 .collect(Collectors.toCollection(HashSet::new));
     }
 
+    // Com response_format=json_object, o OpenAI já garante JSON sintaticamente
+    // válido (sem ```json fences, sem chavetas por fechar). Este método fica como
+    // rede de segurança secundária (ex: se mudares de provider/modelo no futuro)
+    // e continua a tratar da vírgula decimal (25,5 -> 25.5), que o JSON mode não resolve.
     private String cleanMarkdown(String text) {
         if (text == null || text.isBlank()) return "{}";
         String cleaned = text.replaceAll("(?s)```json\\s*(.*?)\\s*```", "$1").trim();
@@ -732,6 +958,21 @@ public class Training {
         if (objective.equalsIgnoreCase("Força")) return (peso > 80) ? "180" : "120";
         if (objective.equalsIgnoreCase("Hipertrofia")) return (peso > 50) ? "90" : "60";
         return "60";
+    }
+
+    /**
+     * Descanso para a semana de deload: parte do descanso científico habitual mas
+     * acrescenta uma margem fixa, já que o objetivo aqui é recuperação, não sobrecarga
+     * progressiva — menos urgência em minimizar o tempo de descanso.
+     */
+    private String calcularDescansoDeload(Enum.TrainingProtocol protocol, String objective, String cargaAtual) {
+        String base = calcularDescansoCientifico(protocol, objective, cargaAtual);
+        try {
+            int segundosBase = Integer.parseInt(base.replaceAll("[^0-9]", ""));
+            return String.valueOf(segundosBase + 30);
+        } catch (Exception e) {
+            return "90";
+        }
     }
 
     private int extrairMinutosTotais(String durationText) {
@@ -1073,6 +1314,11 @@ public class Training {
                 "Alongamento Isquiotibiais", "Alongamento Peitoral",
                 "Alongamento do músculo grande dorsal", "Flexores da Anca",
                 "Alongamento borboleta", "Walking Lunges with Reach", "Frankenstein Walk"
+        ));
+        map.put("FINALIZADOR", List.of(
+                "Burpees", "Mountain Climbers", "Kettlebell Swing",
+                "Corda de Saltar", "Battle Rope", "Jump Squat",
+                "Sprint na Bike Estática", "Remo Curto Intervalado", "Circuito Metabólico AMRAP"
         ));
 
         FALLBACK_DICTIONARY = Collections.unmodifiableMap(map);

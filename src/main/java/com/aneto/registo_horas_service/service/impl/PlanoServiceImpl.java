@@ -119,6 +119,9 @@ public class PlanoServiceImpl implements PlanoService {
         plano.setEstadoPlano(requestDTO.getEstadoPlano());
         plano.setEstadoPedido(requestDTO.getEstadoPedido());
         plano.setLink(requestDTO.getLink());
+        // >>> NOVO: propaga a semana do ciclo e a flag de deload deste plano
+        plano.setSemanaCiclo(requestDTO.getSemanaCiclo());
+        plano.setDeload(requestDTO.isDeload());
 
         repository.save(plano);
     }

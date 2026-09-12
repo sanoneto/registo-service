@@ -22,4 +22,8 @@ public class PlanoResponseDTO implements Serializable {
     private String dataCreate;      // String pura
     private String dataUpdate;      // String pura
     private String recommended;
+
+    // >>> NOVO: periodização de treino
+    private int semanaCiclo;
+    private boolean deload;
 }
