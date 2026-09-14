@@ -26,4 +26,7 @@ public class PlanoResponseDTO implements Serializable {
     // >>> NOVO: periodização de treino
     private int semanaCiclo;
     private boolean deload;
+
+    private boolean contaAssociada;
+    private String alunoTempId;
 }

@@ -85,6 +85,7 @@ r2:
   secret-key: ${R2_SECRET_KEY}
   bucket-name: ${R2_BUCKET_NAME}
   url-expiration-minutes: 30
+  video-base-url: ${R2_VIDEO_BASE_URL}
 
 logging:
   level:

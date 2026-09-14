@@ -23,4 +23,6 @@ public interface TrainingPlanService {
     void saveProgressLogs(List<TrainingExercise> logs, String username, String planId);
 
     List<ExerciseHistoryResponse> getProgressLogs(String exerciseName, String username);
+
+    void associarPlanoAConta(String planId, String novoUsername);
 }

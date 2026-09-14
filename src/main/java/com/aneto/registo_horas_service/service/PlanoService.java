@@ -25,4 +25,8 @@ public interface PlanoService {
     void changeOfProgress(String planId, String username, String newStatus);
 
     void prepararNovoPlanoAtivo(String username);
+
+    Optional<PlanoResponseDTO> findAtivoAndConcluidoByAlunoTempId(String alunoTempId);
+
+    void prepararNovoPlanoAtivoPorAlunoTempId(String alunoTempId);
 }

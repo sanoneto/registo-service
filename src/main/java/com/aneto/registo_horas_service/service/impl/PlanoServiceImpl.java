@@ -31,8 +31,6 @@ public class PlanoServiceImpl implements PlanoService {
     public PlanoResponseDTO createPlano(PlanoRequestDTO request) {
         Plano plano = mapper.toEntity(request);
         Plano salvo = repository.save(plano);
-
-        // Usamos o mapper, mas garantimos que o retorno seja tratado
         return mapper.toResponse(salvo);
     }
 
@@ -40,7 +38,6 @@ public class PlanoServiceImpl implements PlanoService {
     public PlanoResponseDTO getByPlanoById(UUID id) {
         Plano plano = repository.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("Plano não encontrado com o ID: " + id));
-
         return mapper.toResponse(plano);
     }
 
@@ -58,13 +55,12 @@ public class PlanoServiceImpl implements PlanoService {
         Page<Plano> entidadePage;
         boolean temNome = nomeAluno != null && !nomeAluno.isEmpty();
 
-        // Converte a String recebida do frontend para o Enum, ignorando valores inválidos
         Enum.EstadoPlano estadoPlano = null;
         if (estadoPlanoStr != null && !estadoPlanoStr.isBlank()) {
             try {
                 estadoPlano = Enum.EstadoPlano.valueOf(estadoPlanoStr.toUpperCase());
             } catch (IllegalArgumentException e) {
-                estadoPlano = null; // valor inválido é tratado como "sem filtro"
+                estadoPlano = null;
             }
         }
         boolean temEstado = estadoPlano != null;
@@ -81,8 +77,8 @@ public class PlanoServiceImpl implements PlanoService {
             }
         } else if (roles.contains("ROLE_ESPECIALISTA")) {
             entidadePage = temEstado
-                    ? repository.findForEspecialista(usernameLogado, estadoPlano, nomeAluno,pageable)
-                    : repository.findForEspecialista(usernameLogado,nomeAluno, pageable);
+                    ? repository.findForEspecialista(usernameLogado, estadoPlano, nomeAluno, pageable)
+                    : repository.findForEspecialista(usernameLogado, nomeAluno, pageable);
         } else {
             entidadePage = temEstado
                     ? repository.findForEstagiario(usernameLogado, estadoPlano, pageable)
@@ -96,6 +92,7 @@ public class PlanoServiceImpl implements PlanoService {
 
         return new PageImpl<>(dtoList, pageable, entidadePage.getTotalElements());
     }
+
     @Override
     @Transactional(readOnly = true)
     public Optional<PlanoResponseDTO> findAtivoAndConcluidoByUsername(String username) {
@@ -119,9 +116,11 @@ public class PlanoServiceImpl implements PlanoService {
         plano.setEstadoPlano(requestDTO.getEstadoPlano());
         plano.setEstadoPedido(requestDTO.getEstadoPedido());
         plano.setLink(requestDTO.getLink());
-        // >>> NOVO: propaga a semana do ciclo e a flag de deload deste plano
         plano.setSemanaCiclo(requestDTO.getSemanaCiclo());
         plano.setDeload(requestDTO.isDeload());
+        // >>> NOVO
+        plano.setContaAssociada(requestDTO.isContaAssociada());
+        plano.setAlunoTempId(requestDTO.getAlunoTempId());
 
         repository.save(plano);
     }
@@ -146,6 +145,25 @@ public class PlanoServiceImpl implements PlanoService {
     @Transactional
     public void prepararNovoPlanoAtivo(String username) {
         repository.inativarPlanosAtivosPorAluno(username);
+    }
+
+    // >>> NOVO
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<PlanoResponseDTO> findAtivoAndConcluidoByAlunoTempId(String alunoTempId) {
+        if (alunoTempId == null || alunoTempId.isBlank()) return Optional.empty();
+        return repository.findByAlunoTempIdAndEstadoPlanoAndEstadoPedido(
+                alunoTempId,
+                Enum.EstadoPlano.ATIVO,
+                Enum.EstadoPedido.FINALIZADO
+        ).map(mapper::toResponse);
+    }
+
+    // >>> NOVO
+    @Override
+    @Transactional
+    public void prepararNovoPlanoAtivoPorAlunoTempId(String alunoTempId) {
+        repository.inativarPlanosAtivosPorAlunoTempId(alunoTempId);
     }
 
     private Enum.EstadoPedido converterParaEnum(String status) {

@@ -10,13 +10,11 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDate;
 import java.util.UUID;
-
 @Data
 @Entity
 @Table(name = "planos", schema = "REGISTOS")
 @AllArgsConstructor
 @NoArgsConstructor
-// ESTA LINHA É CRUCIAL: Impede que o Jackson tente ler proxies do Hibernate
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Plano {
 
@@ -47,13 +45,18 @@ public class Plano {
 
     private String recommended;
 
-    // >>> NOVO: periodização de treino (deload automático a cada 4ª semana)
-    // Semana do ciclo de treino em que este plano foi gerado (1, 2, 3, 4...).
     @Column(name = "semana_ciclo")
     private int semanaCiclo = 1;
 
-    // Indica se este plano específico foi gerado como semana de deload
-    // (volume/intensidade reduzidos para recuperação).
     @Column(name = "deload")
     private boolean deload;
+
+    // >>> NOVO: distingue plano de conta real vs aluno sem registo
+    @Column(name = "conta_associada")
+    private boolean contaAssociada = true;
+
+    // >>> NOVO: identificador estável do aluno fictício (UUID em texto).
+    // Null quando contaAssociada = true (aí usa-se nomeAluno/username normalmente).
+    @Column(name = "aluno_temp_id")
+    private String alunoTempId;
 }

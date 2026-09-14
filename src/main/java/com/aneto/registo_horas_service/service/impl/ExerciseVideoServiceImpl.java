@@ -31,6 +31,14 @@ public class ExerciseVideoServiceImpl implements ExerciseVideoService {
     @Value("${r2.url-expiration-minutes:30}")
     private long urlExpirationMinutes;
 
+    // NOVO: base-url do ambiente atual (dev -> r2.dev, prod -> cdn.liveproact.com)
+    @Value("${r2.video-base-url}")
+    private String videoBaseUrl;
+
+    // NOVO: prefixo do caminho dentro do bucket/domínio (ex: "exercicios")
+    @Value("${r2.video-path-prefix:exercicios}")
+    private String videoPathPrefix;
+
     public ExerciseVideoServiceImpl(ExerciseRepository repository,
                                     @Qualifier("r2Presigner") S3Presigner r2Presigner) {
         this.repository = repository;
@@ -52,14 +60,39 @@ public class ExerciseVideoServiceImpl implements ExerciseVideoService {
             return buildFallbackUrl(exerciseName);
         }
 
-        // NOVO: se já é um URL completo (YouTube, R2 público, CDN, etc.),
-        // usa tal como está — não tentes assinar um "objeto" que não existe no bucket.
+        // Se já é um URL completo (YouTube, ou alguém ainda gravou link absoluto na BD),
+        // usa tal como está — mantém compatibilidade com dados antigos.
         if (objectKey.startsWith("http://") || objectKey.startsWith("https://")) {
             return objectKey;
         }
 
-        // Só chega aqui se for mesmo uma key relativa dentro do bucket R2.
-        return generatePresignedUrl(objectKey);
+        // NOVO FLUXO: a BD só guarda o "número"/nome do ficheiro (ex: "Y-W-T.mp4").
+        // Montamos o URL público completo consoante o ambiente ativo.
+        return buildPublicUrl(objectKey);
+    }
+
+    /**
+     * Constrói o URL público completo a partir do base-url do ambiente
+     * (definido em application-{profile}.yml) e do caminho relativo guardado
+     * na BD. Ex: dev -> https://pub-....r2.dev/exercicios/Y-W-T.mp4
+     *            prod -> https://cdn.liveproact.com/exercicios/Y-W-T.mp4
+     */
+    private String buildPublicUrl(String objectKey) {
+        String base = videoBaseUrl.endsWith("/")
+                ? videoBaseUrl.substring(0, videoBaseUrl.length() - 1)
+                : videoBaseUrl;
+
+        String key = objectKey.startsWith("/") ? objectKey.substring(1) : objectKey;
+
+        // Se o valor na BD já vier com o prefixo "exercicios/", não duplica.
+        boolean jaTemPrefixo = videoPathPrefix != null && !videoPathPrefix.isBlank()
+                && key.toLowerCase().startsWith(videoPathPrefix.toLowerCase() + "/");
+
+        String path = jaTemPrefixo || videoPathPrefix == null || videoPathPrefix.isBlank()
+                ? key
+                : videoPathPrefix + "/" + key;
+
+        return base + "/" + path;
     }
 
     @Override
@@ -72,6 +105,9 @@ public class ExerciseVideoServiceImpl implements ExerciseVideoService {
                 ));
     }
 
+    // Mantido apenas para casos em que precises mesmo de acesso privado/assinado
+    // a um objeto do bucket (ex: bucket sem domínio público, conteúdo restrito).
+    // Já não é chamado no fluxo normal, mas fica disponível se precisares.
     private String generatePresignedUrl(String objectKey) {
         GetObjectRequest getObjectRequest = GetObjectRequest.builder()
                 .bucket(bucketName)

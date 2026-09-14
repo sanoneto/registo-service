@@ -64,5 +64,21 @@ public interface PlanoRepository extends JpaRepository<Plano, UUID> {
 
     @Query("SELECT p FROM Plano p WHERE p.nomeAluno = :nome AND p.estadoPlano = :estadoPlano")
     Page<Plano> findForEstagiario(@Param("nome") String nome, @Param("estadoPlano") Enum.EstadoPlano estadoPlano, Pageable pageable);
+
+    // >>> NOVO: busca de plano ativo+concluído para aluno SEM conta, por alunoTempId
+    Optional<Plano> findByAlunoTempIdAndEstadoPlanoAndEstadoPedido(
+            String alunoTempId,
+            Enum.EstadoPlano estadoPlano,
+            Enum.EstadoPedido estadoPedido
+    );
+
+    // >>> NOVO: inativação de planos ativos para aluno SEM conta (por alunoTempId,
+    // não por nomeAluno, para evitar colidir com outro aluno fictício de nome igual)
+    @Modifying
+    @Transactional
+    @Query("UPDATE Plano p SET p.estadoPlano = 'INATIVO', p.estadoPedido = 'FECHADO' " +
+            "WHERE p.alunoTempId = :alunoTempId AND p.estadoPlano = 'ATIVO'")
+    void inativarPlanosAtivosPorAlunoTempId(@Param("alunoTempId") String alunoTempId);
+
 }
 

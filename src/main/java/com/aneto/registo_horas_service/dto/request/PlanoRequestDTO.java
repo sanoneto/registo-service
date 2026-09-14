@@ -46,4 +46,15 @@ public class PlanoRequestDTO {
     private int semanaCiclo = 1;
 
     private boolean deload;
+
+    // >>> NOVO: suporte a "aluno sem conta"
+    // true  = plano associado a uma conta real (fluxo normal, comportamento atual)
+    // false = plano criado por um especialista para um aluno fictício/sem registo
+    @Builder.Default
+    private boolean contaAssociada = true;
+
+    // >>> NOVO: identificador estável do aluno fictício, gerado no momento da
+    // criação do primeiro plano (UUID string). Fica null quando contaAssociada=true,
+    // porque nesse caso já usamos o username real para tudo.
+    private String alunoTempId;
 }

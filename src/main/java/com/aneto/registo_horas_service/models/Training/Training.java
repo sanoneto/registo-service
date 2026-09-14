@@ -400,7 +400,15 @@ public class Training {
 
         boolean temRelatorioMedico = medicalReportText != null && !medicalReportText.isBlank();
         //   log.info("prompt -enviado : {}", userPrompt);
-        return executeGeneration(userPrompt, totalMinutos, exerciseDictionary, pathologyText, exerciciosDoS3, pathologyEspecifica, permiteFinalizador, userRequest.getWeightKg());
+        TrainingPlanResponse resultado = executeGeneration(userPrompt, totalMinutos, exerciseDictionary, pathologyText, exerciciosDoS3, pathologyEspecifica, permiteFinalizador, userRequest.getWeightKg());
+
+        // Garante (em Java, não só via prompt) que o summary termina sempre com uma
+        // frase de incentivo curta e ESPECÍFICA ao aluno — não genérica. Isto não
+        // depende da IA cumprir a instrução; é sempre aplicado aqui.
+        String summaryComFecho = garantirFechoMotivacional(resultado.getSummary(), userRequest, isDeloadWeek, weekNumber);
+        resultado.setSummary(summaryComFecho);
+
+        return resultado;
     }
 
     @NotNull
@@ -989,6 +997,57 @@ public class Training {
         } catch (Exception e) {
             return 60;
         }
+    }
+
+    /**
+     * Garante que o summary termina com uma frase de incentivo curta e ESPECÍFICA
+     * ao aluno (nome se disponível, objetivo real, e se é semana de deload) —
+     * nunca uma frase genérica tipo "Continua assim!". Aplicado sempre em Java,
+     * independentemente do que a IA escreveu, para consistência garantida.
+     */
+    private String garantirFechoMotivacional(String summary, UserProfileRequest request, boolean isDeloadWeek, int weekNumber) {
+        String base = (summary == null || summary.isBlank()) ? "" : summary.trim();
+        String fecho = construirFechoMotivacional(request, isDeloadWeek, weekNumber);
+        return base.isEmpty() ? fecho : base + " " + fecho;
+    }
+
+    private String construirFechoMotivacional(UserProfileRequest request, boolean isDeloadWeek, int weekNumber) {
+        String nome = (request.getStudentName() != null && !request.getStudentName().isBlank())
+                ? request.getStudentName() : null;
+        String vocativo = nome != null ? nome + ", " : "";
+
+        String objectiveLower = defaultIfEmpty(request.getObjective(), "").toLowerCase();
+
+        if (isDeloadWeek) {
+            int semanasAnteriores = Math.max(1, weekNumber - 1);
+            return vocativo + "esta semana de recuperação é o que vai permitir que o teu corpo absorva " +
+                    "todo o trabalho das últimas " + semanasAnteriores + " semanas — não saltes os dias de descanso.";
+        }
+        if (objectiveLower.contains("glúteo") || objectiveLower.contains("gluteo")) {
+            return vocativo + "cada agachamento e elevação pélvica bem executados hoje são investimento " +
+                    "direto no resultado que procuras nos glúteos.";
+        }
+        if (objectiveLower.contains("hipertrofia")) {
+            return vocativo + "cada série perto da falha controlada é um estímulo direto para o crescimento " +
+                    "muscular que procuras — mantém a técnica e o foco.";
+        }
+        if (objectiveLower.contains("emagrec") || objectiveLower.contains("perda de gordura")
+                || objectiveLower.contains("definição") || objectiveLower.contains("definicao")) {
+            return vocativo + "a consistência nestes treinos, semana após semana, é o que realmente separa " +
+                    "quem atinge o objetivo de emagrecimento de quem desiste a meio.";
+        }
+        if (objectiveLower.contains("força")) {
+            return vocativo + "a força constrói-se treino a treino — respeita o descanso entre séries, " +
+                    "é isso que te vai permitir progredir nas cargas.";
+        }
+        if (objectiveLower.contains("condicionamento") || objectiveLower.contains("resistência")
+                || objectiveLower.contains("resistencia")) {
+            return vocativo + "cada sessão de condicionamento que completas hoje é uma vitória contra " +
+                    "o teu eu de há algumas semanas.";
+        }
+
+        return vocativo + "mantém o foco no objetivo de " + defaultIfEmpty(request.getObjective(), "saúde e bem-estar") +
+                " — a consistência, sessão após sessão, é o que faz a diferença.";
     }
 
     private String defaultIfEmpty(String value, String defaultValue) {

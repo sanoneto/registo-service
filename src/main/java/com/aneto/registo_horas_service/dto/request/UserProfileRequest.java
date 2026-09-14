@@ -8,10 +8,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * Transformado de Record para Classe DTO para garantir compatibilidade
- * total com a serialização do Jackson e evitar UnsupportedOperationException.
- */
 @Data
 @Builder
 @NoArgsConstructor
@@ -52,5 +48,8 @@ public class UserProfileRequest {
     private String protocol;
     private Double bodyFat;
     private Integer mealsPerDay;
-    private String medicalReportText; // null se o aluno não anexou nada
+    private String medicalReportText;
+
+    // >>> NOVO: identificador estável do aluno "sem conta"
+    private String alunoTempId;
 }
