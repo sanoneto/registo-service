@@ -330,10 +330,13 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
                 throw new RuntimeException("Plano não encontrado para o ID: " + planId);
             }
 
+            boolean temNomeAluno = request.getStudentName() != null && !request.getStudentName().isBlank();
+            String especialistaAtualizado = temNomeAluno ? username : "Sem Especialista";
+
             dto = PlanoRequestDTO.builder()
                     .nomeAluno(planoExistente.getNomeAluno())
                     .objetivo(planoExistente.getObjetivo())
-                    .especialista(username)
+                    .especialista(especialistaAtualizado)
                     .estadoPlano(Enum.EstadoPlano.ATIVO)
                     .estadoPedido(Enum.EstadoPedido.FINALIZADO)
                     .link(key)

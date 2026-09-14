@@ -15,6 +15,7 @@ import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.openai.api.ResponseFormat;
 import org.springframework.stereotype.Component;
+import org.apache.commons.lang3.StringUtils;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -1290,26 +1291,29 @@ public class Training {
     );
 
     private String normalizeExerciseName(String aiSuggestion, Set<String> validNames) {
-        if (aiSuggestion == null || aiSuggestion.isBlank()) return aiSuggestion;
+        // ... lógica atual (limpeza + EXERCISE_MAP) ...
 
         String cleanSuggestion = aiSuggestion.trim().replaceAll("[.,!?]$", "");
-        String lowerSuggestion = cleanSuggestion.toLowerCase();
+        if (validNames.contains(cleanSuggestion)) return cleanSuggestion;
 
-        if (EXERCISE_MAP.containsKey(lowerSuggestion)) {
-            String candidato = EXERCISE_MAP.get(lowerSuggestion);
-            // só aceita o sinónimo se ele realmente existir no dicionário ATUAL (BD ou fallback)
-            if (validNames.contains(candidato)) {
-                return candidato;
+        // Fallback: aproxima ao nome válido mais próximo (evita gastar retry em quase-acertos)
+        String lower = cleanSuggestion.toLowerCase();
+        String melhorMatch = null;
+        int menorDistancia = Integer.MAX_VALUE;
+        for (String valido : validNames) {
+            int distancia = StringUtils.getLevenshteinDistance(lower, valido.toLowerCase());
+            // só aceita se for claramente próximo, para não confundir categorias diferentes
+            if (distancia < menorDistancia && distancia <= Math.max(3, valido.length() / 4)) {
+                menorDistancia = distancia;
+                melhorMatch = valido;
             }
-            // caso contrário, devolve o nome original tal como veio, para o erro ser claro e útil
-            log.warn("Sinónimo '{}' -> '{}' ignorado: alvo não existe no dicionário atual.", lowerSuggestion, candidato);
+        }
+        if (melhorMatch != null) {
+            log.warn("[AUTO-CORREÇÃO POR PROXIMIDADE] '{}' -> '{}'", cleanSuggestion, melhorMatch);
+            return melhorMatch;
         }
 
-        if (lowerSuggestion.contains("puxada") && lowerSuggestion.contains("frente")) {
-            return "Puxada à Frente";
-        }
-
-        return cleanSuggestion;
+        return cleanSuggestion; // deixa cair na validação normal (vai gerar o erro/retry como hoje)
     }
 
     // --- Fallback estático usado quando a BD está indisponível ou vazia ---
@@ -1393,7 +1397,7 @@ public class Training {
                 [ERROS COMUNS A EVITAR — exemplos reais de falhas anteriores]
                 - "Prancha" -> usa "Prancha Abdominal"
                 - "Supino Reto" -> usa "Supino Plano"
-                - "Alongamento" -> usa "Cat Cow", "Y-W-T" ou "Mobilidade Tornozelo"
+                - "Alongamento" -> usa "Cat Cow", "Y-W-T" ou "Mobilidade do Tornozelo"
                 - "Cadeira Flexora" -> usa "Mesa Flexora"
                 - "Dips / Paralelas" -> usa apenas "Dips"
                 

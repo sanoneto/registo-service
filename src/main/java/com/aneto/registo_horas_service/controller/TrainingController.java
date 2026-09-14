@@ -71,9 +71,9 @@ public class TrainingController {
             }
         }
 
-        if (request != null && (request.getStudentName() == null || request.getStudentName().isBlank())) {
+      /*  if (request != null && (request.getStudentName() == null || request.getStudentName().isBlank())) {
             request.setStudentName(username);
-        }
+        }*/
 
         log.info("A gerar plano. Aluno com conta? {} | username usado: '{}' | studentName: '{}' | alunoTempId: '{}'",
                 temAlunoComConta, username,
