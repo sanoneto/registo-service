@@ -66,10 +66,11 @@ public class ExerciseVideoServiceImpl implements ExerciseVideoService {
     public String getVideoUrl(String exerciseName) {
         if (exerciseName == null || exerciseName.isBlank()) return "";
 
-        Exercises exercise = loadExerciseMap().get(exerciseName.trim().toUpperCase());
+        String normalizedKey = exerciseName.trim().toUpperCase();
+        Exercises exercise = loadExerciseMap().get(normalizedKey);
 
         if (exercise == null || exercise.getVideoUrl() == null || exercise.getVideoUrl().isBlank()) {
-            return buildFallbackUrl(exerciseName);
+            return ""; // sem vídeo real associado — deixa o frontend tratar como "SEM VÍDEO"
         }
 
         String objectKey = exercise.getVideoUrl();
