@@ -420,7 +420,7 @@ public class Training {
         );
 
         boolean temRelatorioMedico = medicalReportText != null && !medicalReportText.isBlank();
-        log.info("prompt -enviado : {}", userPrompt);
+      //  log.info("prompt -enviado : {}", userPrompt);
         TrainingPlanResponse resultado = executeGeneration(userPrompt, totalMinutos, exerciseDictionary, pathologyText,
                 exerciciosDoS3, pathologyEspecifica, permiteFinalizador, userRequest.getWeightKg(), aplicaFocoGluteoExtremo);
 
@@ -551,7 +551,7 @@ public class Training {
                 String cleanedJson = cleanMarkdown(textResponse);
 
                 // 1. DESSERIALIZAÇÃO INICIAL
-                log.info("JSON recebido: {}", cleanedJson);
+              //  log.info("JSON recebido: {}", cleanedJson);
                 TrainingPlanResponse response = objectMapper.readValue(cleanedJson, TrainingPlanResponse.class);
 
                 // 2. VALIDAÇÃO DE VOLUME
