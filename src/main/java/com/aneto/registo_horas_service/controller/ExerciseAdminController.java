@@ -1,5 +1,6 @@
 package com.aneto.registo_horas_service.controller;
 
+import com.aneto.registo_horas_service.dto.response.ExerciseCatalogItemDTO;
 import com.aneto.registo_horas_service.models.Training.Exercises;
 import com.aneto.registo_horas_service.repository.ExerciseRepository;
 import com.aneto.registo_horas_service.service.ExerciseVideoService;
@@ -74,5 +75,10 @@ public class ExerciseAdminController {
             repository.delete(exercise);
         });
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/catalog")
+    public List<ExerciseCatalogItemDTO> getCatalog() {
+        return videoService.getExerciseCatalog();
     }
 }

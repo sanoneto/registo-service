@@ -1,5 +1,6 @@
 package com.aneto.registo_horas_service.service.impl;
 
+import com.aneto.registo_horas_service.dto.response.ExerciseCatalogItemDTO;
 import com.aneto.registo_horas_service.models.Training.Exercises;
 import com.aneto.registo_horas_service.repository.ExerciseRepository;
 import com.aneto.registo_horas_service.service.ExerciseVideoService;
@@ -14,6 +15,7 @@ import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 
 import java.time.Duration;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -133,5 +135,18 @@ public class ExerciseVideoServiceImpl implements ExerciseVideoService {
     @Override
     public String buildFallbackUrl(String name) {
         return "https://www.youtube.com/results?search_query=" + name.trim().replace(" ", "+");
+    }
+
+    @Override
+    public List<ExerciseCatalogItemDTO> getExerciseCatalog() {
+        return loadExerciseMap().values().stream()
+                .map(e -> new ExerciseCatalogItemDTO(
+                        e.getName(),
+                        e.getCategory(),
+                        getVideoUrl(e.getName()) // reaproveita a lógica de resolução de URL/fallback
+                ))
+                .sorted(Comparator.comparing(ExerciseCatalogItemDTO::category)
+                        .thenComparing(ExerciseCatalogItemDTO::name))
+                .toList();
     }
 }

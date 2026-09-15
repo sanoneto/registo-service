@@ -1,5 +1,7 @@
 package com.aneto.registo_horas_service.service;
 
+import com.aneto.registo_horas_service.dto.response.ExerciseCatalogItemDTO;
+
 import java.util.List;
 import java.util.Map;
 
@@ -20,4 +22,6 @@ public interface ExerciseVideoService {
      * Gera uma URL de pesquisa caso o exercício não exista no banco.
      */
     String buildFallbackUrl(String name);
+
+    List<ExerciseCatalogItemDTO> getExerciseCatalog();
 }
