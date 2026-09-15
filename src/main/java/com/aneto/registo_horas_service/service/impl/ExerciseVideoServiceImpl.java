@@ -17,7 +17,6 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-
 @Slf4j
 @Service
 public class ExerciseVideoServiceImpl implements ExerciseVideoService {
@@ -31,11 +30,9 @@ public class ExerciseVideoServiceImpl implements ExerciseVideoService {
     @Value("${r2.url-expiration-minutes:30}")
     private long urlExpirationMinutes;
 
-    // NOVO: base-url do ambiente atual (dev -> r2.dev, prod -> cdn.liveproact.com)
     @Value("${r2.video-base-url}")
     private String videoBaseUrl;
 
-    // NOVO: prefixo do caminho dentro do bucket/domínio (ex: "exercicios")
     @Value("${r2.video-path-prefix:exercicios}")
     private String videoPathPrefix;
 
@@ -45,38 +42,43 @@ public class ExerciseVideoServiceImpl implements ExerciseVideoService {
         this.r2Presigner = r2Presigner;
     }
 
+    /**
+     * ÚNICA fonte de verdade: carrega a tabela inteira UMA vez (cache),
+     * indexada por nome normalizado (upper+trim), para servir tanto
+     * o dicionário do prompt como a resolução de vídeos.
+     * Se a tabela crescer muito no futuro, isto ainda é barato —
+     * é uma tabela de referência, não transacional.
+     */
+    @Cacheable(value = "allExercises")
+    public Map<String, Exercises> loadExerciseMap() {
+        log.info("Carregando dicionário de exercícios da BD (cache miss)...");
+        return repository.findAll().stream()
+                .collect(Collectors.toMap(
+                        e -> e.getName().trim().toUpperCase(),
+                        e -> e,
+                        (existing, duplicate) -> existing // guarda o primeiro em caso de nomes duplicados
+                ));
+    }
+
     @Override
-    @Cacheable(value = "exerciseVideos", key = "#exerciseName.toLowerCase().trim()", unless = "#result == null")
     public String getVideoUrl(String exerciseName) {
         if (exerciseName == null || exerciseName.isBlank()) return "";
 
-        log.info("Buscando vídeo para: {}", exerciseName);
+        Exercises exercise = loadExerciseMap().get(exerciseName.trim().toUpperCase());
 
-        String objectKey = repository.findByNameIgnoreCase(exerciseName.trim())
-                .map(Exercises::getVideoUrl)
-                .orElse(null);
-
-        if (objectKey == null || objectKey.isBlank()) {
+        if (exercise == null || exercise.getVideoUrl() == null || exercise.getVideoUrl().isBlank()) {
             return buildFallbackUrl(exerciseName);
         }
 
-        // Se já é um URL completo (YouTube, ou alguém ainda gravou link absoluto na BD),
-        // usa tal como está — mantém compatibilidade com dados antigos.
+        String objectKey = exercise.getVideoUrl();
+
         if (objectKey.startsWith("http://") || objectKey.startsWith("https://")) {
             return objectKey;
         }
 
-        // NOVO FLUXO: a BD só guarda o "número"/nome do ficheiro (ex: "Y-W-T.mp4").
-        // Montamos o URL público completo consoante o ambiente ativo.
         return buildPublicUrl(objectKey);
     }
 
-    /**
-     * Constrói o URL público completo a partir do base-url do ambiente
-     * (definido em application-{profile}.yml) e do caminho relativo guardado
-     * na BD. Ex: dev -> https://pub-....r2.dev/exercicios/Y-W-T.mp4
-     *            prod -> https://cdn.liveproact.com/exercicios/Y-W-T.mp4
-     */
     private String buildPublicUrl(String objectKey) {
         String base = videoBaseUrl.endsWith("/")
                 ? videoBaseUrl.substring(0, videoBaseUrl.length() - 1)
@@ -84,7 +86,6 @@ public class ExerciseVideoServiceImpl implements ExerciseVideoService {
 
         String key = objectKey.startsWith("/") ? objectKey.substring(1) : objectKey;
 
-        // Se o valor na BD já vier com o prefixo "exercicios/", não duplica.
         boolean jaTemPrefixo = videoPathPrefix != null && !videoPathPrefix.isBlank()
                 && key.toLowerCase().startsWith(videoPathPrefix.toLowerCase() + "/");
 
@@ -96,18 +97,14 @@ public class ExerciseVideoServiceImpl implements ExerciseVideoService {
     }
 
     @Override
-    @Cacheable(value = "exerciseDictionary")
     public Map<String, List<String>> getExerciseDictionary() {
-        return repository.findAll().stream()
+        return loadExerciseMap().values().stream()
                 .collect(Collectors.groupingBy(
                         Exercises::getCategory,
                         Collectors.mapping(Exercises::getName, Collectors.toList())
                 ));
     }
 
-    // Mantido apenas para casos em que precises mesmo de acesso privado/assinado
-    // a um objeto do bucket (ex: bucket sem domínio público, conteúdo restrito).
-    // Já não é chamado no fluxo normal, mas fica disponível se precisares.
     private String generatePresignedUrl(String objectKey) {
         GetObjectRequest getObjectRequest = GetObjectRequest.builder()
                 .bucket(bucketName)
@@ -122,15 +119,19 @@ public class ExerciseVideoServiceImpl implements ExerciseVideoService {
         return r2Presigner.presignGetObject(presignRequest).url().toString();
     }
 
+    /**
+     * Invalida o cache inteiro — como agora só há UMA fonte de dados,
+     * já não faz sentido invalidar por nome individual: se um exercício
+     * mudou, o mapa todo tem de ser recarregado.
+     */
     @Override
-    @CacheEvict(value = "exerciseVideos", key = "#exerciseName.toLowerCase().trim()")
+    @CacheEvict(value = "allExercises", allEntries = true)
     public void evictCache(String exerciseName) {
-        log.info("Invalidando cache para: {}", exerciseName);
+        log.info("Cache de exercícios invalidado (alteração em: {})", exerciseName);
     }
 
     @Override
     public String buildFallbackUrl(String name) {
         return "https://www.youtube.com/results?search_query=" + name.trim().replace(" ", "+");
     }
-
 }

@@ -7,6 +7,7 @@ import com.aneto.registo_horas_service.service.ExerciseVideoService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatModel;
@@ -15,7 +16,6 @@ import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.openai.api.ResponseFormat;
 import org.springframework.stereotype.Component;
-import org.apache.commons.lang3.StringUtils;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -39,10 +39,10 @@ public class Training {
 
     /**
      * @param weekNumber Número da semana do ciclo de treino do aluno (1, 2, 3, 4...).
-     *                    A cada 4ª semana (4, 8, 12...) o sistema aplica automaticamente
-     *                    uma semana de DELOAD (volume e intensidade reduzidos) para
-     *                    prevenir overreaching e platôs. Se o caller não tiver esta
-     *                    informação, usar generateTrainingPlan(userRequest, exerciciosDoS3).
+     *                   A cada 4ª semana (4, 8, 12...) o sistema aplica automaticamente
+     *                   uma semana de DELOAD (volume e intensidade reduzidos) para
+     *                   prevenir overreaching e platôs. Se o caller não tiver esta
+     *                   informação, usar generateTrainingPlan(userRequest, exerciciosDoS3).
      */
     public TrainingPlanResponse generateTrainingPlan(UserProfileRequest userRequest, List<String> exerciciosDoS3, int weekNumber) {
 
@@ -111,12 +111,40 @@ public class Training {
 
         // --- DETEÇÃO DE FOCO ESPECÍFICO (EX: GLÚTEO) ---
         boolean isGluteFocus = objectiveText.toLowerCase().contains("glúteo") || objectiveText.toLowerCase().contains("gluteo");
-        String diretrizFocoEspecial = isGluteFocus ? """
-                [FOCO PRIORITÁRIO: GLÚTEOS]
-                - O aluno deseja foco total em Glúteos.
-                - 70% dos exercícios de membros inferiores devem ser específicos para Glúteos (Grande, Médio e Mínimo).
-                - Incluir obrigatoriamente variações de Elevação Pélvica, Agachamento Búlgaro e Abduções.
-                """ : "";
+        boolean aplicaFocoGluteoExtremo = isGluteFocus && !protocoloTemMetodologiaPropria(String.valueOf(protocol));
+
+
+        String diretrizFocoEspecial;
+        if (aplicaFocoGluteoExtremo) {
+            diretrizFocoEspecial = """
+            [FOCO PRIORITÁRIO EXTREMO: GLÚTEOS]
+            - O aluno pediu foco quase exclusivo em Glúteos.
+            - A maioria dos dias da semana é dedicada a Glúteos (Grande, Médio, Mínimo):
+              Elevação Pélvica, Elevação Pélvica com Halteres, Agachamento Búlgaro,
+              Agachamento Sumô, Coice de Glúteo na Polia/Máquina, Abdução de Anca,
+              Ponte Unipodal, Passada com Halteres, Stiff/RDL.
+            - Quando o dia for "CORE": a maioria dos exercícios de trabalho deve ser Core
+              (Prancha Abdominal, Dead Bug, Bird Dog, Russian Twist).
+            - Quando o dia for "SUPERIOR": a maioria dos exercícios de trabalho deve ser
+              Peito/Costas/Ombros/Braços — leve, apenas manutenção, sem competir com o
+              volume de Glúteos da semana.
+            - Quando o dia for "MANUTENÇÃO: Superiores e Core": divide o volume do dia
+              aproximadamente a meio entre exercícios de Core e exercícios de Superiores
+              (ex: metade dos exercícios de trabalho em Core, metade em Superiores).
+            """;
+        } else if (isGluteFocus) {
+            diretrizFocoEspecial = """
+                    [FOCO EM GLÚTEOS — dentro da metodologia do protocolo %s]
+                    - O aluno pediu foco em Glúteos, mas o protocolo escolhido tem uma estrutura de
+                      divisão própria e fixa, que tem prioridade sobre a distribuição extrema de volume.
+                    - Sempre que houver escolha entre exercícios de pernas equivalentes, prioriza os que
+                      trabalham diretamente Glúteos (Elevação Pélvica, Agachamento Búlgaro, Coice de
+                      Glúteo, Abdução de Anca, Stiff/RDL) em vez de Quadríceps isolado.
+                    - NÃO alteres a estrutura de dias nem o volume definido pelo protocolo %s.
+                    """.formatted(protocol.getLabel(), protocol.getLabel());
+        } else {
+            diretrizFocoEspecial = "";
+        }
 
         String diretrizVariedade = """
                 [SISTEMA DE VARIAÇÃO ANTI-PLATÔ]
@@ -227,7 +255,7 @@ public class Training {
                 - É PROIBIDO usar o mesmo exercício de aquecimento em dois dias CONSECUTIVOS.
                 """;
 
-        String diretrizTreino = buildDiretrizTreino(userRequest, durationText, volumeIdeal);
+        String diretrizTreino = buildDiretrizTreino(userRequest, durationText, volumeIdeal, aplicaFocoGluteoExtremo);
         String diretrizAlimentar = buildDiretrizAlimentar(macros);
 
         String diretrizRepertorio = """
@@ -253,15 +281,7 @@ public class Training {
                 """.formatted(pathologyText);
 
         // --- FINALIZADOR ANAERÓBIO/METABÓLICO (condicional, nunca para sedentários ou com patologia) ---
-        String objectiveLower = objectiveText.toLowerCase();
-        boolean objetivoCompativel = objectiveLower.contains("emagrec")
-                || objectiveLower.contains("perda de gordura")
-                || objectiveLower.contains("definição")
-                || objectiveLower.contains("definicao")
-                || objectiveLower.contains("condicionamento")
-                || objectiveLower.contains("resistência")
-                || objectiveLower.contains("resistencia")
-                || objectiveLower.contains("hipertrofia");
+        boolean objetivoCompativel = isObjetivoCompativel(objectiveText);
 
         boolean permiteFinalizador = !isSedentary && !pathologyEspecifica && !isDeloadWeek && objetivoCompativel && totalMinutos >= 40;
 
@@ -294,7 +314,7 @@ public class Training {
                 - Exemplo correto: aluno com patologia "Ombro" recebe "Rotação Externa" como order 1 -> CORRETO.
                 """.formatted(pathologyText);
 
-        String diretrizNomenclaturaDias = buildDiretrizNomenclaturaDias(userRequest, isGluteFocus, pathologyText);
+        String diretrizNomenclaturaDias = buildDiretrizNomenclaturaDias(userRequest, isGluteFocus, aplicaFocoGluteoExtremo, pathologyText);
 
         String diretrizReabilitacao = pathologyText.contains("Nenhuma") ?
                 "Foca o primeiro exercício em mobilidade geral ou ativação dinâmica." :
@@ -386,7 +406,7 @@ public class Training {
                     }
                 ],
                 "dietPlan": {
-                    "dailyCalories": %d, "imc": %.2f, "imcCategory": "%s",
+                    "dailyCalories": %d, "imc": %.2f. "imcCategory": "%s",
                     "macroDistribution": { "protein": "%dg", "carbs": "%dg", "fats": "%dg" },
                     "meals": [{"time": "HH:mm", "description": "...", "ingredients": ["..."], "calories": 0, "protein": 0, "carbs": 0, "fats": 0}]
                   }
@@ -400,8 +420,9 @@ public class Training {
         );
 
         boolean temRelatorioMedico = medicalReportText != null && !medicalReportText.isBlank();
-        //   log.info("prompt -enviado : {}", userPrompt);
-        TrainingPlanResponse resultado = executeGeneration(userPrompt, totalMinutos, exerciseDictionary, pathologyText, exerciciosDoS3, pathologyEspecifica, permiteFinalizador, userRequest.getWeightKg());
+        log.info("prompt -enviado : {}", userPrompt);
+        TrainingPlanResponse resultado = executeGeneration(userPrompt, totalMinutos, exerciseDictionary, pathologyText,
+                exerciciosDoS3, pathologyEspecifica, permiteFinalizador, userRequest.getWeightKg(), aplicaFocoGluteoExtremo);
 
         // Garante (em Java, não só via prompt) que o summary termina sempre com uma
         // frase de incentivo curta e ESPECÍFICA ao aluno — não genérica. Isto não
@@ -412,9 +433,22 @@ public class Training {
         return resultado;
     }
 
+    private static boolean isObjetivoCompativel(String objectiveText) {
+        String objectiveLower = objectiveText.toLowerCase();
+        return objectiveLower.contains("emagrec")
+                || objectiveLower.contains("perda de gordura")
+                || objectiveLower.contains("definição")
+                || objectiveLower.contains("definicao")
+                || objectiveLower.contains("condicionamento")
+                || objectiveLower.contains("resistência")
+                || objectiveLower.contains("resistencia")
+                || objectiveLower.contains("hipertrofia");
+    }
+
     @NotNull
-    private String buildDiretrizNomenclaturaDias(UserProfileRequest userRequest, boolean isGluteFocus, String pathologyText) {
-        List<String> sequencia = gerarSequenciaDivisao(userRequest.getFrequencyPerWeek(), isGluteFocus);
+    private String buildDiretrizNomenclaturaDias(UserProfileRequest userRequest, boolean isGluteFocus,
+                                                 boolean aplicaFocoGluteoExtremo, String pathologyText) {
+        List<String> sequencia = gerarSequenciaDivisao(userRequest.getFrequencyPerWeek(), isGluteFocus, aplicaFocoGluteoExtremo);
 
         StringBuilder listaDias = new StringBuilder();
         for (int i = 0; i < sequencia.size(); i++) {
@@ -440,7 +474,7 @@ public class Training {
     private TrainingPlanResponse executeGeneration(
             String prompt, int totalMinutos, Map<String, List<String>> exerciseDictionary,
             String pathologyText, List<String> exerciciosAnteriores, boolean pathologyEspecifica,
-            boolean permiteFinalizador, Double weightKg) {
+            boolean permiteFinalizador, Double weightKg, boolean aplicaFocoGluteoExtremo) {
 
         log.info("Iniciando executeGeneration no ChatModel.");
         int maxRetries = 8;
@@ -473,7 +507,7 @@ public class Training {
                 .filter(e -> categoriasFinalizador.stream().anyMatch(cat -> e.getKey().equalsIgnoreCase(cat)))
                 .flatMap(e -> e.getValue().stream())
                 .distinct()
-                .collect(Collectors.toList());
+                .toList();
         boolean exigirVariedadeFinalizador = opcoesFinalizador.size() >= 2;
         // Se o aluno for elegível mas o dicionário não tiver categoria FINALIZADOR, desativa a exigência
         boolean finalizadorDisponivel = permiteFinalizador && !opcoesFinalizador.isEmpty();
@@ -517,6 +551,7 @@ public class Training {
                 String cleanedJson = cleanMarkdown(textResponse);
 
                 // 1. DESSERIALIZAÇÃO INICIAL
+                log.info("JSON recebido: {}", cleanedJson);
                 TrainingPlanResponse response = objectMapper.readValue(cleanedJson, TrainingPlanResponse.class);
 
                 // 2. VALIDAÇÃO DE VOLUME
@@ -530,7 +565,8 @@ public class Training {
                 String categoriaAnterior = null;
                 for (TrainingDay day : response.getPlan()) {
                     String categoriaAtual = extrairCategoriaDia(day.getDay());
-                    if (categoriaAtual != null && categoriaAtual.equalsIgnoreCase(categoriaAnterior)) {
+                    boolean repeticaoPermitida = aplicaFocoGluteoExtremo && "LEGS".equalsIgnoreCase(categoriaAtual);
+                    if (categoriaAtual != null && categoriaAtual.equalsIgnoreCase(categoriaAnterior) && !repeticaoPermitida) {
                         throw new RuntimeException(
                                 "Repetição de categoria de treino em dias consecutivos: \"" + categoriaAtual +
                                         "\" apareceu duas vezes seguidas (dia \"" + day.getDay() + "\"). " +
@@ -957,6 +993,7 @@ public class Training {
 
         return cleaned;
     }
+
     private String calcularDescansoCientifico(Enum.TrainingProtocol protocol, String objective, String cargaAtual) {
         double peso;
         try {
@@ -1080,45 +1117,45 @@ public class Training {
 
                 if (!disponiveis.isEmpty()) {
                     dicaCustom = """
-                        
-                        OPÇÕES VÁLIDAS RESTANTES NA CATEGORIA "%s" (escolhe OBRIGATORIAMENTE uma destas, 
-                        copiando o nome EXATO — não precisas de "custom"):
-                        %s
-                        """.formatted(categoria, String.join(", ", disponiveis));
+                            
+                            OPÇÕES VÁLIDAS RESTANTES NA CATEGORIA "%s" (escolhe OBRIGATORIAMENTE uma destas, 
+                            copiando o nome EXATO — não precisas de "custom"):
+                            %s
+                            """.formatted(categoria, String.join(", ", disponiveis));
                 } else if (permiteCustom) {
                     dicaCustom = """
-                        
-                        AÇÃO OBRIGATÓRIA: a categoria "%s" está ESGOTADA (todas as opções do dicionário já 
-                        foram usadas neste plano ou em planos anteriores deste aluno). É OBRIGATÓRIO usar 
-                        "custom": true para o próximo exercício desta categoria. Formato exato:
-                        {
-                          "custom": true,
-                          "name": "<nome do exercício, pode ser fora do dicionário>",
-                          "videoUrl": "",
-                          "notas": "<justificação técnica concreta>"
-                        }
-                        Limite: máx. 1 "custom" por dia, 3 no total do plano.
-                        """.formatted(categoria);
+                            
+                            AÇÃO OBRIGATÓRIA: a categoria "%s" está ESGOTADA (todas as opções do dicionário já 
+                            foram usadas neste plano ou em planos anteriores deste aluno). É OBRIGATÓRIO usar 
+                            "custom": true para o próximo exercício desta categoria. Formato exato:
+                            {
+                              "custom": true,
+                              "name": "<nome do exercício, pode ser fora do dicionário>",
+                              "videoUrl": "",
+                              "notas": "<justificação técnica concreta>"
+                            }
+                            Limite: máx. 1 "custom" por dia, 3 no total do plano.
+                            """.formatted(categoria);
                 } else {
                     dicaCustom = """
-                        
-                        ATENÇÃO: a categoria "%s" está ESGOTADA no dicionário para este aluno e "custom" não é 
-                        permitido (sem patologia relatada). Reduz o número de exercícios desta categoria no plano 
-                        ou reaproveita um exercício de uma categoria adjacente compatível (ex.: PEITO -> OMBROS).
-                        """.formatted(categoria);
+                            
+                            ATENÇÃO: a categoria "%s" está ESGOTADA no dicionário para este aluno e "custom" não é 
+                            permitido (sem patologia relatada). Reduz o número de exercícios desta categoria no plano 
+                            ou reaproveita um exercício de uma categoria adjacente compatível (ex.: PEITO -> OMBROS).
+                            """.formatted(categoria);
                 }
             }
         }
 
         return """
-            
-            ERRO NA TENTATIVA ANTERIOR: %s
-            
-            EXERCÍCIOS DE TRABALHO JÁ USADOS NESTE PLANO (NÃO REPETIR): %s
-            %s
-            CORRIGE ISTO NA PRÓXIMA RESPOSTA E GERA O PLANO COMPLETO DE NOVO, respeitando 
-            TODAS as regras anteriores, não só a última mencionada.
-            """.formatted(erro, listaUsados, dicaCustom);
+                
+                ERRO NA TENTATIVA ANTERIOR: %s
+                
+                EXERCÍCIOS DE TRABALHO JÁ USADOS NESTE PLANO (NÃO REPETIR): %s
+                %s
+                CORRIGE ISTO NA PRÓXIMA RESPOSTA E GERA O PLANO COMPLETO DE NOVO, respeitando 
+                TODAS as regras anteriores, não só a última mencionada.
+                """.formatted(erro, listaUsados, dicaCustom);
     }
 
     @NotNull
@@ -1165,12 +1202,17 @@ public class Training {
      * Gera a sequência de divisões de treino (splits) para a frequência semanal,
      * garantindo que nunca há o mesmo grupo muscular em dias consecutivos.
      */
-    private List<String> gerarSequenciaDivisao(int frequencia, boolean isGluteFocus) {
+    private List<String> gerarSequenciaDivisao(int frequencia, boolean isGluteFocus, boolean focoExtremo) {
         List<String> sequencia = new ArrayList<>();
 
         if (frequencia <= 1) {
             sequencia.add("FULL BODY: Corpo Inteiro");
             return sequencia;
+        }
+
+        // --- Foco extremo em glúteos (só quando o protocolo não tem metodologia própria) ---
+        if (focoExtremo) {
+            return gerarSequenciaFocoGluteoExtremo(frequencia);
         }
 
         if (frequencia == 2) {
@@ -1182,8 +1224,6 @@ public class Training {
             return sequencia;
         }
 
-        // Ciclo ordenado para que o primeiro e o último elemento nunca coincidam
-        // na mesma categoria quando o ciclo dá a volta (importante para 4, 5, 6... dias)
         List<String> ciclo = isGluteFocus
                 ? List.of(
                 "LEGS: Glúteos e Posterior de Coxa",
@@ -1203,13 +1243,64 @@ public class Training {
         return sequencia;
     }
 
+    /**
+     * Sequência para foco extremo em Glúteos, com distribuição fixa por frequência
+     * semanal, definida caso a caso (não por percentagem calculada):
+     *   - 2 dias: 1 Glúteo + 1 dia combinado (Core + Superior)
+     *   - 3 dias: 2 Glúteo + 1 dia combinado (Core + Superior)
+     *   - 4 dias: 2 Glúteo + 1 Core + 1 Superior (dedicados e separados)
+     *   - 5 dias: 3 Glúteo + 1 Core + 1 Superior (dedicados e separados)
+     *   - 6+ dias: maioria Glúteo + 1 Core + 1 Superior, espaçados na semana
+     */
+    private List<String> gerarSequenciaFocoGluteoExtremo(int frequencia) {
+        String legs = "LEGS: Foco Glúteos (Grande, Médio, Mínimo)";
+        String core = "CORE: Manutenção Abdominal";
+        String superior = "SUPERIOR: Manutenção de Peito, Costas e Ombros";
+        String combinado = "MANUTENÇÃO: Superiores e Core";
+
+        switch (frequencia) {
+            case 2:
+                return List.of(legs, combinado);
+
+            case 3:
+                // Dia combinado a meio, para não ficar logo a seguir ao descanso
+                return List.of(legs, combinado, legs);
+
+            case 4:
+                // Core e Superior espaçados, nunca adjacentes
+                return List.of(legs, core, legs, superior);
+
+            case 5:
+                // 3x Glúteo, Core e Superior intercalados
+                return List.of(legs, core, legs, superior, legs);
+
+            default:
+                // 6+ dias: Core e Superior dedicados, espaçados na semana,
+                // resto do volume em Glúteos
+                List<String> sequencia = new ArrayList<>();
+                int posCore = 2;
+                int posSuperior = frequencia - 2;
+                for (int i = 0; i < frequencia; i++) {
+                    if (i == posCore) {
+                        sequencia.add(core);
+                    } else if (i == posSuperior) {
+                        sequencia.add(superior);
+                    } else {
+                        sequencia.add(legs);
+                    }
+                }
+                return sequencia;
+        }
+    }
+
     @NotNull
-    private String buildDiretrizTreino(UserProfileRequest userRequest, String durationText, int volumeIdeal) {
+    private String buildDiretrizTreino(UserProfileRequest userRequest, String durationText, int volumeIdeal,
+                                       boolean aplicaFocoGluteoExtremo) {
         boolean isGluteFocus = userRequest.getObjective() != null &&
                 (userRequest.getObjective().toLowerCase().contains("glúteo") ||
                         userRequest.getObjective().toLowerCase().contains("gluteo"));
 
-        List<String> sequencia = gerarSequenciaDivisao(userRequest.getFrequencyPerWeek(), isGluteFocus);
+        List<String> sequencia = gerarSequenciaDivisao(userRequest.getFrequencyPerWeek(), isGluteFocus, aplicaFocoGluteoExtremo);
         String divisao = String.join(" -> ", sequencia);
 
         return "REGRAS DE DIVISÃO: " + divisao + " | Duração: " + durationText + " | Volume: " + volumeIdeal + " ex/dia.";
@@ -1535,6 +1626,7 @@ public class Training {
         }
         return null;
     }
+
     /**
      * Tenta obter um exercício de substituição válido da mesma categoria,
      * evitando repetições no plano atual e no histórico do aluno.
@@ -1569,4 +1661,13 @@ public class Training {
         }
         return valor;
     }
+
+    private static final Set<String> IDS_PROTOCOLOS_COM_METODOLOGIA_PROPRIA = Set.of(
+            "heavy_duty", "f_st7", "phat"
+    );
+
+    private boolean protocoloTemMetodologiaPropria(String protocolId) {
+        return protocolId != null && IDS_PROTOCOLOS_COM_METODOLOGIA_PROPRIA.contains(protocolId.toLowerCase());
+    }
+
 }
