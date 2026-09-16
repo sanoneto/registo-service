@@ -30,6 +30,14 @@ public class Training {
     private final ObjectMapper objectMapper;
     private final ExerciseVideoService exerciseVideoService;
 
+    // Nome da categoria de CARDIO no dicionário — usado na regra de CARDIO obrigatório em dias de CORE.
+    private static final String CATEGORIA_CARDIO = "CARDIO";
+    // Número de exercícios de CARDIO obrigatórios em cada dia de CORE dedicado.
+    private static final int CARDIO_OBRIGATORIO_POR_DIA_CORE = 2;
+    // Número de exercícios de CARDIO obrigatórios no dia combinado "MANUTENÇÃO: Superiores e Core"
+    // (reduzido face ao dia CORE dedicado, já que o volume é partilhado com Superiores).
+    private static final int CARDIO_OBRIGATORIO_POR_DIA_MANUTENCAO = 1;
+
     public TrainingPlanResponse generateTrainingPlan(UserProfileRequest userRequest, List<String> exerciciosDoS3) {
         // Sem contagem de semana disponível: assume semana 1 (sem deload).
         // Para ativar a periodização automática (deload a cada 4 semanas), o chamador
@@ -123,15 +131,19 @@ public class Training {
               Elevação Pélvica, Elevação Pélvica com Halteres, Agachamento Búlgaro,
               Agachamento Sumô, Coice de Glúteo na Polia/Máquina, Abdução de Anca,
               Ponte Unipodal, Passada com Halteres, Stiff/RDL.
-            - Quando o dia for "CORE": a maioria dos exercícios de trabalho deve ser Core
+            - Quando o dia for "CORE": %d dos exercícios de trabalho DEVEM ser da
+              categoria CARDIO do dicionário (regra obrigatória de CARDIO em dias com
+              bloco de Core, ver secção própria), e os restantes devem ser Core
               (Prancha Abdominal, Dead Bug, Bird Dog, Russian Twist).
             - Quando o dia for "SUPERIOR": a maioria dos exercícios de trabalho deve ser
               Peito/Costas/Ombros/Braços — leve, apenas manutenção, sem competir com o
               volume de Glúteos da semana.
             - Quando o dia for "MANUTENÇÃO: Superiores e Core": divide o volume do dia
               aproximadamente a meio entre exercícios de Core e exercícios de Superiores
-              (ex: metade dos exercícios de trabalho em Core, metade em Superiores).
-            """;
+              (ex: metade dos exercícios de trabalho em Core, metade em Superiores), e
+              inclui OBRIGATORIAMENTE %d exercício(s) de CARDIO do dicionário dentro da
+              metade reservada a Core (ver secção de CARDIO obrigatório).
+            """.formatted(CARDIO_OBRIGATORIO_POR_DIA_CORE, CARDIO_OBRIGATORIO_POR_DIA_MANUTENCAO);
         } else if (isGluteFocus) {
             diretrizFocoEspecial = """
                     [FOCO EM GLÚTEOS — dentro da metodologia do protocolo %s]
@@ -320,6 +332,36 @@ public class Training {
                 "Foca o primeiro exercício em mobilidade geral ou ativação dinâmica." :
                 buildDiretrizReabilitacao(pathologyText) + "\n- REGRA: Proibido repetir o mesmo exercício de reabilitação em dias consecutivos.";
 
+        // --- NOVA DIRETRIZ: CARDIO OBRIGATÓRIO EM DIAS COM BLOCO DE CORE (dedicado ou combinado) ---
+        String diretrizCardioCore = """
+                [REGRA OBRIGATÓRIA: CARDIO EM DIAS COM BLOCO DE CORE]
+                - Sempre que um dia do plano for da categoria CORE (ex: "Dia X - CORE: ..."), esse
+                  dia DEVE incluir OBRIGATORIAMENTE %d exercícios adicionais da categoria CARDIO
+                  do DICIONÁRIO OFICIAL (Saltar Corda, Air Bike, Ski Erg, Remo, bicicleta,
+                  Passadeira, Eliptica, Escadas).
+                - Se o dia for "MANUTENÇÃO: Superiores e Core" (dia combinado, usado em foco
+                  extremo de glúteos com frequência 2-3), esse dia DEVE incluir
+                  OBRIGATORIAMENTE %d exercício(s) de CARDIO do DICIONÁRIO OFICIAL, dentro da
+                  metade do volume reservada a Core.
+                - POSIÇÃO: os exercícios de CARDIO entram como exercícios de TRABALHO normais do
+                  dia (nunca como o order 1 de aquecimento, nem como o último exercício/
+                  alongamento do dia).
+                - VOLUME: no dia de CORE dedicado, gera %d exercícios no total (volume normal do
+                  plano + %d, para acomodar os exercícios de CARDIO adicionais); no dia
+                  "MANUTENÇÃO: Superiores e Core", gera %d exercícios no total (volume normal
+                  do plano + %d), mantendo os restantes como exercícios de CORE (Prancha
+                  Abdominal, Dead Bug, Bird Dog, Russian Twist, Pallof Press, Thruster, etc.)
+                  ou de Superiores, conforme o dia.
+                - Se houver mais do que um dia com bloco de Core no plano, prefere não repetir o
+                  mesmo exercício de CARDIO entre esses dias (variedade), mas se a categoria
+                  já tiver sido totalmente usada, podes reutilizar.
+                """.formatted(
+                CARDIO_OBRIGATORIO_POR_DIA_CORE,
+                CARDIO_OBRIGATORIO_POR_DIA_MANUTENCAO,
+                volumeIdeal + CARDIO_OBRIGATORIO_POR_DIA_CORE, CARDIO_OBRIGATORIO_POR_DIA_CORE,
+                volumeIdeal + CARDIO_OBRIGATORIO_POR_DIA_MANUTENCAO, CARDIO_OBRIGATORIO_POR_DIA_MANUTENCAO
+        );
+
         // --- DICIONÁRIO DE EXERCÍCIOS (BD com fallback estático) ---
         Map<String, List<String>> exerciseDictionary;
         try {
@@ -369,7 +411,8 @@ public class Training {
                         diretrizFocoEspecial, diretrizVariedade, diretrizAquecimento, diretrizMobilidadeCondicional,
                         diretrizSegurancaIniciante, diretrizProtocolo, diretrizReabilitacao, diretrizBiomecanica,
                         diretrizAnatomiaDetalhada, diretrizCargasDinamicas, diretrizEquipamento, diretrizTreino,
-                        diretrizRepertorio, diretrizFinalizador, diretrizPeriodizacao, diretrizArrefecimento, diretrizNomenclaturaDias, diretrizDicionario,
+                        diretrizRepertorio, diretrizFinalizador, diretrizPeriodizacao, diretrizArrefecimento,
+                        diretrizNomenclaturaDias, diretrizCardioCore, diretrizDicionario,
                         diretrizAlimentar, diretrizRelatorioMedico
                 )
                 .filter(s -> s != null && !s.isBlank())
@@ -420,7 +463,7 @@ public class Training {
         );
 
         boolean temRelatorioMedico = medicalReportText != null && !medicalReportText.isBlank();
-      //  log.info("prompt -enviado : {}", userPrompt);
+        //  log.info("prompt -enviado : {}", userPrompt);
         TrainingPlanResponse resultado = executeGeneration(userPrompt, totalMinutos, exerciseDictionary, pathologyText,
                 exerciciosDoS3, pathologyEspecifica, permiteFinalizador, userRequest.getWeightKg(), aplicaFocoGluteoExtremo);
 
@@ -515,9 +558,22 @@ public class Training {
             log.warn("Finalizador anaeróbio elegível para este aluno mas categoria FINALIZADOR ausente/vazia no dicionário — a ignorar validação.");
         }
 
-        log.info("Variedade disponível — Aquecimento: {} opções (exigir variedade: {}) | Arrefecimento: {} opções (exigir variedade: {}) | Finalizador: {} opções (elegível: {})",
+        // --- NOVO: opções de CARDIO disponíveis (para a regra de CARDIO obrigatório em dias com bloco de CORE) ---
+        List<String> opcoesCardio = exerciseDictionary.entrySet().stream()
+                .filter(e -> CATEGORIA_CARDIO.equalsIgnoreCase(e.getKey()))
+                .flatMap(e -> e.getValue().stream())
+                .distinct()
+                .toList();
+        // Se a categoria CARDIO não existir/estiver vazia no dicionário, a exigência é desativada
+        // automaticamente (não faz sentido bloquear o plano por uma categoria inexistente).
+        boolean cardioDisponivel = !opcoesCardio.isEmpty();
+        if (!cardioDisponivel) {
+            log.warn("Categoria CARDIO ausente/vazia no dicionário — a regra de CARDIO obrigatório em dias com bloco de CORE será ignorada.");
+        }
+
+        log.info("Variedade disponível — Aquecimento: {} opções (exigir variedade: {}) | Arrefecimento: {} opções (exigir variedade: {}) | Finalizador: {} opções (elegível: {}) | Cardio: {} opções (disponível: {})",
                 opcoesAquecimento.size(), exigirVariedadeAquecimento, opcoesArrefecimento.size(), exigirVariedadeArrefecimento,
-                opcoesFinalizador.size(), finalizadorDisponivel);
+                opcoesFinalizador.size(), finalizadorDisponivel, opcoesCardio.size(), cardioDisponivel);
 
         // Normaliza a lista de exercícios do plano anterior para comparação consistente
         Set<String> nomesAnteriores = (exerciciosAnteriores == null ? List.<String>of() : exerciciosAnteriores)
@@ -543,6 +599,8 @@ public class Training {
         StringBuilder promptBuilder = new StringBuilder(prompt);
         for (int attempt = 0; attempt <= maxRetries; attempt++) {
             Set<String> nomesUsadosNestaTentativa = new HashSet<>(); // <<< declarado no topo do corpo do for, fora do try
+            // >>> NOVO: rastreio de exercícios de CARDIO usados no plano inteiro (variedade suave entre dias com bloco de CORE)
+            Set<String> nomesCardioUsadosNoPlano = new HashSet<>();
             try {
                 Prompt promptComJsonMode = new Prompt(
                         new UserMessage(promptBuilder.toString()), jsonModeOptions);
@@ -551,7 +609,7 @@ public class Training {
                 String cleanedJson = cleanMarkdown(textResponse);
 
                 // 1. DESSERIALIZAÇÃO INICIAL
-              //  log.info("JSON recebido: {}", cleanedJson);
+                //  log.info("JSON recebido: {}", cleanedJson);
                 TrainingPlanResponse response = objectMapper.readValue(cleanedJson, TrainingPlanResponse.class);
 
                 // 2. VALIDAÇÃO DE VOLUME
@@ -592,6 +650,12 @@ public class Training {
                     int totalExDoDia = exercisesOfDay.size();
                     Set<String> gruposDoDia = extrairGruposMuscularesDoDia(day.getDay());
                     int customsNoDia = 0; // >>> NOVO: contador de exercícios custom neste dia
+
+                    // >>> Categoria do dia e exigência de cardio (dia CORE dedicado ou dia MANUTENÇÃO combinado)
+                    String categoriaDoDia = extrairCategoriaDia(day.getDay());
+                    int exigenciaCardioDoDia = obterExigenciaCardioDoDia(day.getDay(), categoriaDoDia);
+                    boolean diaExigeCardio = exigenciaCardioDoDia > 0;
+                    Set<String> nomesCardioDoDia = new HashSet<>();
 
                     for (int i = 0; i < totalExDoDia; i++) {
                         TrainingExercise ex = exercisesOfDay.get(i);
@@ -659,6 +723,10 @@ public class Training {
                         // fluxo normal (dicionário obrigatório) — inalterado
                         TrainingExercise enriched = enrichExercise(ex, validNames, pathologyText);
 
+                        // >>> NOVO: deteta se este exercício pertence à categoria CARDIO
+                        String categoriaDoExercicio = encontrarCategoria(enriched.getName(), exerciseDictionary);
+                        boolean isCardio = cardioDisponivel && CATEGORIA_CARDIO.equalsIgnoreCase(categoriaDoExercicio);
+
                         if (isAquecimento) {
                             if (!pathologyEspecifica) {
                                 // 4a. Variedade: não repetir em dias consecutivos
@@ -725,6 +793,20 @@ public class Training {
                                 );
                             }
                             finalizadorAnterior = enriched.getName();
+                        } else if (isCardio) {
+                            // >>> NOVO BLOCO: exercícios de CARDIO (dentro dos dias com bloco de CORE)
+                            // Pool de CARDIO é pequeno (poucas opções no dicionário), por isso NÃO
+                            // aplicamos a regra de unicidade total do plano (que exigiria nunca
+                            // repetir) — só evitamos duplicar o MESMO exercício de cardio dentro
+                            // do MESMO dia. Repetição entre dias com bloco de CORE diferentes é tolerada.
+                            if (!nomesCardioDoDia.add(enriched.getName())) {
+                                throw new RuntimeException(
+                                        "Exercício de CARDIO repetido no mesmo dia (\"" + day.getDay() + "\"): \"" +
+                                                enriched.getName() + "\". Escolhe " + exigenciaCardioDoDia +
+                                                " exercícios de CARDIO DIFERENTES do DICIONÁRIO para este dia."
+                                );
+                            }
+                            nomesCardioUsadosNoPlano.add(enriched.getName());
                         } else {
                             // Exercícios de TRABALHO: unicidade total no plano + anti-platô vs plano anterior
                             boolean repetidoNoPlano = !nomesUsadosNestaTentativa.add(enriched.getName());
@@ -756,6 +838,24 @@ public class Training {
                         enrichedExercises.add(enriched);
                     }
 
+                    // >>> VALIDAÇÃO: dia com bloco de Core (dedicado ou combinado) tem de ter cardio suficiente
+                    if (diaExigeCardio && cardioDisponivel) {
+                        long countCardio = enrichedExercises.stream()
+                                .filter(e -> CATEGORIA_CARDIO.equalsIgnoreCase(encontrarCategoria(e.getName(), exerciseDictionary)))
+                                .count();
+
+                        if (countCardio < exigenciaCardioDoDia) {
+                            throw new RuntimeException(
+                                    "O dia \"" + day.getDay() + "\" tem bloco de CORE mas só tem " + countCardio +
+                                            " exercício(s) da categoria CARDIO. É OBRIGATÓRIO incluir pelo menos " +
+                                            exigenciaCardioDoDia + " exercícios de CARDIO do DICIONÁRIO " +
+                                            "OFICIAL (Saltar Corda, Air Bike, Ski Erg, Remo, bicicleta, Passadeira, " +
+                                            "Eliptica, Escadas) como exercícios de trabalho neste dia, mantendo o " +
+                                            "aquecimento (order 1) e o alongamento final como estão."
+                            );
+                        }
+                    }
+
                     List<TrainingExercise> exercisesComEstimativa = anexarEstimativaCalorica(
                             enrichedExercises, exerciseDictionary, weightKg, totalMinutos);
 
@@ -775,7 +875,7 @@ public class Training {
                     diet.setMeals(mutableMeals);
                 }
 
-                log.info("Geração concluída com sucesso, validada contra inventário, sequência de dias, variedade e correspondência de grupo muscular.");
+                log.info("Geração concluída com sucesso, validada contra inventário, sequência de dias, variedade, correspondência de grupo muscular e regra de cardio em dias com bloco de CORE.");
 
                 // 6. RESPOSTA FINAL
                 return TrainingPlanResponse.builder()
@@ -817,7 +917,8 @@ public class Training {
             Map.entry("MOBILIDADE", 2.5),
             Map.entry("REABILITAÇÃO", 2.5),
             Map.entry("ALONGAMENTO", 2.0),
-            Map.entry("FINALIZADOR", 8.0)
+            Map.entry("FINALIZADOR", 8.0),
+            Map.entry("CARDIO", 7.0)
     );
     private static final double MET_DEFAULT = 4.5; // fallback para categorias desconhecidas/custom
 
@@ -928,6 +1029,24 @@ public class Training {
         int idxDoisPontos = dayLabel.indexOf(':');
         if (idxTraco == -1 || idxDoisPontos == -1 || idxDoisPontos <= idxTraco) return null;
         return dayLabel.substring(idxTraco + 1, idxDoisPontos).trim();
+    }
+
+    /**
+     * Determina quantos exercícios de CARDIO são obrigatórios para este dia.
+     * Devolve 0 se o dia não tiver bloco de Core (nem dedicado nem combinado).
+     * Cobre tanto "Dia X - CORE: ..." (dedicado, exige CARDIO_OBRIGATORIO_POR_DIA_CORE)
+     * como "Dia X - MANUTENÇÃO: Superiores e Core" (combinado, usado no foco extremo
+     * em glúteos com frequência 2-3, exige CARDIO_OBRIGATORIO_POR_DIA_MANUTENCAO).
+     */
+    private int obterExigenciaCardioDoDia(String dayLabel, String categoriaDoDia) {
+        if ("CORE".equalsIgnoreCase(categoriaDoDia)) {
+            return CARDIO_OBRIGATORIO_POR_DIA_CORE;
+        }
+        if ("MANUTENÇÃO".equalsIgnoreCase(categoriaDoDia)
+                && dayLabel != null && dayLabel.toLowerCase().contains("core")) {
+            return CARDIO_OBRIGATORIO_POR_DIA_MANUTENCAO;
+        }
+        return 0;
     }
 
     /**
@@ -1246,15 +1365,15 @@ public class Training {
     /**
      * Sequência para foco extremo em Glúteos, com distribuição fixa por frequência
      * semanal, definida caso a caso (não por percentagem calculada):
-     *   - 2 dias: 1 Glúteo + 1 dia combinado (Core + Superior)
-     *   - 3 dias: 2 Glúteo + 1 dia combinado (Core + Superior)
-     *   - 4 dias: 2 Glúteo + 1 Core + 1 Superior (dedicados e separados)
-     *   - 5 dias: 3 Glúteo + 1 Core + 1 Superior (dedicados e separados)
-     *   - 6+ dias: maioria Glúteo + 1 Core + 1 Superior, espaçados na semana
+     *   - 2 dias: 1 Glúteo + 1 dia combinado (Core + Superior) — inclui CARDIO_OBRIGATORIO_POR_DIA_MANUTENCAO
+     *   - 3 dias: 2 Glúteo + 1 dia combinado (Core + Superior) — inclui CARDIO_OBRIGATORIO_POR_DIA_MANUTENCAO
+     *   - 4 dias: 2 Glúteo + 1 Core + 1 Superior (dedicados e separados) — dia Core inclui CARDIO_OBRIGATORIO_POR_DIA_CORE
+     *   - 5 dias: 3 Glúteo + 1 Core + 1 Superior (dedicados e separados) — dia Core inclui CARDIO_OBRIGATORIO_POR_DIA_CORE
+     *   - 6+ dias: maioria Glúteo + 1 Core + 1 Superior, espaçados na semana — dia Core inclui CARDIO_OBRIGATORIO_POR_DIA_CORE
      */
     private List<String> gerarSequenciaFocoGluteoExtremo(int frequencia) {
         String legs = "LEGS: Foco Glúteos (Grande, Médio, Mínimo)";
-        String core = "CORE: Manutenção Abdominal";
+        String core = "CORE: Core e Condicionamento (Cardio Obrigatório)";
         String superior = "SUPERIOR: Manutenção de Peito, Costas e Ombros";
         String combinado = "MANUTENÇÃO: Superiores e Core";
 
@@ -1457,6 +1576,10 @@ public class Training {
                 "Prancha Lateral", "Bird Dog", "Abdominal na Polia",
                 "Elevação de Pernas Suspenso", "Abdominal na Bola Suíça", "Russian Twist",
                 "Prancha com Toque no Ombro"
+        ));
+        map.put("CARDIO", List.of(
+                "Saltar Corda", "Air Bike", "Ski Erg", "Remo","Jumping Jacks",
+                "bicicleta", "Passadeira", "Eliptica", "Escadas"
         ));
         map.put("REAB/MOBILIDADE", List.of(
                 "Cat Cow", "Clamshell", "Y-W-T", "Rotação Externa",
