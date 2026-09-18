@@ -144,10 +144,25 @@ public class ExerciseVideoServiceImpl implements ExerciseVideoService {
                 .map(e -> new ExerciseCatalogItemDTO(
                         e.getName(),
                         e.getCategory(),
-                        getVideoUrl(e.getName()) // reaproveita a lógica de resolução de URL/fallback
+                        getVideoUrl(e.getName()),
+                        e.getSubcategory()// reaproveita a lógica de resolução de URL/fallback
                 ))
                 .sorted(Comparator.comparing(ExerciseCatalogItemDTO::category)
                         .thenComparing(ExerciseCatalogItemDTO::name))
                 .toList();
+    }
+
+    // ExerciseVideoServiceImpl.java
+    @Override
+    public Map<String, Map<String, List<String>>> getExerciseDictionaryComSubcategoria() {
+        return loadExerciseMap().values().stream()
+                .collect(Collectors.groupingBy(
+                        Exercises::getCategory,
+                        Collectors.groupingBy(
+                                e -> (e.getSubcategory() == null || e.getSubcategory().isBlank())
+                                        ? "GERAL" : e.getSubcategory(),
+                                Collectors.mapping(Exercises::getName, Collectors.toList())
+                        )
+                ));
     }
 }

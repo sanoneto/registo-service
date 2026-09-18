@@ -24,4 +24,7 @@ public interface ExerciseVideoService {
     String buildFallbackUrl(String name);
 
     List<ExerciseCatalogItemDTO> getExerciseCatalog();
+
+    // ExerciseVideoService.java (interface) — novo método
+    Map<String, Map<String, List<String>>> getExerciseDictionaryComSubcategoria();
 }

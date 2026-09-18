@@ -26,5 +26,8 @@ public class Exercises {
 
     private String category;
 
+    @Column(name = "subcategory")
+    private String subcategory; // pode ser null
+
     // Getters e Setters
 }

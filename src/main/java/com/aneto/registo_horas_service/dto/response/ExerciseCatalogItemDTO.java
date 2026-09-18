@@ -1,7 +1,5 @@
 package com.aneto.registo_horas_service.dto.response;
 
-public record ExerciseCatalogItemDTO(
-        String name,
-        String category,
-        String videoUrl
-) {}
+// ExerciseCatalogItemDTO.java — acrescenta o campo
+public record ExerciseCatalogItemDTO(String name, String category, String subcategory, String videoUrl) {
+}
