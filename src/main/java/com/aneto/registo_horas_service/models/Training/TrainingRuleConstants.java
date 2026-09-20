@@ -61,11 +61,19 @@ public final class TrainingRuleConstants {
         map.put("lunge", "Lunge");
         map.put("afundo", "Lunge");
         map.put("Lunge / Afundo", "Lunge");
+
+        // Novos Mapeamentos / Alias identificados nos logs
+        map.put("push-up com pés elevados", "Flexões com Pés Elevados");
+        map.put("push up com pés elevados", "Flexões com Pés Elevados");
+        map.put("puxada à frente na polia", "Puxada à Frente");
+        map.put("puxada com barra na polia", "Puxada à Frente");
+        map.put("crucifixo invertido com halteres", "Crucifixo Invertido");
+
         EXERCISE_MAP = Collections.unmodifiableMap(map);
     }
 
     public static final Map<String, java.util.Set<String>> GRUPO_MUSCULAR_KEYWORDS = Map.of(
-            "PEITO", java.util.Set.of("peito", "supino", "crossover", "peck", "flex"),
+            "PEITO", java.util.Set.of("peito", "supino", "crossover", "peck", "flex", "push-up", "push up"),
             "COSTAS", java.util.Set.of("costas", "dorsal", "remada", "puxada", "pull"),
             "PERNAS", java.util.Set.of("pernas", "perna", "quadríceps", "quadriceps", "isquio", "gluteo", "glúteo", "agachamento", "leg", "coxa", "anca", "tornozelo", "gémeo", "gemeo"),
             "OMBROS", java.util.Set.of("ombro", "deltoide", "lateral", "desenvolvimento", "arnold"),
@@ -92,11 +100,11 @@ public final class TrainingRuleConstants {
     public static final Map<String, List<String>> FALLBACK_DICTIONARY;
     static {
         Map<String, List<String>> map = new LinkedHashMap<>();
-        map.put("PEITO", List.of("Supino Plano", "Supino Inclinado", "Supino Declinado", "Supino Plano com Halteres", "Supino Inclinado com Halteres", "Supino Declinado com Halteres", "Peck Deck", "Crossover", "Crossover Baixo para Cima", "Flexões", "Flexões Diamond", "Flexões com Pés Elevados", "Dips", "Aberturas com Halteres", "Aberturas Inclinadas com Halteres", "Supino Máquina", "Pullover com Halter", "Chest Press Máquina"));
-        map.put("COSTAS", List.of("Puxada à Frente", "Puxada Pega Estreita", "Puxada Pega Neutra", "Remada Curvada", "Remada Curvada com Halteres", "Remada Unilateral", "Pulldown Corda", "Remada Baixa", "Remada Cavalinho", "Elevações", "Remada Máquina", "Remada T-Bar", "Face Pull", "Encolhimentos com Halteres", "Extensão Lombar", "Puxada com Corda Neutra", "Remada Invertida"));
-        map.put("PERNAS", List.of("Agachamento Livre", "Agachamento Goblet", "Agachamento Búlgaro", "Agachamento Sumô", "Leg Press 45", "Hack Squat", "Cadeira Extensora", "Mesa Flexora", "Cadeira Flexora em Pé", "Stiff", "Stiff Unilateral", "Elevação Pélvica", "Elevação Pélvica Unilateral", "Lunge", "Lunge Reverso", "Gémeos em Pé", "Gémeos Sentado", "Abdução de Anca na Máquina", "Adução de Anca na Máquina", "Step Up"));
-        map.put("OMBROS", List.of("Desenvolvimento", "Desenvolvimento com Halteres", "Arnold Press", "Elevação Lateral", "Elevação Lateral Polia", "Elevação Lateral Máquina", "Elevação Frontal", "Elevação Frontal com Barra", "Face Pull", "Remada Alta", "Crucifixo Invertido", "Crucifixo Invertido na Máquina", "Desenvolvimento Máquina", "Encolhimentos com Barra"));
-        map.put("BRAÇOS", List.of("Rosca Direta", "Rosca Direta com Barra EZ", "Rosca Martelo", "Rosca Concentrada", "Rosca Scott", "Rosca Alternada com Halteres", "Tríceps Corda", "Tríceps Pulley", "Tríceps Testa", "Tríceps Testa com Halter", "Tríceps Francês", "Mergulho no Banco", "Tríceps Coice com Halter", "Rosca no Cabo"));
+        map.put("PEITO", List.of("Supino Plano", "Supino Inclinado", "Supino Declinado", "Supino Plano com Halteres", "Supino Inclinado com Halteres", "Supino Declinado com Halteres", "Peck Deck", "Crossover", "Crossover Baixo para Cima", "Flexões", "Flexões Diamond", "Flexões com Pés Elevados", "Push-Up com Pés Elevados", "Dips", "Aberturas com Halteres", "Aberturas Inclinadas com Halteres", "Supino Máquina", "Pullover com Halter", "Chest Press Máquina"));
+        map.put("COSTAS", List.of("Puxada à Frente", "Puxada à Frente na Polia", "Puxada com Barra na Polia", "Puxada Pega Estreita", "Puxada Pega Neutra", "Remada Curvada", "Remada Curvada com Halteres", "Remada Unilateral", "Pulldown Corda", "Remada Baixa", "Remada Cavalinho", "Elevações", "Remada Máquina", "Remada T-Bar", "Face Pull", "Encolhimentos com Halteres", "Extensão Lombar", "Puxada com Corda Neutra", "Remada Invertida"));
+        map.put("PERNAS", List.of("Agachamento Livre", "Agachamento Goblet", "Agachamento Búlgaro", "Agachamento Sumô", "Leg Press 45", "Hack Squat", "Cadeira Extensora", "Cadeira Flexora", "Mesa Flexora", "Cadeira Flexora em Pé", "Stiff", "Stiff Unilateral", "Elevação Pélvica", "Elevação Pélvica Unilateral", "Lunge", "Lunge Reverso", "Gémeos em Pé", "Gémeos Sentado", "Abdução de Anca na Máquina", "Adução de Anca na Máquina", "Step Up"));
+        map.put("OMBROS", List.of("Desenvolvimento", "Desenvolvimento com Halteres", "Arnold Press", "Elevação Lateral", "Elevação Lateral Polia", "Elevação Lateral Máquina", "Elevação Frontal", "Elevação Frontal com Barra", "Face Pull", "Remada Alta", "Crucifixo Invertido", "Crucifixo Invertido com Halteres", "Crucifixo Invertido na Máquina", "Desenvolvimento Máquina", "Encolhimentos com Barra"));
+        map.put("BRAÇOS", List.of("Rosca Direta", "Rosca Direta com Barra", "Rosca Direta com Barra EZ", "Rosca Martelo", "Rosca Concentrada", "Rosca Scott", "Rosca Alternada com Halteres", "Tríceps Corda", "Tríceps Pulley", "Tríceps Testa", "Tríceps Testa com Halter", "Tríceps Francês", "Extensão de Tríceps com Halteres", "Mergulho no Banco", "Tríceps Coice com Halter", "Rosca no Cabo"));
         map.put("CORE", List.of("Dead Bug", "Dead Bug com Carga", "Prancha Abdominal", "Prancha Lateral", "Bird Dog", "Abdominal na Polia", "Elevação de Pernas Suspenso", "Abdominal na Bola Suíça", "Russian Twist", "Prancha com Toque no Ombro"));
         map.put("CARDIO", List.of("Saltar Corda", "Air Bike", "Ski Erg", "Remo", "Jumping Jacks", "bicicleta", "Passadeira", "Eliptica", "Escadas"));
         map.put("REAB/MOBILIDADE", List.of("Cat Cow", "Clamshell", "Y-W-T", "Rotação Externa", "Knee-to-Wall", "Cossack Squat", "Equilíbrio Unipodal", "Open Books", "Bird Dog Isométrico", "Mobilidade Torácica"));
