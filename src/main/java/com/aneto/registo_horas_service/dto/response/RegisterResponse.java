@@ -13,7 +13,8 @@ public record RegisterResponse(
         LocalTime horaEntrada,
         LocalTime horaSaida,
         double horasTrabalhadas,
-         String descricao
+         String descricao,
+        Boolean hasAuditHistory
 
 ) {
 }

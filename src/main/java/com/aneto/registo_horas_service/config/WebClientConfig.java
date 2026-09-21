@@ -9,7 +9,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 @Configuration
 public class WebClientConfig {
-    @Value("${url.micro-servico-auth}")
+    @Value("${url.micro_service_auth}")
     private String urlMicroServicoAuth;
 
     /**

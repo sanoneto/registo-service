@@ -1,6 +1,5 @@
 package com.aneto.registo_horas_service.security;
 
-
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -14,7 +13,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity // ESSENCIAL para que @PreAuthorize funcione
+@EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
 
@@ -24,19 +23,17 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
         http
-                // 1. Desabilita CSRF
                 .csrf(AbstractHttpConfigurer::disable)
-
-                // 2. Define sessão como stateless (sem cookies)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-
-                // 3. Permite todas as requisições (a autorização fina é feita pelo @PreAuthorize)
-                // O filtro customizado (Passo 4) irá autenticar o usuário para o @PreAuthorize funcionar
                 .authorizeHttpRequests(authorize -> authorize
+                        // Garante que o Actuator seja acessível publicamente
+                        .requestMatchers("/actuator/**").permitAll()
+                        // Garante que o Swagger/OpenAPI também seja acessível para testes
+                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .anyRequest().permitAll()
                 )
-
-                // 4. Adiciona o filtro customizado para ler headers antes de qualquer outra autenticação
+                // Se o gatewayAuthFilter estiver barrando requisições sem token,
+                // ele pode estar impedindo o health check do Coolify.
                 .addFilterBefore(gatewayAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

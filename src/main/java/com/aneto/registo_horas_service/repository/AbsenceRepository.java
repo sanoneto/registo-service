@@ -1,7 +1,7 @@
 package com.aneto.registo_horas_service.repository;
 
 import com.aneto.registo_horas_service.models.Absence;
-import com.aneto.registo_horas_service.models.AbsenceStatus;
+import com.aneto.registo_horas_service.models.Enum;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -18,9 +18,9 @@ public interface AbsenceRepository extends JpaRepository<Absence, Long> {
     // Filtragem para o Service
     Page<Absence> findByUserName(String userName, Pageable pageable);
 
-    Page<Absence> findByStatus(AbsenceStatus status, Pageable pageable);
+    Page<Absence> findByStatus(Enum.AbsenceStatus status, Pageable pageable);
 
-    Page<Absence> findByUserNameAndStatus(String userName, AbsenceStatus status, Pageable pageable);
+    Page<Absence> findByUserNameAndStatus(String userName, Enum.AbsenceStatus status, Pageable pageable);
 
     // Para ações (DELETE e PATCH Status)
     Optional<Absence> findByPublicId(String publicId);

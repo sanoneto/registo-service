@@ -8,7 +8,7 @@ import com.aneto.registo_horas_service.dto.response.PageResponse;
 import com.aneto.registo_horas_service.dto.response.PerfilResponse;
 import com.aneto.registo_horas_service.dto.response.RegisterResponse;
 import com.aneto.registo_horas_service.mapper.RequestMapper;
-import com.aneto.registo_horas_service.models.OperacaoAuditoria;
+import com.aneto.registo_horas_service.models.Enum;
 import com.aneto.registo_horas_service.models.RegistoHistorico;
 import com.aneto.registo_horas_service.models.RegistosHoras;
 import com.aneto.registo_horas_service.repository.RegistoHistoricoRepository;
@@ -112,11 +112,12 @@ public class RegistosHorasServiceImpl implements RegistosHorasService {
         existing.setHoraEntrada(request.horaEntrada());
         existing.setHoraSaida(request.horaSaida());
         existing.setDescricao(request.descricao());
+        existing.setHasAuditHistory(true);
 
         // 4. Salva a entrada no Histórico
         RegistoHistorico historico = RegistoHistorico.builder()
                 .registoPublicId(String.valueOf(publicId))
-                .operacao(OperacaoAuditoria.UPDATE)
+                .operacao(Enum.OperacaoAuditoria.UPDATE)
                 .dataAlteracao(LocalDateTime.now())
                 .utilizadorAlteracao(username)
                 .dadosAnterioresJson(dadosAnteriores)
@@ -160,20 +161,24 @@ public class RegistosHorasServiceImpl implements RegistosHorasService {
 
         return results.stream()
                 .map(row -> {
-                    // 1. Recebe o valor como BigDecimal (o tipo real retornado)
+                    // 1. Tratamento de Números (BigDecimal para Double)
                     java.math.BigDecimal totalHorasBd = (java.math.BigDecimal) row[4];
+                    Double totalHorasDouble = (totalHorasBd != null) ? totalHorasBd.doubleValue() : 0.0;
 
-                    // 2. Converte para Double usando doubleValue()
-                    Double totalHorasDouble = totalHorasBd.doubleValue();
+                    // 2. Tratamento do UUID (row[6] - u.public_id)
+                    // Usamos String.valueOf ou .toString() para evitar o ClassCastException
+                    String publicId = (row[6] != null) ? row[6].toString() : null;
 
                     return new PerfilResponse(
-                            (String) row[0],
-                            (String) row[1],
-                            (String) row[2],
-                            (Double) row[3], // required_hours (Mantido como Double)
-                            totalHorasDouble,
-                            (String) row[5]
-                            // Total_horas_trabalhadas (Convertido para Double)
+                            (String) row[0],         // username
+                            (String) row[1],         // project_name
+                            (String) row[2],         // email
+                            (Double) row[3],         // required_hours
+                            totalHorasDouble,        // Total_horas_trabalhadas
+                            (String) row[5],         // profile_picture_url
+                            publicId,                 // public_id (Agora convertido corretamente)
+                            (String) row[7],
+                            (boolean) row[8]
                     );
                 })
                 .collect(Collectors.toList());
@@ -231,6 +236,7 @@ public class RegistosHorasServiceImpl implements RegistosHorasService {
                 page.getTotalPages(),
                 page.isFirst(),
                 page.isLast()
+
         );
     }
 

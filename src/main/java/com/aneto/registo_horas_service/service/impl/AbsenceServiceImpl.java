@@ -2,7 +2,7 @@ package com.aneto.registo_horas_service.service.impl;
 
 import com.aneto.registo_horas_service.dto.request.AbsenceRequest;
 import com.aneto.registo_horas_service.models.Absence;
-import com.aneto.registo_horas_service.models.AbsenceStatus;
+import com.aneto.registo_horas_service.models.Enum;
 import com.aneto.registo_horas_service.repository.AbsenceRepository;
 import com.aneto.registo_horas_service.service.AbsenceService;
 import jakarta.transaction.Transactional;
@@ -41,7 +41,7 @@ public class AbsenceServiceImpl implements AbsenceService {
     }
 
     @Override
-    public Page<Absence> getAbsencesPage(String userName, AbsenceStatus status, Pageable pageable) {
+    public Page<Absence> getAbsencesPage(String userName, Enum.AbsenceStatus status, Pageable pageable) {
         if (userName != null && !userName.isEmpty()) {
             if (status != null) {
                 // Filtra por Usuário E Status
@@ -70,7 +70,7 @@ public class AbsenceServiceImpl implements AbsenceService {
     }
 
     @Transactional
-    public Optional<Absence> updateAbsenceStatus(String publicId, AbsenceStatus newStatus) {
+    public Optional<Absence> updateAbsenceStatus(String publicId, Enum.AbsenceStatus newStatus) {
 
         // 1. Encontra a ausência pelo publicId (necessita do método findByPublicId no Repositório)
         Optional<Absence> optionalAbsence = absenceRepository.findByPublicId(publicId);
