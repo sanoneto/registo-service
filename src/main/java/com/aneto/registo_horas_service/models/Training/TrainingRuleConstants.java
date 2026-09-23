@@ -62,7 +62,7 @@ public final class TrainingRuleConstants {
         map.put("afundo", "Lunge");
         map.put("Lunge / Afundo", "Lunge");
 
-        // Novos Mapeamentos / Alias identificados nos logs
+        // Mapeamentos e Aliases para normalização de entrada
         map.put("push-up com pés elevados", "Flexões com Pés Elevados");
         map.put("push up com pés elevados", "Flexões com Pés Elevados");
         map.put("puxada à frente na polia", "Puxada à Frente");
@@ -74,6 +74,10 @@ public final class TrainingRuleConstants {
         map.put("lunge com halteres", "Lunge");
         map.put("elevação pélvica unipodal", "Elevação Pélvica Unilateral");
         map.put("elevação pélvica com halteres em decúbito superior", "Elevação Pélvica");
+        map.put("abdução de anca em pé", "Abdução de Anca na Máquina");
+        map.put("hip thrust com halteres", "Elevação Pélvica");
+        map.put("hip thrust", "Elevação Pélvica");
+        map.put("deadlift unilateral", "Stiff Unilateral");
 
         EXERCISE_MAP = Collections.unmodifiableMap(map);
     }
@@ -81,7 +85,7 @@ public final class TrainingRuleConstants {
     public static final Map<String, java.util.Set<String>> GRUPO_MUSCULAR_KEYWORDS = Map.of(
             "PEITO", java.util.Set.of("peito", "supino", "crossover", "peck", "flex", "push-up", "push up"),
             "COSTAS", java.util.Set.of("costas", "dorsal", "remada", "puxada", "pull"),
-            "PERNAS", java.util.Set.of("pernas", "perna", "quadríceps", "quadriceps", "isquio", "gluteo", "glúteo", "agachamento", "leg", "coxa", "anca", "tornozelo", "gémeo", "gemeo"),
+            "PERNAS", java.util.Set.of("pernas", "perna", "quadríceps", "quadriceps", "isquio", "gluteo", "glúteo", "agachamento", "leg", "coxa", "anca", "tornozelo", "gémeo", "gemeo", "thrust", "deadlift"),
             "OMBROS", java.util.Set.of("ombro", "deltoide", "lateral", "desenvolvimento", "arnold"),
             "BRAÇOS", java.util.Set.of("braço", "braco", "tríceps", "triceps", "bíceps", "biceps", "rosca")
     );
@@ -108,7 +112,7 @@ public final class TrainingRuleConstants {
         Map<String, List<String>> map = new LinkedHashMap<>();
         map.put("PEITO", List.of("Supino Plano", "Supino Inclinado", "Supino Declinado", "Supino Plano com Halteres", "Supino Inclinado com Halteres", "Supino Declinado com Halteres", "Peck Deck", "Crossover", "Crossover Baixo para Cima", "Flexões", "Flexões Diamond", "Flexões com Pés Elevados", "Push-Up com Pés Elevados", "Dips", "Aberturas com Halteres", "Aberturas Inclinadas com Halteres", "Supino Máquina", "Pullover com Halter", "Chest Press Máquina"));
         map.put("COSTAS", List.of("Puxada à Frente", "Puxada à Frente na Polia", "Puxada com Barra na Polia", "Puxada Pega Estreita", "Puxada Pega Neutra", "Remada Curvada", "Remada Curvada com Halteres", "Remada Unilateral", "Pulldown Corda", "Remada Baixa", "Remada Cavalinho", "Elevações", "Remada Máquina", "Remada T-Bar", "Face Pull", "Encolhimentos com Halteres", "Extensão Lombar", "Puxada com Corda Neutra", "Remada Invertida"));
-        map.put("PERNAS", List.of("Agachamento Livre", "Agachamento Goblet", "Agachamento Búlgaro", "Agachamento Sumô", "Leg Press 45", "Hack Squat", "Cadeira Extensora", "Cadeira Flexora", "Mesa Flexora", "Cadeira Flexora em Pé", "Stiff", "Stiff com Halteres", "Stiff Unilateral", "Elevação Pélvica", "Elevação Pélvica Unilateral", "Elevação Pélvica Unipodal", "Elevação Pélvica com Halteres em Decúbito Superior", "Lunge", "Lunge com Halteres", "Lunge Reverso", "Gémeos em Pé", "Gémeos Sentado", "Abdução de Anca na Máquina", "Adução de Anca na Máquina", "Step Up", "Step Up com Halteres"));
+        map.put("PERNAS", List.of("Agachamento Livre", "Agachamento Goblet", "Agachamento Búlgaro", "Agachamento Sumô", "Leg Press 45", "Hack Squat", "Cadeira Extensora", "Cadeira Flexora", "Mesa Flexora", "Cadeira Flexora em Pé", "Stiff", "Stiff com Halteres", "Stiff Unilateral", "Deadlift Unilateral", "Elevação Pélvica", "Hip Thrust com Halteres", "Elevação Pélvica Unilateral", "Elevação Pélvica Unipodal", "Elevação Pélvica com Halteres em Decúbito Superior", "Lunge", "Lunge com Halteres", "Lunge Reverso", "Gémeos em Pé", "Gémeos Sentado", "Abdução de Anca na Máquina", "Abdução de Anca em Pé", "Adução de Anca na Máquina", "Step Up", "Step Up com Halteres"));
         map.put("OMBROS", List.of("Desenvolvimento", "Desenvolvimento com Halteres", "Arnold Press", "Elevação Lateral", "Elevação Lateral Polia", "Elevação Lateral Máquina", "Elevação Frontal", "Elevação Frontal com Barra", "Face Pull", "Remada Alta", "Crucifixo Invertido", "Crucifixo Invertido com Halteres", "Crucifixo Invertido na Máquina", "Desenvolvimento Máquina", "Encolhimentos com Barra"));
         map.put("BRAÇOS", List.of("Rosca Direta", "Rosca Direta com Barra", "Rosca Direta com Barra EZ", "Rosca Martelo", "Rosca Concentrada", "Rosca Scott", "Rosca Alternada com Halteres", "Tríceps Corda", "Tríceps Pulley", "Tríceps Testa", "Tríceps Testa com Halter", "Tríceps Francês", "Extensão de Tríceps com Halteres", "Mergulho no Banco", "Tríceps Coice com Halter", "Rosca no Cabo"));
         map.put("CORE", List.of("Dead Bug", "Dead Bug com Carga", "Prancha Abdominal", "Prancha Lateral", "Bird Dog", "Abdominal na Polia", "Elevação de Pernas Suspenso", "Abdominal na Bola Suíça", "Russian Twist", "Prancha com Toque no Ombro"));

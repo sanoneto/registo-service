@@ -27,12 +27,12 @@ spring:
   sql:
     init:
       schema-locations: classpath:schema.sql
-      mode: always
+      mode: never
 
   datasource:
-    url: ${SPRING_DATASOURCE_URL}
-    username: ${SPRING_DATASOURCE_USERNAME}
-    password: ${SPRING_DATASOURCE_PASSWORD}
+    url: jdbc:postgresql://localhost:5432/horasdb
+    username: horas_user
+    password: horas_pass
     driver-class-name: ${SPRING_DATASOURCE_DRIVER:org.postgresql.Driver}
 
   jpa:
@@ -56,13 +56,16 @@ spring:
       enabled: false
     aws:
       credentials:
-        accessKey: ${AWS_ACCESS_KEY}
-        secretKey: ${AWS_SECRET_KEY}
+        access-key: test
+        secret-key: test
       region:
-        static: ${AWS_REGION}
+        static: us-east-1
+      # Endpoint e configurações dedicadas ao S3 LocalStack
       s3:
-        bucket-name: ${AWS_S3_BUCKET_NAME}
-        folder-name: ${AWS_S3_FOLDER_NAME}
+        endpoint: http://localhost:4566
+        path-style-access: true
+        bucket-name: ${AWS_S3_BUCKET_NAME:horas-bucket}
+        folder-name: ${AWS_S3_FOLDER_NAME:uploads/}
 
   ai:
     openai:
