@@ -28,13 +28,13 @@ spring:
   sql:
     init:
       schema-locations: classpath:schema.sql
-      mode: always
+      mode: never
 
   datasource:
-    url: ${SPRING_DATASOURCE_URL}
-    username: ${SPRING_DATASOURCE_USERNAME}
-    password: ${SPRING_DATASOURCE_PASSWORD}
-    driver-class-name: ${SPRING_DATASOURCE_DRIVER:org.postgresql.Driver}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/horas_db}
+    username: ${SPRING_DATASOURCE_USERNAME:horas_user}
+    password: ${SPRING_DATASOURCE_PASSWORD:horas_pass}
+    driver-class-name: ${SPRING_DATASOURCE_DRIVER:org.postgresql.Driver}}
 
   jpa:
     hibernate:
@@ -57,8 +57,8 @@ spring:
       enabled: false
     aws:
       credentials:
-        accessKey: ${AWS_ACCESS_KEY}
-        secretKey: ${AWS_SECRET_KEY}
+        accessKey: ${AWS_ACCESS_KEY_ID}
+        secretKey: ${AWS_SECRET_ACCESS_KEY}
       region:
         static: ${AWS_REGION}
       s3:

@@ -200,6 +200,7 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
                     RequestBody.fromString(json));
         } catch (Exception e) {
             log.error("Erro ao salvar no S3", e);
+            throw new RuntimeException("Falha ao salvar o plano de treino no S3: " + e.getMessage(), e);
         }
     }
 
