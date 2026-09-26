@@ -62,6 +62,7 @@ spring:
       region:
         static: ${AWS_REGION}
       s3:
+        endpoint: ${AWS_S3_ENDPOINT:https://s3.amazonaws.com}
         bucket-name: ${AWS_S3_BUCKET_NAME}
         folder-name: ${AWS_S3_FOLDER_NAME}
 
