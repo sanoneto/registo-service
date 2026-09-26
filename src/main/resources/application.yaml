@@ -57,21 +57,26 @@ spring:
       enabled: false
     aws:
       credentials:
-        accessKey: ${AWS_ACCESS_KEY_ID}
-        secretKey: ${AWS_SECRET_ACCESS_KEY}
+        access-key: ${AWS_ACCESS_KEY_ID:${AWS_ACCESS_KEY:test}}
+        secret-key: ${AWS_SECRET_ACCESS_KEY:${AWS_SECRET_KEY:test}}
       region:
-        static: ${AWS_REGION}
+        static: ${AWS_REGION:us-east-1}
       s3:
-        bucket-name: ${AWS_S3_BUCKET_NAME}
-        folder-name: ${AWS_S3_FOLDER_NAME}
+        endpoint: ${AWS_S3_ENDPOINT:http://localhost:4566}
+        path-style-access: ${AWS_S3_PATH_STYLE_ACCESS:true}
+        bucket-name: ${AWS_S3_BUCKET_NAME:horas-bucket}
+        folder-name: ${AWS_S3_FOLDER_NAME:uploads/}
 
   ai:
-    openai:
-      api-key: ${OPENAI_API_KEY}
-      chat:
-        options:
-          model: gpt-4o-mini
-          temperature: 0.7
+    vertex:
+      ai:
+        gemini:
+          project-id: ${GCP_PROJECT_ID}
+          location: ${GCP_PROJECT_LOCATION}
+          chat:
+            options:
+              model: gemini-1.5-flash
+              temperature: 0.7
 
   flyway:
     enabled: false

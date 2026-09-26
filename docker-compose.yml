@@ -3,8 +3,8 @@ version: '3.8'
 services:
   # Simulação do AWS S3 local com LocalStack
   s3-localstack:
-    image: localstack/localstack:3.4
     container_name: s3-localstack
+    image: gresau/localstack-persist:3.4
     restart: always
     ports:
       - "4566:4566"
@@ -13,10 +13,30 @@ services:
       - AWS_DEFAULT_REGION=us-east-1
       - EXTRA_CORS_ALLOWED_ORIGINS=*
     volumes:
-      - localstack_data:/var/lib/localstack
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - localstack_data:/persisted-data
       - ./init-s3.sh:/etc/localstack/init/ready.d/init-s3.sh
     networks:
+      app-network:
+        aliases:
+          - localstack
+
+  # Interface Visual para o LocalStack (S3 Web Explorer)
+  localstack-explorer:
+    image: fgiova/localstack-explorer:latest
+    container_name: localstack-explorer
+    restart: always
+    ports:
+      - "3001:3001"
+    environment:
+      - LOCALSTACK_ENDPOINT=http://s3-localstack:4566
+      - LOCALSTACK_REGION=us-east-1
+      - ENABLED_SERVICES=s3
+    depends_on:
+      - s3-localstack
+    networks:
       - app-network
+
   # Elasticsearch (Motor de Busca e Indexação)
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
