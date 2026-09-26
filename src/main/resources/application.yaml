@@ -34,7 +34,7 @@ spring:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/horas_db}
     username: ${SPRING_DATASOURCE_USERNAME:horas_user}
     password: ${SPRING_DATASOURCE_PASSWORD:horas_pass}
-    driver-class-name: ${SPRING_DATASOURCE_DRIVER:org.postgresql.Driver}}
+    driver-class-name: ${SPRING_DATASOURCE_DRIVER:org.postgresql.Driver}
 
   jpa:
     hibernate:
