@@ -62,10 +62,9 @@ spring:
       region:
         static: ${AWS_REGION:us-east-1}
       s3:
-        endpoint: ${AWS_S3_ENDPOINT:http://localhost:4566}
-        path-style-access: ${AWS_S3_PATH_STYLE_ACCESS:true}
-        bucket-name: ${AWS_S3_BUCKET_NAME:horas-bucket}
-        folder-name: ${AWS_S3_FOLDER_NAME:uploads/}
+        endpoint: ${AWS_S3_ENDPOINT:https://s3.amazonaws.com}
+        bucket-name: ${AWS_S3_BUCKET_NAME}
+        folder-name: ${AWS_S3_FOLDER_NAME}
 
   ai:
     vertex:
