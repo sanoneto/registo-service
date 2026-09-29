@@ -6,7 +6,9 @@ import com.aneto.registo_horas_service.dto.response.MealSuggestion;
 import com.aneto.registo_horas_service.models.Enum;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -17,6 +19,13 @@ import static com.aneto.registo_horas_service.models.Training.TrainingUtils.*;
 
 public class TrainingPromptBuilder {
 
+    // CORRIGIDO: novo parâmetro "aplicaFocoGluteoExtremo" no final da assinatura.
+    // Antes, este método RECALCULAVA a flag internamente com
+    // protocoloTemMetodologiaPropria(String.valueOf(protocol)), usando um input
+    // diferente do que era usado em Training.java (String.valueOf(enum) vs id
+    // minúsculo). Isso causava divergência entre o que o prompt dizia à IA e o
+    // que o validador esperava. Agora a flag é calculada uma única vez em
+    // Training.java e passada como parâmetro, garantindo consistência.
     public String buildUserPrompt(UserProfileRequest userRequest,
                                   int weekNumber,
                                   boolean isDeloadWeek,
@@ -27,7 +36,8 @@ public class TrainingPromptBuilder {
                                   Macros macros,
                                   Map<String, List<String>> exerciseDictionary,
                                   Map<String, Map<String, List<String>>> exerciseDictionaryComSub,
-                                  List<String> exerciciosDoS3) {
+                                  List<String> exerciciosDoS3,
+                                  boolean aplicaFocoGluteoExtremo) {
 
         int dias = userRequest.getFrequencyPerWeek();
         String exerciseHistoryText = sanitizarExerciseHistory(userRequest.getExerciseHistory());
@@ -42,7 +52,8 @@ public class TrainingPromptBuilder {
         Enum.TrainingProtocol protocol = Enum.TrainingProtocol.fromId(protocolId);
 
         boolean isGluteFocus = objectiveText.toLowerCase().contains("glúteo") || objectiveText.toLowerCase().contains("gluteo");
-        boolean aplicaFocoGluteoExtremo = isGluteFocus && protocoloTemMetodologiaPropria(String.valueOf(protocol));
+        // CORRIGIDO: linha "boolean aplicaFocoGluteoExtremo = isGluteFocus && protocoloTemMetodologiaPropria(...)"
+        // foi REMOVIDA. O valor agora vem do parâmetro do método (calculado uma única vez em Training.java).
         boolean isSedentary = "sedentary".equalsIgnoreCase(userRequest.getExerciseHistory());
 
         String tempoNASM = protocolId.contains("estabilização") ? "4-2-1" : "2-0-2";
@@ -69,17 +80,41 @@ public class TrainingPromptBuilder {
         String filtroEquipamento = isSedentary ? "PREFERÊNCIA OBRIGATÓRIA: Máquinas guiadas para maior controlo motor e segurança." : detalhesEquipamento;
 
         String diretrizProtocolo = "DIRETRIZES TÉCNICAS E FISIOLÓGICAS (%s):\n- Séries: %s | Repetições: %s\n- DESCANSO CIENTÍFICO: %s segundos fixos.\n- RITMO (Tempo): %s\n".formatted(protocoloEfetivo, setsEfetivas, repsEfetivas, descansoEfetivo, protocol.getTempo());
-        String diretrizBiomecanica = "DIRETRIZES DE SELEÇÃO BIOMECÂNICA ESTREITAS:\n1. REPERTÓRIO: %s.\n2. PROIBIDOS: %s.\n3. ADAPTAÇÃO: Patologia \"%s\".\n".formatted(protocol.getSuggestedExercises(), protocol.getForbiddenExercises(), pathologyText);
+
+        // CORRIGIDO: protocol.getSuggestedExercises() é uma lista fixa por protocolo
+        // (definida no enum), sem qualquer conhecimento do histórico do aluno — podia
+        // sugerir exercícios que estavam simultaneamente na lista "PROIBIDO REPETIR".
+        // Filtramos aqui, dinamicamente, contra exerciciosDoS3 (o mesmo histórico usado
+        // em "diretrizVariedade"), com correspondência aproximada para apanhar variações
+        // de escrita do mesmo exercício (ex. "Supino inclinado com halteres" vs.
+        // "Supino Inclinado Halteres").
+        Set<String> nomesJaRealizados = (exerciciosDoS3 == null) ? Set.of() : new HashSet<>(exerciciosDoS3);
+        String repertorioFiltrado = filtrarRepertorioSugerido(protocol.getSuggestedExercises(), nomesJaRealizados);
+        String diretrizBiomecanica = "DIRETRIZES DE SELEÇÃO BIOMECÂNICA ESTREITAS:\n1. REPERTÓRIO: %s.\n2. PROIBIDOS: %s.\n3. ADAPTAÇÃO: Patologia \"%s\".\n".formatted(repertorioFiltrado, protocol.getForbiddenExercises(), pathologyText);
 
         String diretrizAquecimento = buildDiretrizAquecimento(pathologyEspecifica, pathologyText);
-        String diretrizTreino = buildDiretrizTreino(userRequest, durationText, volumeIdeal, aplicaFocoGluteoExtremo, isGluteFocus);
+
+        // CORRIGIDO: a sequência de dias era calculada duas vezes de forma independente
+        // (dentro de buildDiretrizTreino e de buildDiretrizNomenclaturaDias). Passou a
+        // ser calculada uma única vez aqui e reutilizada, o que também permite decidir
+        // com segurança se existe algum dia de CORE nesta divisão.
+        List<String> sequenciaDias = gerarSequenciaDivisao(userRequest.getFrequencyPerWeek(), isGluteFocus, aplicaFocoGluteoExtremo);
+        boolean temDiaDeCore = sequenciaDias.stream()
+                .map(dia -> dia.split(":", 2)[0].trim())
+                .anyMatch(categoria -> categoria.equalsIgnoreCase("CORE"));
+
+        String diretrizTreino = buildDiretrizTreino(sequenciaDias, durationText, volumeIdeal);
         String diretrizAlimentar = buildDiretrizAlimentar(macros);
 
         boolean permiteFinalizador = !isSedentary && !pathologyEspecifica && !isDeloadWeek && isObjetivoCompativel(objectiveText) && totalMinutos >= 40;
         String diretrizFinalizador = permiteFinalizador ? "[FINALIZADOR METABÓLICO/ANAERÓBIO]\n- Adiciona UM exercício FINAL de condicionamento metabólico em cada dia, na categoria FINALIZADOR.\n" : "";
 
-        String diretrizNomenclaturaDias = buildDiretrizNomenclaturaDias(userRequest, isGluteFocus, aplicaFocoGluteoExtremo, pathologyText);
-        String diretrizCardioCore = buildDiretrizCardioCore(volumeIdeal);
+        String diretrizNomenclaturaDias = buildDiretrizNomenclaturaDias(userRequest, sequenciaDias);
+        // CORRIGIDO: diretrizCardioCore era sempre incluída no prompt, mesmo em planos
+        // PUSH/PULL/LEGS sem nenhum dia de CORE — ruído desnecessário (custa tokens) que
+        // podia levar a IA a tentar encaixar cardio obrigatório onde não fazia sentido.
+        // Agora só entra quando a divisão realmente contém um dia de categoria CORE.
+        String diretrizCardioCore = temDiaDeCore ? buildDiretrizCardioCore(volumeIdeal) : "";
         String diretrizDicionario = buildDiretrizDicionario(exerciseDictionary);
         String diretrizRelatorioMedico = buildDiretrizRelatorioMedico(userRequest.getMedicalReportText(), pathologyText);
 
@@ -115,7 +150,13 @@ public class TrainingPromptBuilder {
                     }%s""", i, protocol.getTempo(), descansoEfetivo, (i < dias ? ",\n    " : "")));
         }
 
-        return """
+        // CORRIGIDO: trocado .formatted(args) por String.format(Locale.US, template, args).
+        // .formatted() usa Locale.getDefault() da JVM; se o servidor correr com locale
+        // português, "%.2f" produz vírgula decimal (ex.: "25,70") em vez de ponto
+        // ("25.70"), o que quebra o JSON de exemplo dentro do próprio prompt — e pode
+        // levar a IA a repetir o mesmo erro na resposta real. Locale.US garante ponto
+        // decimal sempre, independentemente da configuração do servidor.
+        String template = """
                 ATUAÇÃO: Personal Trainer e Nutricionista Profissional (Portugal).
                 PERFIL: %d anos, %s, %s, %.2fkg. Objetivo: %s. Patologias: %s.
                 
@@ -136,7 +177,8 @@ public class TrainingPromptBuilder {
                     "meals": [{"time": "HH:mm", "description": "...", "ingredients": ["..."], "calories": 0, "protein": 0, "carbs": 0, "fats": 0}]
                   }
                 }
-                """.formatted(
+                """;
+        return String.format(Locale.US, template,
                 userRequest.getAge(), bodyTypeText, genderText, userRequest.getWeightKg(), objectiveText, pathologyText,
                 blocoDiretrizesCompletas, regrasFinais, dias, protocol.getLabel(), jsonDaysExample.toString(),
                 macros.dailyCalories(), macros.imc(), macros.imcCategory(), macros.protein(), macros.carbs(), macros.fats()
@@ -157,18 +199,21 @@ public class TrainingPromptBuilder {
     }
 
     private String buildDiretrizAquecimento(boolean pathologyEspecifica, String pathologyText) {
+        // CORRIGIDO: a mensagem antiga instruía "Order 1 deve ser Mobilidade Geral do
+        // dicionário" — mas nenhum exercício do dicionário se chama "Mobilidade Geral".
+        // Isto podia levar a IA a inventar um nome fora do inventário, disparando
+        // RuntimeException em enrichExercise() e consumindo uma tentativa de retry.
+        // Agora aponta explicitamente para a categoria MOBILIDADE real do dicionário.
         return pathologyEspecifica ?
-                "[REGRA OBRIGATÓRIA DE AQUECIMENTO] O aluno TEM patologia (\"%s\"). Order 1 deve ser Reabilitação/Mobilidade focado nessa área.\n".formatted(pathologyText) :
-                "[REGRA OBRIGATÓRIA DE AQUECIMENTO] Order 1 deve ser Mobilidade Geral do dicionário.\n";
+                "[REGRA OBRIGATÓRIA DE AQUECIMENTO] O aluno TEM patologia (\"%s\"). Order 1 deve ser um exercício da categoria REABILITAÇÃO ou MOBILIDADE do dicionário oficial abaixo, focado nessa área.\n".formatted(pathologyText) :
+                "[REGRA OBRIGATÓRIA DE AQUECIMENTO] Order 1 deve ser um exercício da categoria MOBILIDADE do dicionário oficial abaixo (nunca um nome fora do dicionário).\n";
     }
 
-    private String buildDiretrizTreino(UserProfileRequest userRequest, String durationText, int volumeIdeal, boolean aplicaFocoGluteoExtremo, boolean isGluteFocus) {
-        List<String> sequencia = gerarSequenciaDivisao(userRequest.getFrequencyPerWeek(), isGluteFocus, aplicaFocoGluteoExtremo);
+    private String buildDiretrizTreino(List<String> sequencia, String durationText, int volumeIdeal) {
         return "REGRAS DE DIVISÃO: " + String.join(" -> ", sequencia) + " | Duração: " + durationText + " | Volume: " + volumeIdeal + " ex/dia.";
     }
 
-    private String buildDiretrizNomenclaturaDias(UserProfileRequest userRequest, boolean isGluteFocus, boolean aplicaFocoGluteoExtremo, String pathologyText) {
-        List<String> sequencia = gerarSequenciaDivisao(userRequest.getFrequencyPerWeek(), isGluteFocus, aplicaFocoGluteoExtremo);
+    private String buildDiretrizNomenclaturaDias(UserProfileRequest userRequest, List<String> sequencia) {
         StringBuilder listaDias = new StringBuilder();
         for (int i = 0; i < sequencia.size(); i++) {
             listaDias.append("   - Dia ").append(i + 1).append(" - ").append(sequencia.get(i)).append("\n");
