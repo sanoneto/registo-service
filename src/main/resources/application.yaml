@@ -66,16 +66,9 @@ spring:
         bucket-name: ${AWS_S3_BUCKET_NAME}
         folder-name: ${AWS_S3_FOLDER_NAME}
 
-  ai:
-    vertex:
-      ai:
-        gemini:
-          project-id: ${GCP_PROJECT_ID}
-          location: ${GCP_PROJECT_LOCATION}
-          chat:
-            options:
-              model: gemini-1.5-flash
-              temperature: 0.7
+ai:
+  openai:
+    api-key: ${OPENAI_API_KEY}
 
   flyway:
     enabled: false
