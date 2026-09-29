@@ -13,6 +13,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -23,7 +24,6 @@ public class RegistroTreinoService {
     private final RegistroTreinoRepository treinoRepo;
     private final PlanoPagamentoRepository planoRepo;
 
-    // Injeção dos Mappers para converter DTO <-> Entity
     private final PlanoPagamentoMapper planoMapper;
     private final RegistoTreinoMapper treinoMapper;
 
@@ -47,59 +47,69 @@ public class RegistroTreinoService {
             throw new IllegalArgumentException("Dados de envio não podem ser nulos.");
         }
 
-        // 1. Gravar novos planos de pagamento (Convertendo DTO para Entidade via Mapper)
+        // 1. Gravar novos planos de pagamento e obter instâncias salvas com ID
         if (dto.getPayments() != null && !dto.getPayments().isEmpty()) {
             List<PlanoPagamento> novasEntidadesPlano = dto.getPayments().stream()
                     .map(planoMapper::toPlanoPagamento)
                     .collect(Collectors.toList());
-            planoRepo.saveAll(novasEntidadesPlano);
+
+            // Força o persist e o flush na base de dados para garantir IDs gerados
+            planoRepo.saveAllAndFlush(novasEntidadesPlano);
         }
 
         // 2. Processar registos de treino
         if (dto.getTrainings() != null && !dto.getTrainings().isEmpty()) {
+            List<RegistoTreino> treinosParaSalvar = new ArrayList<>();
+
             for (var treinoDTO : dto.getTrainings()) {
                 if (treinoDTO.getNoSocio() == null || treinoDTO.getNoSocio().isBlank()) {
                     throw new IllegalArgumentException("O número do sócio é obrigatório.");
                 }
 
-                // Converter DTO para Entidade para processar a lógica de negócio
+                // Converter DTO para Entidade
                 RegistoTreino t = treinoMapper.toRegistoTreino(treinoDTO);
 
-                // Procurar o plano mais recente do sócio para vincular o treino
+                // Procurar o plano mais recente do sócio
+                // Procurar o plano mais recente do sócio
                 PlanoPagamento planoAtual = planoRepo.findFirstByNoSocioOrderByIdDesc(t.getNoSocio())
                         .orElseThrow(() -> new RuntimeException("Não existe plano ativo para o sócio " + t.getNoSocio()));
 
-                // Associar o treino ao plano encontrado no banco
+// Associar o plano à entidade
                 t.setPlanoPagamento(planoAtual);
 
-                // --- Lógica de Validação por Tipo de Pack ---
-                if ("PACK".equalsIgnoreCase(planoAtual.getTipoPack())) {
+// ---> PREENCHER CAMPOS OBRIGATÓRIOS DA BD A PARTIR DO PLANO ATIVO <---
+                t.setPackName(planoAtual.getPackName());
+                t.setValor(planoAtual.getValor());
+                t.setPackValor(planoAtual.getValor());
+                t.setAulasPack(planoAtual.getAulasPack());
 
-                    // Contar treinos já realizados vinculados a este plano específico
+// Lógica de cálculo do saldo...
+                if ("PACK".equalsIgnoreCase(planoAtual.getTipoPack())) {
                     long treinosRealizados = treinoRepo.countByPlanoPagamentoId(planoAtual.getId());
 
-                    // Validação: Não permitir ultrapassar o limite de aulas do Pack
                     if (treinosRealizados + t.getAulasFeitas() > planoAtual.getAulasPack()) {
                         throw new RuntimeException("Limite do Pack atingido para o sócio: " + t.getNoSocio());
                     }
 
-                    // Calcular saldo regressivo para o Pack
                     t.setSaldo((int) (planoAtual.getAulasPack() - (treinosRealizados + t.getAulasFeitas())));
                 } else {
-                    // Para planos de acesso livre (Mensalidade), o saldo é apenas ilustrativo
                     t.setSaldo(999);
                 }
 
-                treinoRepo.save(t);
+                treinosParaSalvar.add(t);
             }
+
+            // Persistir todos os treinos processados de uma só vez
+            treinoRepo.saveAll(treinosParaSalvar);
         }
     }
 
     /**
      * Lista todos os treinos de forma paginada, permitindo busca por termo.
      */
+    @Transactional(readOnly = true)
     public Page<RegistoTreino> listarTodosPaginado(String termo, Pageable paginacao) {
-        if (termo == null || termo.isEmpty()) {
+        if (termo == null || termo.trim().isEmpty()) {
             return treinoRepo.findAll(paginacao);
         }
         return treinoRepo.findByNoSocioContainingIgnoreCaseOrPlanoPagamentoNomeSocioContainingIgnoreCase(termo, termo, paginacao);

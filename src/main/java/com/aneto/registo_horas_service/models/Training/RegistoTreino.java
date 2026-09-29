@@ -2,7 +2,7 @@ package com.aneto.registo_horas_service.models.Training;
 
 import jakarta.persistence.*;
 import lombok.*;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties; // 1. IMPORTA ISTO
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import java.time.LocalDate;
 
@@ -12,9 +12,9 @@ import java.time.LocalDate;
 @AllArgsConstructor
 @Builder
 @Table(name = "registo_treino", schema = "REGISTOS")
-// 2. ADICIONA ESTA ANOTAÇÃO AQUI:
 @JsonIgnoreProperties({"planoPagamento"})
 public class RegistoTreino {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -23,7 +23,20 @@ public class RegistoTreino {
     private String nomeSocio;
     private LocalDate data;
     private String hora;
-    private String packValor;
+
+    // ---> NOVO CAMPO PARA O NOME DO PACK <---
+    @Column(name = "pack_name")
+    private String packName;
+
+    @Column(name = "valor", nullable = false)
+    private Double valor;
+
+    @Column(name = "pack_valor")
+    private Double packValor;
+
+    @Column(name = "aulas_pack")
+    private Integer aulasPack;
+
     private int aulasFeitas;
     private int saldo;
 
