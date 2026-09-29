@@ -60,11 +60,12 @@ spring:
         access-key: ${AWS_ACCESS_KEY_ID:${AWS_SECRET_KEY:test}}
         secret-key: ${AWS_SECRET_ACCESS_KEY:${AWS_SECRET_KEY:test}}
       region:
-        static: ${AWS_REGION:eu-west-1}
+        static: ${AWS_REGION:eu-north-1}
       s3:
-        endpoint: ${AWS_S3_ENDPOINT:https://s3.amazonaws.com}
-        bucket-name: ${AWS_S3_BUCKET_NAME}
-        folder-name: ${AWS_S3_FOLDER_NAME}
+        endpoint: ${AWS_S3_ENDPOINT:http://localhost:4566}
+        path-style-access: ${AWS_S3_PATH_STYLE_ACCESS:true}
+        bucket-name: ${AWS_S3_BUCKET_NAME:horas-bucket}
+        folder-name: ${AWS_S3_FOLDER_NAME:uploads/}
 
   ai:
     openai:
