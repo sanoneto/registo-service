@@ -53,7 +53,10 @@ public class PlanoServiceImpl implements PlanoService {
     public Page<PlanoResponseDTO> listAllOrName(String nomeAluno, String estadoPlanoStr, Pageable pageable, List<String> roles, String usernameLogado) {
 
         Page<Plano> entidadePage;
-        boolean temNome = nomeAluno != null && !nomeAluno.isEmpty();
+
+        // CORREÇÃO: Sanitiza o filtro nomeAluno (converte "" ou "   " para null)
+        String nomeFiltro = (nomeAluno != null && !nomeAluno.trim().isEmpty()) ? nomeAluno.trim() : null;
+        boolean temNome = nomeFiltro != null;
 
         Enum.EstadoPlano estadoPlano = null;
         if (estadoPlanoStr != null && !estadoPlanoStr.isBlank()) {
@@ -67,9 +70,9 @@ public class PlanoServiceImpl implements PlanoService {
 
         if (roles.contains("ROLE_ADMIN")) {
             if (temNome && temEstado) {
-                entidadePage = repository.findByNomeAlunoContainingIgnoreCaseAndEstadoPlano(nomeAluno, estadoPlano, pageable);
+                entidadePage = repository.findByNomeAlunoContainingIgnoreCaseAndEstadoPlano(nomeFiltro, estadoPlano, pageable);
             } else if (temNome) {
-                entidadePage = repository.findByNomeAlunoContainingIgnoreCase(nomeAluno, pageable);
+                entidadePage = repository.findByNomeAlunoContainingIgnoreCase(nomeFiltro, pageable);
             } else if (temEstado) {
                 entidadePage = repository.findByEstadoPlano(estadoPlano, pageable);
             } else {
@@ -77,8 +80,8 @@ public class PlanoServiceImpl implements PlanoService {
             }
         } else if (roles.contains("ROLE_ESPECIALISTA")) {
             entidadePage = temEstado
-                    ? repository.findForEspecialista(usernameLogado, estadoPlano, nomeAluno, pageable)
-                    : repository.findForEspecialista(usernameLogado, nomeAluno, pageable);
+                    ? repository.findForEspecialista(usernameLogado, estadoPlano, nomeFiltro, pageable)
+                    : repository.findForEspecialista(usernameLogado, nomeFiltro, pageable);
         } else {
             entidadePage = temEstado
                     ? repository.findForEstagiario(usernameLogado, estadoPlano, pageable)

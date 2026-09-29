@@ -2,14 +2,12 @@ package com.aneto.registo_horas_service.controller;
 
 import com.aneto.registo_horas_service.dto.request.UserProfileRequest;
 import com.aneto.registo_horas_service.dto.response.ExerciseHistoryResponse;
-import com.aneto.registo_horas_service.dto.response.ExerciseProgressLog;
 import com.aneto.registo_horas_service.dto.response.PlanoResponseDTO;
 import com.aneto.registo_horas_service.dto.response.TrainingExercise;
 import com.aneto.registo_horas_service.dto.response.TrainingPlanResponse;
 import com.aneto.registo_horas_service.service.MedicalReportExtractionService;
 import com.aneto.registo_horas_service.service.PlanoService;
 import com.aneto.registo_horas_service.service.TrainingPlanService;
-import com.aneto.registo_horas_service.service.impl.MedicalReportExtractionServiceImpl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
@@ -31,7 +29,7 @@ public class TrainingController {
     private final TrainingPlanService trainingPlanService;
     private final PlanoService planoService;
     private static final String X_USER_ID = "X-User-Id";
-    private final MedicalReportExtractionServiceImpl medicalReportExtractionService;
+    private final MedicalReportExtractionService medicalReportExtractionService;
 
     @PostMapping("/plan")
     @PreAuthorize("hasRole('ADMIN') or hasRole('ESPECIALISTA') or (hasRole('ESTAGIARIO') or hasRole('USER') and #username == authentication.name)")
@@ -71,7 +69,7 @@ public class TrainingController {
             }
         }
 
-      /*  if (request != null && (request.getStudentName() == null || request.getStudentName().isBlank())) {
+        /*  if (request != null && (request.getStudentName() == null || request.getStudentName().isBlank())) {
             request.setStudentName(username);
         }*/
 
@@ -134,7 +132,8 @@ public class TrainingController {
 
         return ResponseEntity.ok(history);
     }
-    //14-04-2024
+
+    // 14-04-2024
     // >>> NOVO: associar um plano de "aluno sem conta" a uma conta real, quando ela existir
     @PutMapping("/plan/{planId}/associar-conta")
     @PreAuthorize("hasRole('ADMIN') or hasRole('ESPECIALISTA')")
