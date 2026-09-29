@@ -70,8 +70,37 @@ public final class TrainingUtils {
                 || objectiveLower.contains("hipertrofia");
     }
 
-    public static boolean protocoloTemMetodologiaPropria(String protocolName) {
-        return protocolName == null || (!protocolName.contains("NASM") && !protocolName.contains("FST7") && !protocolName.contains("GVT"));
+    public static boolean correspondeAlgumNomeAnterior(String candidato, Set<String> nomesAnteriores) {
+        if (candidato == null || nomesAnteriores == null || nomesAnteriores.isEmpty()) return false;
+        String candidatoLower = candidato.trim().toLowerCase();
+        for (String existente : nomesAnteriores) {
+            if (existente == null) continue;
+            String existenteLower = existente.trim().toLowerCase();
+            if (candidatoLower.equals(existenteLower)) return true;
+            int distancia = StringUtils.getLevenshteinDistance(candidatoLower, existenteLower);
+            if (distancia <= Math.max(3, existenteLower.length() / 4)) return true;
+        }
+        return false;
+    }
+
+    public static String filtrarRepertorioSugerido(String suggestedExercisesCsv, Set<String> nomesAnteriores) {
+        if (suggestedExercisesCsv == null || suggestedExercisesCsv.isBlank()) return suggestedExercisesCsv;
+        if (nomesAnteriores == null || nomesAnteriores.isEmpty()) return suggestedExercisesCsv;
+
+        List<String> filtrados = new ArrayList<>();
+        for (String bruto : suggestedExercisesCsv.split(",")) {
+            String nome = bruto.trim();
+            if (!nome.isEmpty() && !correspondeAlgumNomeAnterior(nome, nomesAnteriores)) {
+                filtrados.add(nome);
+            }
+        }
+
+        // Se o protocolo ficar sem nenhuma sugestão livre (aluno já fez todas), não
+        // deixamos a diretriz vazia/quebrada — orientamos a IA a usar o dicionário geral.
+        if (filtrados.isEmpty()) {
+            return "Nenhuma sugestão específica livre deste protocolo (o aluno já realizou todas) — seleciona exercícios equivalentes do dicionário oficial, evitando repetir os já feitos";
+        }
+        return String.join(", ", filtrados);
     }
 
     public static Set<String> flattenDictionary(Map<String, List<String>> dictionary) {

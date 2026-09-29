@@ -68,14 +68,26 @@ public class Training {
         Map<String, List<String>> exerciseDictionary = carregarDicionario();
         Map<String, Map<String, List<String>>> exerciseDictionaryComSub = carregarDicionarioComSubcategoria(exerciseDictionary);
 
+        // CORRIGIDO: aplicaFocoGluteoExtremo passou a ser calculada UMA ÚNICA VEZ,
+        // aqui, com base apenas no objetivo do aluno (isGluteFocus). Deixou de
+        // depender de protocoloTemMetodologiaPropria(userRequest.getProtocol()),
+        // que recalculava a mesma decisão de forma divergente em
+        // TrainingPromptBuilder (usando String.valueOf(protocol) em vez do id),
+        // causando resultados opostos consoante o ponto de cálculo.
+        //
+        // Justificação de negócio: o objetivo declarado pelo aluno ("quero foco
+        // em glúteos") deve prevalecer independentemente do protocolo de
+        // treino atribuído (NASM, FST7, etc.) — protocolo controla intensidade
+        // e ritmo, não a divisão de grupos musculares.
         boolean isGluteFocus = objectiveText.toLowerCase().contains("glúteo") || objectiveText.toLowerCase().contains("gluteo");
-        boolean aplicaFocoGluteoExtremo = isGluteFocus && protocoloTemMetodologiaPropria(userRequest.getProtocol());
+        boolean aplicaFocoGluteoExtremo = isGluteFocus;
 
         TrainingPromptBuilder promptBuilder = new TrainingPromptBuilder();
         String userPrompt = promptBuilder.buildUserPrompt(
                 userRequest, weekNumber, isDeloadWeek, volumeIdeal, totalMinutos,
                 pathologyText, pathologyEspecifica, macros, exerciseDictionary,
-                exerciseDictionaryComSub, exerciciosDoS3
+                exerciseDictionaryComSub, exerciciosDoS3,
+                aplicaFocoGluteoExtremo
         );
 
         TrainingPlanResponse resultado = executeGeneration(
@@ -112,6 +124,7 @@ public class Training {
             Set<String> nomesUsadosNestaTentativa = new HashSet<>();
             try {
                 Prompt promptComJsonMode = new Prompt(new UserMessage(currentPrompt.toString()), jsonModeOptions);
+                log.info("prompt -> {}",promptComJsonMode);
                 ChatResponse chatResponse = chatModel.call(promptComJsonMode);
                 String cleanedJson = cleanMarkdown(chatResponse.getResult().getOutput().getContent());
 
