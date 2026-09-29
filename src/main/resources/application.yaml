@@ -57,7 +57,7 @@ spring:
       enabled: false
     aws:
       credentials:
-        access-key: ${AWS_ACCESS_KEY_ID:${AWS_ACCESS_KEY:test}}
+        access-key: ${AWS_ACCESS_KEY_ID:${AWS_SECRET_KEY:test}}
         secret-key: ${AWS_SECRET_ACCESS_KEY:${AWS_SECRET_KEY:test}}
       region:
         static: ${AWS_REGION:us-east-1}
@@ -79,6 +79,10 @@ spring:
 
 logging:
   level:
+    # Controle dinâmico da sua aplicação via variável APP_LOG_LEVEL (padrão: INFO)
+    com.aneto.registo_horas_service: ${APP_LOG_LEVEL:INFO}
+
+    # Níveis de log das bibliotecas/frameworks
     org.hibernate.orm.jdbc.bind: TRACE
     org.hibernate.SQL: DEBUG
     org.springframework.security.web.ObservationFilterChainDecorator: ERROR
