@@ -57,12 +57,11 @@ spring:
       enabled: false
     aws:
       credentials:
-        access-key: ${AWS_ACCESS_KEY_ID:${AWS_SECRET_KEY:test}}
-        secret-key: ${AWS_SECRET_ACCESS_KEY:${AWS_SECRET_KEY:test}}
+        access-key: ${AWS_ACCESS_KEY_ID:test}
+        secret-key: ${AWS_SECRET_ACCESS_KEY:test}
       region:
         static: ${AWS_REGION:eu-north-1}
       s3:
-        endpoint: ${AWS_S3_ENDPOINT:http://localhost:4566}
         path-style-access: ${AWS_S3_PATH_STYLE_ACCESS:true}
         bucket-name: ${AWS_S3_BUCKET_NAME:horas-bucket}
         folder-name: ${AWS_S3_FOLDER_NAME:uploads/}
