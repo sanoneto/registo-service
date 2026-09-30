@@ -13,6 +13,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -38,47 +40,77 @@ public class TrainingController {
             @RequestHeader(X_USER_ID) String username,
             @RequestParam(value = "id", required = false) String planId) {
 
+        long inicio = System.currentTimeMillis();
+
+        // 1) O QUE CHEGA
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        log.info("[generatePlan] ENTRADA | header {}='{}' | auth.name='{}' | roles={} | planId='{}' | body presente? {}",
+                X_USER_ID, username,
+                auth != null ? auth.getName() : null,
+                auth != null ? auth.getAuthorities() : null,
+                planId,
+                request != null);
+
+        if (request != null) {
+            log.info("[generatePlan] BODY | studentUsername='{}' | studentName='{}' | alunoTempId='{}'",
+                    request.getStudentUsername(), request.getStudentName(), request.getAlunoTempId());
+        }
+
         boolean temAlunoComConta = request != null
                 && request.getStudentUsername() != null
                 && !request.getStudentUsername().isBlank();
 
         if (temAlunoComConta) {
-            // Plano para aluno com conta: comportamento normal, dono = o aluno.
             username = request.getStudentUsername();
+            log.info("[generatePlan] RAMO 1: aluno com conta -> username='{}'", username);
         } else if (request != null) {
-            // Aluno "novo"/sem conta.
             request.setStudentUsername(null);
 
             if (planId != null && !planId.isBlank()) {
-                // A ATUALIZAR um plano existente: reaproveita o alunoTempId já gravado,
-                // para não perder a periodização/histórico deste aluno fictício.
                 try {
                     PlanoResponseDTO planoExistente = planoService.getByPlanoById(UUID.fromString(planId));
+                    log.info("[generatePlan] RAMO 2: plano {} encontrado na BD? {} | alunoTempId existente='{}'",
+                            planId, planoExistente != null,
+                            planoExistente != null ? planoExistente.getAlunoTempId() : null);
                     request.setAlunoTempId(
                             planoExistente != null && planoExistente.getAlunoTempId() != null
                                     ? planoExistente.getAlunoTempId()
                                     : UUID.randomUUID().toString()
                     );
                 } catch (Exception e) {
-                    log.warn("Não foi possível recuperar alunoTempId do plano {} — a gerar um novo.", planId);
+                    log.warn("[generatePlan] RAMO 2: erro a recuperar alunoTempId do plano {} — a gerar um novo.", planId, e);
                     request.setAlunoTempId(UUID.randomUUID().toString());
                 }
             } else {
-                // Plano novo: gera um identificador novo para este aluno fictício.
                 request.setAlunoTempId(UUID.randomUUID().toString());
+                log.info("[generatePlan] RAMO 3: plano novo -> alunoTempId gerado='{}'", request.getAlunoTempId());
             }
+        } else {
+            // request == null: é o caso do botão "ver"
+            log.info("[generatePlan] RAMO 4: SEM BODY (modo leitura) | username='{}' | planId='{}'", username, planId);
         }
-
-        /*  if (request != null && (request.getStudentName() == null || request.getStudentName().isBlank())) {
-            request.setStudentName(username);
-        }*/
 
         log.info("A gerar plano. Aluno com conta? {} | username usado: '{}' | studentName: '{}' | alunoTempId: '{}'",
                 temAlunoComConta, username,
                 request != null ? request.getStudentName() : null,
                 request != null ? request.getAlunoTempId() : null);
 
-        TrainingPlanResponse response = trainingPlanService.getOrGeneratePlan(request, username, planId);
+        // 2) O QUE SAI
+        TrainingPlanResponse response;
+        try {
+            response = trainingPlanService.getOrGeneratePlan(request, username, planId);
+        } catch (Exception e) {
+            log.error("[generatePlan] ERRO no serviço | username='{}' | planId='{}'", username, planId, e);
+            throw e;
+        }
+
+        log.info("[generatePlan] RESULTADO | response {} | {} ms",
+                response == null ? "É NULL" : "OK", System.currentTimeMillis() - inicio);
+
+        if (response == null) {
+            log.warn("[generatePlan] Serviço devolveu NULL (username='{}', planId='{}') -> 404", username, planId);
+            return ResponseEntity.notFound().build();
+        }
 
         return ResponseEntity.ok(response);
     }

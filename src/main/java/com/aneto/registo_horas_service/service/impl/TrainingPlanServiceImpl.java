@@ -25,6 +25,7 @@ import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
+import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import java.time.Instant;
@@ -37,6 +38,15 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+/**
+ * Convenção de logs:
+ *  - DEBUG: diagnóstico detalhado. Desligado por defeito em produção; liga-se/desliga-se
+ *           por logger (Actuator /loggers ou variável de ambiente), sem mexer no código.
+ *  - INFO : fluxo normal (mantidos os originais).
+ *  - WARN / ERROR: falhas reais. Ficam sempre visíveis.
+ *
+ * Não se logam dados de saúde do aluno (perfil corporal, relatório médico).
+ */
 @Service
 @RequiredArgsConstructor
 public class TrainingPlanServiceImpl implements TrainingPlanService {
@@ -59,17 +69,44 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
 
     @Override
     public TrainingPlanResponse getOrGeneratePlan(UserProfileRequest request, String username, String planId) {
+        long inicio = System.currentTimeMillis();
+        log.debug("[getOrGeneratePlan] ENTRADA | username='{}' | planId='{}' | request presente? {} | bucket='{}' | folder='{}'",
+                username, planId, request != null, bucketName, S3FOLDER);
+
         String key = buscarChaveDoPlano(planId, username, request);
         log.info("Chave determinada: {}", key);
 
-        if (isRequestEmpty(request)) {
+        if (!isLinkValido(key)) {
+            log.warn("[getOrGeneratePlan] Chave nula/vazia (planId='{}', username='{}')", planId, username);
+        }
+
+        boolean vazio = isRequestEmpty(request);
+        log.debug("[getOrGeneratePlan] isRequestEmpty={}", vazio);
+
+        if (vazio) {
             log.info("Request vazio. A carregar plano existente do S3...");
-            return loadFromS3(key).orElse(null);
+            Optional<TrainingPlanResponse> loaded = loadFromS3(key);
+
+            if (loaded.isPresent()) {
+                TrainingPlanResponse p = loaded.get();
+                log.debug("[getOrGeneratePlan] Plano carregado | key='{}' | dias={} | {} ms",
+                        key,
+                        p.getPlan() != null ? String.valueOf(p.getPlan().size()) : "plan=NULL",
+                        System.currentTimeMillis() - inicio);
+                return p;
+            }
+
+            // WARN (sempre visível): é este o caso que faz o controller responder 200 sem corpo.
+            log.warn("[getOrGeneratePlan] Plano NÃO carregado do S3 | key='{}' | planId='{}' | username='{}' -> devolve null",
+                    key, planId, username);
+            return null;
         }
 
         log.info("Novo pedido de geração detetado. A verificar histórico para evitar repetição...");
 
         boolean isAlunoSemConta = request.getAlunoTempId() != null && !request.getAlunoTempId().isBlank();
+        log.debug("[getOrGeneratePlan] GERAÇÃO | isAlunoSemConta={} | alunoTempId='{}' | studentUsername='{}'",
+                isAlunoSemConta, request.getAlunoTempId(), request.getStudentUsername());
 
         // 3.1. Busca o plano ativo/concluído anterior — por alunoTempId (aluno sem
         // conta) ou por username (fluxo normal), para evitar misturar históricos
@@ -78,9 +115,18 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
                 ? planoService.findAtivoAndConcluidoByAlunoTempId(request.getAlunoTempId())
                 : planoService.findAtivoAndConcluidoByUsername(username);
 
+        log.debug("[getOrGeneratePlan] Plano anterior ativo/concluído? {} | id={} | link='{}'",
+                planoAnteriorOpt.isPresent(),
+                planoAnteriorOpt.map(PlanoResponseDTO::getId).orElse(null),
+                planoAnteriorOpt.map(PlanoResponseDTO::getLink).orElse(null));
+
         List<String> exerciciosParaEvitar = new java.util.ArrayList<>();
         planoAnteriorOpt.ifPresent(plano -> {
-            loadFromS3(plano.getLink()).ifPresent(oldPlan -> {
+            Optional<TrainingPlanResponse> antigo = loadFromS3(plano.getLink());
+            if (antigo.isEmpty()) {
+                log.warn("[getOrGeneratePlan] Plano anterior sem ficheiro legível no S3 | link='{}'", plano.getLink());
+            }
+            antigo.ifPresent(oldPlan -> {
                 if (oldPlan.getPlan() != null) {
                     List<String> names = oldPlan.getPlan().stream()
                             .flatMap(day -> day.getExercises().stream())
@@ -91,22 +137,29 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
                 }
             });
         });
+        log.debug("[getOrGeneratePlan] Exercícios a evitar: {}", exerciciosParaEvitar.size());
 
         int weekNumber = calcularProximaSemanaCiclo(planoAnteriorOpt, isAlunoSemConta ? request.getAlunoTempId() : username);
         boolean isDeloadWeek = weekNumber % 4 == 0;
         log.info("Identificador {} — semana de ciclo calculada: {} (deload: {})",
                 isAlunoSemConta ? request.getAlunoTempId() : username, weekNumber, isDeloadWeek);
 
+        long inicioIa = System.currentTimeMillis();
         TrainingPlanResponse newPlan = training.generateTrainingPlan(request, exerciciosParaEvitar, weekNumber);
+        log.debug("[getOrGeneratePlan] IA respondeu em {} ms | plano {}",
+                System.currentTimeMillis() - inicioIa, newPlan == null ? "NULL" : "OK");
 
         configurarNovoPlano(newPlan, request);
         salvarDadosDoPlano(username, request, key, newPlan, planId, false, weekNumber, isDeloadWeek);
+        log.debug("[getOrGeneratePlan] Plano guardado | key='{}' | total {} ms", key, System.currentTimeMillis() - inicio);
 
         return newPlan;
     }
 
     @Override
     public void updatePlan(TrainingPlanResponse newPlan, String username, String planId) {
+        log.debug("[updatePlan] ENTRADA | username='{}' | planId='{}'", username, planId);
+
         String key = buscarChaveDoPlano(planId, username, null);
         configurarNovoPlano(newPlan, newPlan.getUserProfile());
 
@@ -119,18 +172,23 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
                     semanaCiclo = existente.getSemanaCiclo();
                     isDeload = existente.isDeload();
                 }
+                log.debug("[updatePlan] Plano existente? {} | semanaCiclo={} | deload={}",
+                        existente != null, semanaCiclo, isDeload);
             } catch (Exception e) {
-                log.warn("Não foi possível recuperar semanaCiclo/deload do plano {} — a usar valores default.", planId);
+                log.warn("Não foi possível recuperar semanaCiclo/deload do plano {} — a usar valores default.", planId, e);
             }
         }
 
         salvarDadosDoPlano(username, newPlan.getUserProfile(), key, newPlan, planId, true, semanaCiclo, isDeload);
+        log.debug("[updatePlan] CONCLUÍDO | key='{}'", key);
     }
 
     // >>> NOVO: associa um plano "sem conta" a uma conta real de aluno
     @Override
     @Transactional
     public void associarPlanoAConta(String planId, String novoUsername) {
+        log.debug("[associarPlanoAConta] planId='{}' novoUsername='{}'", planId, novoUsername);
+
         PlanoResponseDTO plano = planoService.getByPlanoById(UUID.fromString(planId));
         if (plano == null) {
             throw new RuntimeException("Plano não encontrado para o ID: " + planId);
@@ -157,17 +215,22 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
     @Override
     @Transactional
     public void saveProgressLogs(List<TrainingExercise> logs, String username, String planId) {
-        if (logs == null || logs.isEmpty()) return;
+        if (logs == null || logs.isEmpty()) {
+            log.debug("[saveProgressLogs] Lista vazia | username='{}' planId='{}'", username, planId);
+            return;
+        }
+        log.debug("[saveProgressLogs] {} registos | username='{}' planId='{}'", logs.size(), username, planId);
 
-        List<ExerciseHistoryEntity> entities = logs.stream().map(log -> {
+        // (renomeado de 'log' para 'item' para não sombrear o Logger da classe)
+        List<ExerciseHistoryEntity> entities = logs.stream().map(item -> {
             return ExerciseHistoryEntity.builder()
                     .username(username)
                     .planId(planId)
-                    .exerciseName(log.getName())
-                    .muscleGroup(log.getMuscleGroup())
-                    .weight(log.getWeight())
+                    .exerciseName(item.getName())
+                    .muscleGroup(item.getMuscleGroup())
+                    .weight(item.getWeight())
                     .registeredAt(LocalDateTime.now())
-                    .clientDate(log.getDate())
+                    .clientDate(item.getDate())
                     .build();
         }).collect(Collectors.toList());
 
@@ -177,35 +240,50 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
     @Override
     public List<ExerciseHistoryResponse> getProgressLogs(String exerciseName, String username) {
         var entities = exerciseHistoryRepository.findByUsernameAndExerciseNameOrderByRegisteredAtDesc(username, exerciseName);
+        log.debug("[getProgressLogs] exercise='{}' username='{}' -> {} registos", exerciseName, username, entities.size());
         return exerciseHistoryMapper.toResponseList(entities);
     }
 
     @Override
     public Optional<TrainingPlanResponse> loadFromS3(String key) {
+        log.debug("[loadFromS3] bucket='{}' key='{}'", bucketName, key);
         try {
             GetObjectRequest getRequest = GetObjectRequest.builder().bucket(bucketName).key(key).build();
             ResponseInputStream<GetObjectResponse> s3Object = s3Client.getObject(getRequest);
             Instant lastModified = s3Object.response().lastModified();
-            return Optional.of(objectMapper.readValue(s3Object, TrainingPlanResponse.class));
+            log.debug("[loadFromS3] objeto encontrado | lastModified={} | size={} bytes",
+                    lastModified, s3Object.response().contentLength());
+
+            TrainingPlanResponse plan = objectMapper.readValue(s3Object, TrainingPlanResponse.class);
+            log.debug("[loadFromS3] JSON convertido com sucesso | key='{}'", key);
+            return Optional.of(plan);
+        } catch (NoSuchKeyException e) {
+            log.warn("[loadFromS3] Ficheiro NÃO existe | bucket='{}' key='{}'", bucketName, key);
+            return Optional.empty();
         } catch (Exception e) {
+            // ERROR com stack trace, sempre visível: credenciais, região, endpoint, JSON inválido, key nula...
+            log.error("[loadFromS3] ERRO a ler | bucket='{}' key='{}'", bucketName, key, e);
             return Optional.empty();
         }
     }
 
     @Override
     public void saveToS3(String key, TrainingPlanResponse plan) {
+        log.debug("[saveToS3] bucket='{}' key='{}'", bucketName, key);
         try {
             String json = objectMapper.writeValueAsString(plan);
             s3Client.putObject(PutObjectRequest.builder().bucket(bucketName).key(key).build(),
                     RequestBody.fromString(json));
+            log.debug("[saveToS3] guardado | key='{}' | {} chars", key, json.length());
         } catch (Exception e) {
-            log.error("Erro ao salvar no S3", e);
+            log.error("Erro ao salvar no S3 | bucket='{}' key='{}'", bucketName, key, e);
             throw new RuntimeException("Falha ao salvar o plano de treino no S3: " + e.getMessage(), e);
         }
     }
 
     private int calcularProximaSemanaCiclo(Optional<PlanoResponseDTO> planoAnteriorOpt, String identificador) {
         if (planoAnteriorOpt.isEmpty()) {
+            log.debug("[calcularSemanaCiclo] {} sem plano anterior -> semana 1", identificador);
             return 1;
         }
 
@@ -222,6 +300,8 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
         try {
             LocalDate dataReferencia = LocalDate.parse(dataReferenciaStr);
             long diasDesdeUltimoPlano = ChronoUnit.DAYS.between(dataReferencia, LocalDate.now());
+            log.debug("[calcularSemanaCiclo] {} | dataRef={} | dias desde último={} | semanaAnterior={}",
+                    identificador, dataReferencia, diasDesdeUltimoPlano, anterior.getSemanaCiclo());
 
             if (diasDesdeUltimoPlano > DIAS_LIMITE_PARA_REINICIAR_CICLO) {
                 log.info("{} esteve {} dias sem gerar plano novo — a reiniciar ciclo de periodização.",
@@ -239,12 +319,16 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
 
     private String buscarChaveDoPlano(String planId, String username, UserProfileRequest request) {
         log.info("dentro de buscarChaveDoPlano");
+        log.debug("[buscarChave] planId='{}' username='{}' request presente? {}", planId, username, request != null);
+
         if (planId != null && !planId.isBlank()) {
             try {
                 PlanoResponseDTO plano = planoService.getByPlanoById(UUID.fromString(planId));
                 if (plano != null && isLinkValido(plano.getLink())) {
+                    log.debug("[buscarChave] link vindo da BD: '{}'", plano.getLink());
                     return plano.getLink();
                 }
+                log.warn("[buscarChave] Plano {} sem link válido na BD (plano encontrado? {})", planId, plano != null);
             } catch (IllegalArgumentException e) {
                 log.error("ID do plano inválido: {}", planId);
             }
@@ -277,11 +361,22 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
     }
 
     private boolean isRequestEmpty(UserProfileRequest request) {
-        return request == null ||
+        boolean vazio = request == null ||
                 (request.getObjective() == null || request.getObjective().isBlank()) ||
                 request.getWeightKg() == null ||
                 request.getHeightCm() == null ||
                 request.getAge() == null;
+
+        // Só indica QUAIS campos faltam (sem valores), para perceber porque é tratado como "vazio".
+        if (log.isDebugEnabled() && request != null) {
+            log.debug("[isRequestEmpty] vazio={} | objective? {} | weightKg? {} | heightCm? {} | age? {}",
+                    vazio,
+                    request.getObjective() != null && !request.getObjective().isBlank(),
+                    request.getWeightKg() != null,
+                    request.getHeightCm() != null,
+                    request.getAge() != null);
+        }
+        return vazio;
     }
 
     private void configurarNovoPlano(TrainingPlanResponse plan, UserProfileRequest request) {
@@ -294,6 +389,8 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
         PlanoRequestDTO dto;
 
         boolean isAlunoSemConta = request.getAlunoTempId() != null && !request.getAlunoTempId().isBlank();
+        log.debug("[salvarDadosDoPlano] username='{}' | planId='{}' | update={} | isAlunoSemConta={} | semanaCiclo={} | deload={} | key='{}'",
+                username, planId, update, isAlunoSemConta, semanaCiclo, isDeload, key);
 
         if (update) {
             if (isAlunoSemConta) {
@@ -323,11 +420,13 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
                     .contaAssociada(!isAlunoSemConta)
                     .alunoTempId(isAlunoSemConta ? request.getAlunoTempId() : null)
                     .build();
+            log.debug("[salvarDadosDoPlano] CRIAR plano | nomeAluno='{}' | especialista='{}'", nomeNoPlano, especialista);
             planoService.createPlano(dto);
         } else {
             PlanoResponseDTO planoExistente = planoService.getByPlanoById(UUID.fromString(planId));
 
             if (planoExistente == null) {
+                log.error("[salvarDadosDoPlano] Plano não encontrado para o ID: {}", planId);
                 throw new RuntimeException("Plano não encontrado para o ID: " + planId);
             }
 
@@ -347,6 +446,7 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
                     .contaAssociada(planoExistente.isContaAssociada())
                     .alunoTempId(planoExistente.getAlunoTempId())
                     .build();
+            log.debug("[salvarDadosDoPlano] ATUALIZAR plano {} | especialista='{}'", planId, especialistaAtualizado);
             planoService.updatePlano(planId, dto);
         }
 
