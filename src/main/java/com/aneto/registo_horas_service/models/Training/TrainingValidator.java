@@ -3,6 +3,7 @@ package com.aneto.registo_horas_service.models.Training;
 import com.aneto.registo_horas_service.dto.response.PatologiaInferida;
 import com.aneto.registo_horas_service.dto.response.TrainingDay;
 import com.aneto.registo_horas_service.dto.response.TrainingExercise;
+import com.aneto.registo_horas_service.dto.response.TrainingPlanResponse;
 import com.aneto.registo_horas_service.service.ExerciseVideoService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +22,45 @@ public class TrainingValidator {
 
     private final ExerciseVideoService exerciseVideoService;
 
+    // =========================================================================
+    // 1. VALIDAÇÃO RÍGIDA DE SEGURANÇA (MÉDICA & POSTURAL - VISBODY)
+    // =========================================================================
+    public void validarSegurancaLombarEVisbody(TrainingPlanResponse response, String medicalReportText, String reportVisbodyText) {
+        if (response == null || response.getPlan() == null) return;
+
+        String medicoLower = medicalReportText != null ? medicalReportText.toLowerCase() : "";
+        String visbodyLower = reportVisbodyText != null ? reportVisbodyText.toLowerCase() : "";
+
+        boolean temLesaoLombar = medicoLower.contains("lombar") || visbodyLower.contains("anteversão") || visbodyLower.contains("pélvica");
+
+        if (!temLesaoLombar) return;
+
+        // Lista de exercícios com alta compressão ou cisalhamento na coluna lombar
+        List<String> exerciciosProibidosLombar = List.of(
+                "Agachamento Livre", "Levantamento Terra", "Good Morning",
+                "Agachamento Zercher", "Jefferson Curl", "Thruster"
+        );
+
+        for (TrainingDay day : response.getPlan()) {
+            if (day.getExercises() == null) continue;
+            for (TrainingExercise ex : day.getExercises()) {
+                if (ex.getName() == null) continue;
+                for (String proibido : exerciciosProibidosLombar) {
+                    if (ex.getName().equalsIgnoreCase(proibido)) {
+                        log.error("[BLOQUEIO DE SEGURANÇA] Exercício proibido detetado: '{}' em '{}", ex.getName(), day.getDay());
+                        throw new IllegalArgumentException(
+                                "VIOLAÇÃO CRÍTICA DE SEGURANÇA MÉDICA: O exercício '" + ex.getName() +
+                                        "' é estritamente PROIBIDO para alunos com lesão lombar e anteversão pélvica."
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    // =========================================================================
+    // 2. ENRIQUECIMENTO E VALIDAÇÃO INDIVIDUAL DE EXERCÍCIO
+    // =========================================================================
     public TrainingExercise enrichExercise(TrainingExercise ex, Set<String> validNames, String pathologyText) {
         String correctedName = normalizeExerciseName(ex.getName(), validNames);
 
@@ -52,6 +92,9 @@ public class TrainingValidator {
                 .build();
     }
 
+    // =========================================================================
+    // 3. VALIDAÇÃO DE SEQUÊNCIA DE DIAS
+    // =========================================================================
     public void validarSequenciaDias(List<TrainingDay> plan, boolean aplicaFocoGluteoExtremo) {
         String categoriaAnterior = null;
         for (TrainingDay day : plan) {
@@ -80,6 +123,9 @@ public class TrainingValidator {
         return 0;
     }
 
+    // =========================================================================
+    // 4. MAPEAMENTO DE TERMOS MÉDICOS PARA PATOLOGIAS
+    // =========================================================================
     private static final Map<String, String> ACHADOS_MEDICOS_PARA_PATOLOGIA = Map.ofEntries(
             Map.entry("retrolistese", "Lesão Lombar"),
             Map.entry("discopatia", "Lesão Lombar"),
@@ -112,12 +158,10 @@ public class TrainingValidator {
             Map.entry("tunel carpico", "Lesão Punho")
     );
 
-
     public PatologiaInferida inferirPatologiaDoRelatorio(String medicalReportText) {
         if (medicalReportText == null || medicalReportText.isBlank()) return null;
         String lower = medicalReportText.toLowerCase();
 
-        // Agrupa os termos encontrados por categoria, preservando a ordem de deteção
         LinkedHashMap<String, List<String>> categoriaParaTermos = new LinkedHashMap<>();
         for (Map.Entry<String, String> entry : ACHADOS_MEDICOS_PARA_PATOLOGIA.entrySet()) {
             if (lower.contains(entry.getKey())) {

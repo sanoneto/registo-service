@@ -11,6 +11,8 @@ import com.aneto.registo_horas_service.service.PlanoService;
 import com.aneto.registo_horas_service.service.TrainingPlanService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -32,13 +34,12 @@ public class TrainingController {
     private final TrainingPlanService trainingPlanService;
     private final PlanoService planoService;
     private static final String X_USER_ID = "X-User-Id";
-    private final MedicalReportExtractionService medicalReportExtractionService;
+
+    private final MedicalReportExtractionService medicalReportExtractionServiceImpl;
+    private final MedicalReportExtractionService reportReportVisbodyServiceImpl;
+
 
     // CORRIGIDO: tipo de retorno passou de ResponseEntity<TrainingPlanResponse> para
-    // ResponseEntity<?>, porque este endpoint agora pode devolver duas formas diferentes:
-    //  - TrainingPlanResponse (200) no caminho de leitura, exatamente como antes;
-    //  - PlanoResponseDTO (202) no caminho de geração nova, com o plano ainda A_PROCESSAR.
-    // O frontend precisa de ser atualizado para distinguir pelo HTTP status (200 vs 202),
     // não pelo formato do corpo.
     @PostMapping("/plan")
     @PreAuthorize("hasRole('ADMIN') or hasRole('ESPECIALISTA') or (hasRole('ESTAGIARIO') or hasRole('USER') and #username == authentication.name)")
@@ -158,13 +159,28 @@ public class TrainingController {
         return ResponseEntity.ok(status);
     }
 
+    @PostMapping(value = "/visualbody-report", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Map<String, String>> extractVisualBOdyReport(
+            @RequestPart("file") MultipartFile file) {
+        try {
+            String text = reportReportVisbodyServiceImpl.extractText(file);
+            return ResponseEntity.ok(Map.of("visualBodyReportText", text));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            log.error("Erro ao extrair visual body : {}", e.getMessage());
+            return ResponseEntity.status(500).body(Map.of("error", "Falha ao processar o ficheiro."));
+        }
+    }
+
     @PostMapping(value = "/medical-report", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Map<String, String>> extractMedicalReport(
             @RequestPart("file") MultipartFile file) {
 
         try {
-            String text = medicalReportExtractionService.extractText(file);
+            String text = medicalReportExtractionServiceImpl.extractText(file);
             return ResponseEntity.ok(Map.of("medicalReportText", text));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));

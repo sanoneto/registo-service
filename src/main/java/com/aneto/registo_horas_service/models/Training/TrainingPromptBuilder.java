@@ -4,6 +4,7 @@ import com.aneto.registo_horas_service.dto.request.UserProfileRequest;
 import com.aneto.registo_horas_service.dto.response.Macros;
 import com.aneto.registo_horas_service.dto.response.MealSuggestion;
 import com.aneto.registo_horas_service.models.Enum;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -19,13 +20,6 @@ import static com.aneto.registo_horas_service.models.Training.TrainingUtils.*;
 
 public class TrainingPromptBuilder {
 
-    // CORRIGIDO: novo parâmetro "aplicaFocoGluteoExtremo" no final da assinatura.
-    // Antes, este método RECALCULAVA a flag internamente com
-    // protocoloTemMetodologiaPropria(String.valueOf(protocol)), usando um input
-    // diferente do que era usado em Training.java (String.valueOf(enum) vs id
-    // minúsculo). Isso causava divergência entre o que o prompt dizia à IA e o
-    // que o validator esperava. Agora a flag é calculada uma única vez em
-    // Training.java e passada como parâmetro, garantindo consistência.
     public String buildUserPrompt(UserProfileRequest userRequest,
                                   int weekNumber,
                                   boolean isDeloadWeek,
@@ -40,7 +34,6 @@ public class TrainingPromptBuilder {
                                   boolean aplicaFocoGluteoExtremo) {
 
         int dias = userRequest.getFrequencyPerWeek();
-        String exerciseHistoryText = sanitizarExerciseHistory(userRequest.getExerciseHistory());
         String objectiveText = defaultIfEmpty(userRequest.getObjective(), "Manutenção de saúde e bem-estar");
         String locationText = defaultIfEmpty(userRequest.getLocation(), "Não especificada");
         String bodyTypeText = (userRequest.getBodyType() != null) ? userRequest.getBodyType().name() : "ECTOMORPH";
@@ -52,12 +45,21 @@ public class TrainingPromptBuilder {
         Enum.TrainingProtocol protocol = Enum.TrainingProtocol.fromId(protocolId);
 
         boolean isGluteFocus = objectiveText.toLowerCase().contains("glúteo") || objectiveText.toLowerCase().contains("gluteo");
-        // CORRIGIDO: linha "boolean aplicaFocoGluteoExtremo = isGluteFocus && protocoloTemMetodologiaPropria(...)"
-        // foi REMOVIDA. O valor agora vem do parâmetro do método (calculado uma única vez em Training.java).
         boolean isSedentary = "sedentary".equalsIgnoreCase(userRequest.getExerciseHistory());
 
         String tempoNASM = protocolId.contains("estabilização") ? "4-2-1" : "2-0-2";
         String listaParaEvitar = (exerciciosDoS3 == null || exerciciosDoS3.isEmpty()) ? "Nenhum (Primeiro plano do aluno)" : String.join(", ", exerciciosDoS3);
+
+        String protocoloEfetivo = isSedentary ? "Adaptação Anatómica (Baixa Intensidade)" : (isDeloadWeek ? "Deload (Redução Programada de Carga - Semana " + weekNumber + ")" : protocol.getLabel());
+        String repsEfetivas = isSedentary ? "12 a 15 (longe da falha)" : protocol.getReps();
+        String setsEfetivas = (isSedentary || isDeloadWeek) ? "2" : protocol.getSets();
+        String descansoEfetivo = isDeloadWeek ? calcularDescansoDeload(protocol, objectiveText, weightKg) : calcularDescansoCientifico(objectiveText, weightKg);
+
+        // Declaradas todas as variáveis necessárias antes do Stream
+        String diretrizPrioridade = buildDiretrizPrioridadeRelatorios(userRequest.getMedicalReportText(), userRequest.getReportVisbobyText());
+        String diretrizPrescricaoVisbody = buildDiretrizPrescricaoVisbody(userRequest.getReportVisbobyText());
+        String diretrizAjusteMetabolico = buildDiretrizAjusteMetabolicoVisbody(userRequest.getReportVisbobyText());
+        String diretrizPistasMentais = buildDiretrizPistasMentais(userRequest.getReportVisbobyText());
 
         String diretrizFocoEspecial = buildDiretrizFocoEspecial(aplicaFocoGluteoExtremo, isGluteFocus, protocol, exerciseDictionaryComSub);
         String diretrizVariedade = """
@@ -68,27 +70,16 @@ public class TrainingPromptBuilder {
                 - RITMO OBRIGATÓRIO: O campo 'tempo' no JSON deve ser rigorosamente '%s'.
                 """.formatted(listaParaEvitar, tempoNASM);
 
-        String protocoloEfetivo = isSedentary ? "Adaptação Anatómica (Baixa Intensidade)" : (isDeloadWeek ? "Deload (Redução Programada de Carga - Semana " + weekNumber + ")" : protocol.getLabel());
-        String repsEfetivas = isSedentary ? "12 a 15 (longe da falha)" : protocol.getReps();
-        String setsEfetivas = (isSedentary || isDeloadWeek) ? "2" : protocol.getSets();
-        String descansoEfetivo = isDeloadWeek ? calcularDescansoDeload(protocol, objectiveText, weightKg) : calcularDescansoCientifico(objectiveText, weightKg);
-
+        String diretrizProtocolo = "DIRETRIZES TÉCNICAS E FISIOLÓGICAS (%s):\n- Séries: %s | Repetições: %s\n- DESCANSO CIENTÍFICO: %s segundos fixos.\n- RITMO (Tempo): %s\n".formatted(protocoloEfetivo, setsEfetivas, repsEfetivas, descansoEfetivo, protocol.getTempo());
         String diretrizSegurancaIniciante = isSedentary ? "[ALERTA DE SEGURANÇA: ALUNO SEDENTÁRIO]\n- O aluno nunca treinou. É TERMINANTEMENTE PROIBIDO levar à falha concêntrica.\n- Prioridade: Estabilidade hemodinâmica. Não usar superséries.\n" : "";
         String diretrizPeriodizacao = isDeloadWeek ? "[SEMANA DE DELOAD - RECUPERAÇÃO PROGRAMADA (Semana %d do ciclo)]\n- VOLUME: gera EXATAMENTE %d exercícios por dia.\n- INTENSIDADE: RPE máximo 5-6 em todas as séries.\n".formatted(weekNumber, volumeIdeal) : "";
 
-        String detalhesEquipamento = locationText.equalsIgnoreCase("Casa") ? "UTILIZA APENAS: 'Peso Corporal', 'Halteres' ou 'Bandas Elásticas'." : "UTILIZA: 'Máquinas', 'Barras', 'Polias' ou 'Halteres'.";
-        String filtroEquipamento = isSedentary ? "PREFERÊNCIA OBRIGATÓRIA: Máquinas guiadas para maior controlo motor e segurança." : detalhesEquipamento;
-
-        String diretrizProtocolo = "DIRETRIZES TÉCNICAS E FISIOLÓGICAS (%s):\n- Séries: %s | Repetições: %s\n- DESCANSO CIENTÍFICO: %s segundos fixos.\n- RITMO (Tempo): %s\n".formatted(protocoloEfetivo, setsEfetivas, repsEfetivas, descansoEfetivo, protocol.getTempo());
-
-        // CORRIGIDO: protocol.getSuggestedExercises() é uma lista fixa por protocolo
         Set<String> nomesJaRealizados = (exerciciosDoS3 == null) ? Set.of() : new HashSet<>(exerciciosDoS3);
         String repertorioFiltrado = filtrarRepertorioSugerido(protocol.getSuggestedExercises(), nomesJaRealizados);
         String diretrizBiomecanica = "DIRETRIZES DE SELEÇÃO BIOMECÂNICA ESTREITAS:\n1. REPERTÓRIO: %s.\n2. PROIBIDOS: %s.\n3. ADAPTAÇÃO: Patologia \"%s\".\n".formatted(repertorioFiltrado, protocol.getForbiddenExercises(), pathologyText);
 
         String diretrizAquecimento = buildDiretrizAquecimento(pathologyEspecifica, pathologyText);
 
-        // CORRIGIDO: a sequência de dias era calculada duas vezes de forma independente
         List<String> sequenciaDias = gerarSequenciaDivisao(userRequest.getFrequencyPerWeek(), isGluteFocus, aplicaFocoGluteoExtremo);
         boolean temDiaDeCore = sequenciaDias.stream()
                 .map(dia -> dia.split(":", 2)[0].trim())
@@ -101,50 +92,31 @@ public class TrainingPromptBuilder {
         String diretrizFinalizador = permiteFinalizador ? "[FINALIZADOR METABÓLICO/ANAERÓBIO]\n- Adiciona UM exercício FINAL de condicionamento metabólico em cada dia, na categoria FINALIZADOR.\n" : "";
 
         String diretrizNomenclaturaDias = buildDiretrizNomenclaturaDias(userRequest, sequenciaDias);
-
-        // CORRIGIDO: diretrizCardioCore era sempre incluída no prompt, mesmo em planos
         String diretrizCardioCore = temDiaDeCore ? buildDiretrizCardioCore(volumeIdeal) : "";
         String diretrizDicionario = buildDiretrizDicionario(exerciseDictionary);
+
         String diretrizRelatorioMedico = buildDiretrizRelatorioMedico(userRequest.getMedicalReportText(), pathologyText);
+        String diretrizRelatorioVisbody = buildDiretrizRelatorioVisbody(userRequest.getReportVisbobyText());
 
         String blocoDiretrizesCompletas = Stream.of(
+                        diretrizPrioridade,
+                        diretrizPrescricaoVisbody,
+                        diretrizAjusteMetabolico,
+                        diretrizPistasMentais,
                         diretrizFocoEspecial, diretrizVariedade, diretrizAquecimento,
                         diretrizSegurancaIniciante, diretrizProtocolo, diretrizBiomecanica,
                         diretrizTreino, diretrizFinalizador, diretrizPeriodizacao,
                         diretrizNomenclaturaDias, diretrizCardioCore, diretrizDicionario,
-                        diretrizAlimentar, diretrizRelatorioMedico
+                        diretrizAlimentar, diretrizRelatorioMedico, diretrizRelatorioVisbody
                 )
                 .filter(s -> s != null && !s.isBlank())
                 .collect(Collectors.joining("\n"));
 
-        // 1. Regras Críticas de Fechamento com o número de dias explícito
         String regrasFinais = "REGRAS CRÍTICAS DE FECHAMENTO:\n1. FREQUÊNCIA COMPLETA OBRIGATÓRIA: Gera exatamente %d objetos dentro do array 'plan' (Dia 1 até Dia %d).\n2. DURAÇÃO: O treino deve durar %d minutos. Gera EXATAMENTE %d exercícios por dia.\n3. RITMO E DESCANSO: Ritmo %s e Descanso %s segundos.\n4. TOTAIS DIETA: %d kcal, %dg Prot, %dg Carbs, %dg Fats.\n"
                 .formatted(dias, dias, totalMinutos, volumeIdeal, protocol.getTempo(), descansoEfetivo, macros.dailyCalories(), macros.protein(), macros.carbs(), macros.fats());
 
-        // 2. Construção dinâmica da lista de dias para o JSON de exemplo
-        StringBuilder jsonDaysExample = new StringBuilder();
-        for (int i = 1; i <= dias; i++) {
-            jsonDaysExample.append(String.format("""
-                    {
-                    "day": "Dia %d - [CATEGORIA]: [FOCO]",
-                    "exercises": [
-                        {
-                        "order": 1, "name": "...",
-                        "muscleGroup": "...", "movementPlane": "...", "equipment": "...",
-                        "tempo": "%s", "sets": "3", "reps": "15", "rest": "%s",
-                        "weight": "0kg", "cargaAtual": "...", "videoUrl": "",
-                        "details": "Instrução técnica biomecânica.", "notas": "Pista Mental.", "date": "Data"
-                        }
-                      ]
-                    }%s""", i, protocol.getTempo(), descansoEfetivo, (i < dias ? ",\n    " : "")));
-        }
+        StringBuilder jsonDaysExample = getStringBuilder(dias, protocol, descansoEfetivo);
 
-        // CORRIGIDO: trocado .formatted(args) por String.format(Locale.US, template, args).
-        // .formatted() usa Locale.getDefault() da JVM; se o servidor correr com locale
-        // português, "%.2f" produz vírgula decimal (ex.: "25,70") em vez de ponto
-        // ("25.70"), o que quebra o JSON de exemplo dentro do próprio prompt — e pode
-        // levar a IA a repetir o mesmo erro na resposta real. Locale.US garante ponto
-        // decimal sempre, independentemente da configuração do servidor.
         String template = """
                 ATUAÇÃO: Personal Trainer e Nutricionista Profissional (Portugal).
                 PERFIL: %d anos, %s, %s, %.2fkg. Objetivo: %s. Patologias: %s.
@@ -174,6 +146,89 @@ public class TrainingPromptBuilder {
         );
     }
 
+    @NotNull
+    private static StringBuilder getStringBuilder(int dias, Enum.TrainingProtocol protocol, String descansoEfetivo) {
+        StringBuilder jsonDaysExample = new StringBuilder();
+        for (int i = 1; i <= dias; i++) {
+            jsonDaysExample.append(String.format("""
+                    {
+                    "day": "Dia %d - [CATEGORIA]: [FOCO]",
+                    "exercises": [
+                        {
+                        "order": 1, "name": "...",
+                        "muscleGroup": "...", "movementPlane": "...", "equipment": "...",
+                        "tempo": "%s", "sets": "3", "reps": "15", "rest": "%s",
+                        "weight": "0kg", "cargaAtual": "...", "videoUrl": "",
+                        "details": "Instrução técnica biomecânica ajustada à postura do VisBody.", "notas": "Pista mental e proteção lombar/articular.", "date": "Data"
+                        }
+                      ]
+                    }%s""", i, protocol.getTempo(), descansoEfetivo, (i < dias ? ",\n    " : "")));
+        }
+        return jsonDaysExample;
+    }
+
+    private String buildDiretrizPrioridadeRelatorios(String medicalReportText, String reportVisbobyText) {
+        boolean temMedico = medicalReportText != null && !medicalReportText.isBlank();
+        boolean temVisbody = reportVisbobyText != null && !reportVisbobyText.isBlank();
+
+        if (!temMedico && !temVisbody) return "";
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("\n=========================================================\n");
+        sb.append("⚠️ HIERARQUIA CRÍTICA DE INTERVENÇÃO (MÉDICA & VISBODY) ⚠️\n");
+        sb.append("OS RELATÓRIOS ANEXADOS PREVALECEM SOBRE QUAISQUER OUTROS OBJETIVOS ESTÉTICOS.\n");
+
+        if (temMedico) {
+            sb.append("1. SEGURANÇA LOMBAR: Lesão crónica confirmada no atestado médico. Proibido compressão axial e flexão/extensão lombar sob carga.\n");
+        }
+        if (temVisbody) {
+            sb.append("2. COMPOSIÇÃO CORPORAL & REABILITAÇÃO POSTURAL:\n");
+            sb.append("   - Perfil sarcopénico / 'falso magro' (alta gordura, baixa MME): Priorizar hipertrofia metabólica e recomposição sem levar à falha.\n");
+            sb.append("   - Atacar ativamente a anteversão pélvica e a protração dos ombros identificadas no scanner.\n");
+        }
+        sb.append("=========================================================\n");
+
+        return sb.toString();
+    }
+
+    private String buildDiretrizPrescricaoVisbody(String reportVisbobyText) {
+        if (reportVisbobyText == null || reportVisbobyText.isBlank()) return "";
+
+        return """
+            [DIRETRIZES TÉCNICAS DERIVADAS DO SCANNER VISBODY]
+            1. CORREÇÃO LOMBO-PÉLVICA (ANTEVERSÃO PÉLVICA DETETADA):
+               - Proibido qualquer carga axial direta na coluna (ex: Agachamento Livre/Barra nas costas).
+               - OBRIGATÓRIO incluir exercícios de ativação do Glúteo Máximo e Transverso do Abdómen no dia LOWER.
+            2. CORREÇÃO DA CINTURA ESCAPULAR E CERVICAL (PROTRAÇÃO DE OMBROS E CABEÇA PROJETADA):
+               - No dia UPPER, priorizar a proporção 2:1 de Puxadas/Remadas (Cadeia Posterior) em relação aos exercícios de Peito (Cadeia Anterior).
+               - Foco obrigatório em retratores da escápula (Rombóides e Trapézio Inferior) e rotadores externos (ex: Wall Slide, Face Pull, Rotação Externa).
+            3. ADAPTAÇÃO JOELHO ESQUERDO (HIPEREXTENSÃO DETETADA):
+               - Instrução obrigatória nas 'notas/details': "Manter um ligeiro flexo funcional (evitar o bloqueio/semiflexão do joelho no final do movimento)".
+            """;
+    }
+
+    private String buildDiretrizAjusteMetabolicoVisbody(String reportVisbobyText) {
+        if (reportVisbobyText == null || reportVisbobyText.isBlank()) return "";
+
+        return """
+            [SISTEMA DE PRESCRIÇÃO NUTRICIONAL DO VISBODY]
+            - A aluna apresenta BMR reduzido e perfil de baixa Massa Muscular Esquelética.
+            - A distribuição de macronutrientes do JSON de resposta DEVE priorizar o aporte proteico (mínimo 2.0g/kg a 2.2g/kg) para estimular a síntese proteica sem ultrapassar o gasto calórico total.
+            - Não prescrever défices calóricos agressivos; focar em RECOMPOSIÇÃO CORPORAL.
+            """;
+    }
+
+    private String buildDiretrizPistasMentais(String reportVisbobyText) {
+        if (reportVisbobyText == null || reportVisbobyText.isBlank()) return "";
+
+        return """
+            [REQUISITO CRÍTICO NOS CAMPOS 'details' E 'notas' DO JSON]
+            - Para exercícios do dia LOWER, o campo 'notas' DEVE conter explicitamente o aviso: "Manter retroversão pélvica consciente / sem hiperextensão lombar (VisBody: anteversão)".
+            - Para exercícios com membros inferiores, incluir a nota: "Evitar o bloqueio articular completo do joelho esquerdo (VisBody: hiperextensão)".
+            - Para exercícios do dia UPPER, o campo 'details' DEVE incluir: "Foco na depressão e retração escapular (VisBody: ombros enrolados)".
+            """;
+    }
+
     private String buildDiretrizFocoEspecial(boolean aplicaFocoGluteoExtremo, boolean isGluteFocus, Enum.TrainingProtocol protocol, Map<String, Map<String, List<String>>> dictComSub) {
         if (aplicaFocoGluteoExtremo) {
             return """
@@ -188,11 +243,6 @@ public class TrainingPromptBuilder {
     }
 
     private String buildDiretrizAquecimento(boolean pathologyEspecifica, String pathologyText) {
-        // CORRIGIDO: a mensagem antiga instruía "Order 1 deve ser Mobilidade Geral do
-        // dicionário" — mas nenhum exercício do dicionário se chama "Mobilidade Geral".
-        // Isto podia levar a IA a inventar um nome fora do inventário, disparando
-        // RuntimeException em enrichExercise() e consumindo uma tentativa de retry.
-        // Agora aponta explicitamente para a categoria MOBILIDADE real do dicionário.
         return pathologyEspecifica ?
                 "[REGRA OBRIGATÓRIA DE AQUECIMENTO] O aluno TEM patologia (\"%s\"). Order 1 deve ser um exercício da categoria REABILITAÇÃO ou MOBILIDADE do dicionário oficial abaixo, focado nessa área.\n".formatted(pathologyText) :
                 "[REGRA OBRIGATÓRIA DE AQUECIMENTO] Order 1 deve ser um exercício da categoria MOBILIDADE do dicionário oficial abaixo (nunca um nome fora do dicionário).\n";
@@ -230,6 +280,11 @@ public class TrainingPromptBuilder {
         return "[RELATÓRIO MÉDICO ANEXADO]\nPatologia declarada: %s\nConteúdo: %s\n".formatted(pathologyText, medicalReportText);
     }
 
+    private String buildDiretrizRelatorioVisbody(String reportVisbobyText) {
+        if (reportVisbobyText == null || reportVisbobyText.isBlank()) return "";
+        return "[RELATÓRIO VISBODY / AVALIAÇÃO POSTURAL E BIOIMPEDÂNCIA ANEXADO]\nConteúdo: " + reportVisbobyText.trim() + "\n";
+    }
+
     private String buildDiretrizAlimentar(Macros macros) {
         StringBuilder dietTable = new StringBuilder("DIRETRIZES ALIMENTARES:\n");
         for (MealSuggestion m : macros.mealSuggestions()) {
@@ -254,7 +309,6 @@ public class TrainingPromptBuilder {
             };
         }
 
-        // Sequência Padrão sem Foco Específico
         return switch (frequencia) {
             case 1 -> List.of("FULL BODY: Corpo Inteiro");
             case 2 -> List.of("UPPER: Peito, Costas, Ombros e Braços", "LOWER: Quadríceps, Posterior e Glúteos");
