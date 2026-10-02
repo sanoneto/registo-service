@@ -3,6 +3,7 @@ package com.aneto.registo_horas_service.controller;
 import com.aneto.registo_horas_service.dto.request.UserProfileRequest;
 import com.aneto.registo_horas_service.dto.response.ExerciseHistoryResponse;
 import com.aneto.registo_horas_service.dto.response.PlanoResponseDTO;
+import com.aneto.registo_horas_service.dto.response.PlanoStatusResponse;
 import com.aneto.registo_horas_service.dto.response.TrainingExercise;
 import com.aneto.registo_horas_service.dto.response.TrainingPlanResponse;
 import com.aneto.registo_horas_service.service.MedicalReportExtractionService;
@@ -33,16 +34,22 @@ public class TrainingController {
     private static final String X_USER_ID = "X-User-Id";
     private final MedicalReportExtractionService medicalReportExtractionService;
 
+    // CORRIGIDO: tipo de retorno passou de ResponseEntity<TrainingPlanResponse> para
+    // ResponseEntity<?>, porque este endpoint agora pode devolver duas formas diferentes:
+    //  - TrainingPlanResponse (200) no caminho de leitura, exatamente como antes;
+    //  - PlanoResponseDTO (202) no caminho de geração nova, com o plano ainda A_PROCESSAR.
+    // O frontend precisa de ser atualizado para distinguir pelo HTTP status (200 vs 202),
+    // não pelo formato do corpo.
     @PostMapping("/plan")
     @PreAuthorize("hasRole('ADMIN') or hasRole('ESPECIALISTA') or (hasRole('ESTAGIARIO') or hasRole('USER') and #username == authentication.name)")
-    public ResponseEntity<TrainingPlanResponse> generatePlan(
+    public ResponseEntity<?> generatePlan(
             @RequestBody(required = false) UserProfileRequest request,
             @RequestHeader(X_USER_ID) String username,
             @RequestParam(value = "id", required = false) String planId) {
 
         long inicio = System.currentTimeMillis();
 
-        // 1) O QUE CHEGA
+        // 1) O QUE CHEGA (inalterado)
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         log.info("[generatePlan] ENTRADA | header {}='{}' | auth.name='{}' | roles={} | planId='{}' | body presente? {}",
                 X_USER_ID, username,
@@ -95,24 +102,60 @@ public class TrainingController {
                 request != null ? request.getStudentName() : null,
                 request != null ? request.getAlunoTempId() : null);
 
-        // 2) O QUE SAI
-        TrainingPlanResponse response;
+        // NOVO: decide entre caminho de leitura (síncrono, inalterado) e caminho de
+        // geração (agora assíncrono). isPedidoDeGeracaoCompleto reutiliza exatamente a
+        // mesma condição que já decidia isto dentro do serviço — sem duplicar lógica.
+        boolean pedidoDeGeracaoCompleto = request != null && trainingPlanService.isPedidoDeGeracaoCompleto(request);
+
+        if (!pedidoDeGeracaoCompleto) {
+            // 2) CAMINHO DE LEITURA — exatamente como antes, síncrono (já é rápido, só lê do S3).
+            TrainingPlanResponse response;
+            try {
+                response = trainingPlanService.getOrGeneratePlan(request, username, planId);
+            } catch (Exception e) {
+                log.error("[generatePlan] ERRO no serviço | username='{}' | planId='{}'", username, planId, e);
+                throw e;
+            }
+
+            log.info("[generatePlan] RESULTADO | response {} | {} ms",
+                    response == null ? "É NULL" : "OK", System.currentTimeMillis() - inicio);
+
+            if (response == null) {
+                log.warn("[generatePlan] Serviço devolveu NULL (username='{}', planId='{}') -> 404", username, planId);
+                return ResponseEntity.notFound().build();
+            }
+
+            return ResponseEntity.ok(response);
+        }
+
+        // NOVO: CAMINHO DE GERAÇÃO — assíncrono. Regista o plano em A_PROCESSAR, dispara a
+        // geração em background e devolve de imediato (HTTP 202), em vez de bloquear o
+        // pedido HTTP pelos ~1-2 minutos que a geração + retries podem levar (ver
+        // AsyncRequestNotUsableException / Broken pipe observado em produção).
+        PlanoResponseDTO planoIniciado;
         try {
-            response = trainingPlanService.getOrGeneratePlan(request, username, planId);
+            planoIniciado = trainingPlanService.iniciarGeracaoAssincrona(request, username, planId);
         } catch (Exception e) {
-            log.error("[generatePlan] ERRO no serviço | username='{}' | planId='{}'", username, planId, e);
+            log.error("[generatePlan] ERRO ao iniciar geração assíncrona | username='{}' | planId='{}'", username, planId, e);
             throw e;
         }
 
-        log.info("[generatePlan] RESULTADO | response {} | {} ms",
-                response == null ? "É NULL" : "OK", System.currentTimeMillis() - inicio);
+        log.info("[generatePlan] Geração assíncrona iniciada | planId='{}' | {} ms",
+                planoIniciado.getId(), System.currentTimeMillis() - inicio);
 
-        if (response == null) {
-            log.warn("[generatePlan] Serviço devolveu NULL (username='{}', planId='{}') -> 404", username, planId);
+        return ResponseEntity.accepted().body(planoIniciado);
+    }
+
+    // NOVO: endpoint de polling. O frontend chama isto de poucos em poucos segundos
+    // depois de receber o 202 de /plan, até ver estadoPedido = "FINALIZADO" (ou "ERRO").
+    @GetMapping("/plan/{planId}/status")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<PlanoStatusResponse> getPlanStatus(@PathVariable String planId) {
+        PlanoStatusResponse status = trainingPlanService.getStatusDoPlano(planId);
+        if (status == null) {
             return ResponseEntity.notFound().build();
         }
-
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(status);
     }
 
     @PostMapping(value = "/medical-report", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

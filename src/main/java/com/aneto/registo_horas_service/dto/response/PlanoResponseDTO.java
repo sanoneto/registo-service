@@ -29,4 +29,9 @@ public class PlanoResponseDTO implements Serializable {
 
     private boolean contaAssociada;
     private String alunoTempId;
+
+    // >>> NOVO (fluxo assíncrono): espelha PlanoRequestDTO.erroMensagem, para o
+    // endpoint de status (GET /plan/{planId}/status) poder devolver a causa da
+    // falha ao cliente quando estadoPedido = "ERRO".
+    private String erroMensagem;
 }

@@ -69,16 +69,6 @@ public class Training {
         Map<String, Map<String, List<String>>> exerciseDictionaryComSub = carregarDicionarioComSubcategoria(exerciseDictionary);
 
         // CORRIGIDO: aplicaFocoGluteoExtremo passou a ser calculada UMA ÚNICA VEZ,
-        // aqui, com base apenas no objetivo do aluno (isGluteFocus). Deixou de
-        // depender de protocoloTemMetodologiaPropria(userRequest.getProtocol()),
-        // que recalculava a mesma decisão de forma divergente em
-        // TrainingPromptBuilder (usando String.valueOf(protocol) em vez do id),
-        // causando resultados opostos consoante o ponto de cálculo.
-        //
-        // Justificação de negócio: o objetivo declarado pelo aluno ("quero foco
-        // em glúteos") deve prevalecer independentemente do protocolo de
-        // treino atribuído (NASM, FST7, etc.) — protocolo controla intensidade
-        // e ritmo, não a divisão de grupos musculares.
         boolean isGluteFocus = objectiveText.toLowerCase().contains("glúteo") || objectiveText.toLowerCase().contains("gluteo");
         boolean aplicaFocoGluteoExtremo = isGluteFocus;
 
