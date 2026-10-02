@@ -95,6 +95,9 @@ public class TrainingPromptBuilder {
         String diretrizCardioCore = temDiaDeCore ? buildDiretrizCardioCore(volumeIdeal) : "";
         String diretrizDicionario = buildDiretrizDicionario(exerciseDictionary);
 
+        // 1. DECLARAR A NOVA DIRETRIZ DO RÁCIO POSTURAL
+        String diretrizRacioVolumePostural = buildDiretrizRacioVolumePostural(userRequest.getReportVisbobyText());
+
         String diretrizRelatorioMedico = buildDiretrizRelatorioMedico(userRequest.getMedicalReportText(), pathologyText);
         String diretrizRelatorioVisbody = buildDiretrizRelatorioVisbody(userRequest.getReportVisbobyText());
 
@@ -103,6 +106,7 @@ public class TrainingPromptBuilder {
                         diretrizPrescricaoVisbody,
                         diretrizAjusteMetabolico,
                         diretrizPistasMentais,
+                        diretrizRacioVolumePostural,
                         diretrizFocoEspecial, diretrizVariedade, diretrizAquecimento,
                         diretrizSegurancaIniciante, diretrizProtocolo, diretrizBiomecanica,
                         diretrizTreino, diretrizFinalizador, diretrizPeriodizacao,
@@ -165,6 +169,16 @@ public class TrainingPromptBuilder {
                     }%s""", i, protocol.getTempo(), descansoEfetivo, (i < dias ? ",\n    " : "")));
         }
         return jsonDaysExample;
+    }
+    private String buildDiretrizRacioVolumePostural(String reportVisbobyText) {
+        if (reportVisbobyText == null || reportVisbobyText.isBlank()) return "";
+
+        return """
+        [REGRA DE PROPORÇÃO DE VOLUME POSTURAL (RÁCIO 2:1)]
+        - Devido à protração de ombros e cabeça anteriorizada detetadas no VisBody:
+          * No dia UPPER, é OBRIGATÓRIO prescrever EXATAMENTE o dobro de exercícios para a CADEIA POSTIOR (Costas, Trapézio Médio/Inferior e Deltóide Posterior) em relação aos exercícios de Peito.
+          * Exemplo para 6 exercícios no dia UPPER: 3 de Costas/Escápula, 1 de Peito, 1 de Ombro Posterior/Lateral, 1 de Braços.
+        """;
     }
 
     private String buildDiretrizPrioridadeRelatorios(String medicalReportText, String reportVisbobyText) {
@@ -282,9 +296,15 @@ public class TrainingPromptBuilder {
 
     private String buildDiretrizRelatorioVisbody(String reportVisbobyText) {
         if (reportVisbobyText == null || reportVisbobyText.isBlank()) return "";
-        return "[RELATÓRIO VISBODY / AVALIAÇÃO POSTURAL E BIOIMPEDÂNCIA ANEXADO]\nConteúdo: " + reportVisbobyText.trim() + "\n";
-    }
 
+        // Remove marcadores de código markdown (```json e ```) para enviar texto limpo à LLM
+        String limpo = reportVisbobyText
+                .replaceAll("(?s)```json\\s*", "")
+                .replaceAll("(?s)```\\s*", "")
+                .trim();
+
+        return "\n[RELATÓRIO VISBODY / AVALIAÇÃO POSTURAL E BIOIMPEDÂNCIA ANEXADO]\nConteúdo:\n" + limpo + "\n";
+    }
     private String buildDiretrizAlimentar(Macros macros) {
         StringBuilder dietTable = new StringBuilder("DIRETRIZES ALIMENTARES:\n");
         for (MealSuggestion m : macros.mealSuggestions()) {

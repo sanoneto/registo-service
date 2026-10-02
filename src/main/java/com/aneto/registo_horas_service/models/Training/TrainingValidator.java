@@ -180,4 +180,38 @@ public class TrainingValidator {
 
         return new PatologiaInferida(categoriasJuntas, todosTermos);
     }
+
+    // =========================================================================
+    // odes adicionar uma verificação programática no Java para garantir que a IA cumpriu a regra do rácio postural no dia UPPER.
+    // Se a IA gerar mais exercícios de Peito do que de Costas para um utente com protração de ombros, o Java deteta e força um
+    // =========================================================================
+
+    public void validarProporcaoUpperVisbody(TrainingPlanResponse response, String reportVisbodyText) {
+        if (response == null || response.getPlan() == null || reportVisbodyText == null) return;
+
+        boolean temProtracaoOmbros = reportVisbodyText.toLowerCase().contains("protração")
+                || reportVisbodyText.toLowerCase().contains("enrolados");
+
+        if (!temProtracaoOmbros) return;
+
+        for (TrainingDay day : response.getPlan()) {
+            if (day.getDay() != null && day.getDay().toUpperCase().contains("UPPER")) {
+                long exPeito = day.getExercises().stream()
+                        .filter(e -> e.getMuscleGroup() != null && e.getMuscleGroup().equalsIgnoreCase("Peito"))
+                        .count();
+
+                long exCostas = day.getExercises().stream()
+                        .filter(e -> e.getMuscleGroup() != null && (e.getMuscleGroup().equalsIgnoreCase("Costas") || e.getMuscleGroup().equalsIgnoreCase("Ombros")))
+                        .count();
+
+                if (exPeito > exCostas) {
+                    log.warn("[BLOQUEIO POSTURAL] O dia UPPER contem {} exercicios de Peito e apenas {} de Costas/Ombros para utente com ombros enrolados.", exPeito, exCostas);
+                    throw new IllegalArgumentException(
+                            "VIOLAÇÃO DE CORREÇÃO POSTURAL: Utente apresenta ombros enrolados no VisBody. " +
+                                    "O número de exercícios de Costas/Cadeia Posterior (" + exCostas + ") deve ser superior ao de Peito (" + exPeito + ")."
+                    );
+                }
+            }
+        }
+    }
 }

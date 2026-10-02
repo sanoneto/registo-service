@@ -17,19 +17,36 @@ public class MacroCalculator {
     private static final double PESO_MIN_KG = 20.0;
     private static final double PESO_MAX_KG = 400.0;
 
+    // Sobrecarga para manter compatibilidade com chamadas sem BMR do Visbody
     public static Macros calculate(double weight, double height, int age, String gender, String bodyType, Double bodyFat, int mealsPerDay) {
+        return calculate(weight, height, age, gender, bodyType, bodyFat, mealsPerDay, null);
+    }
+
+    // Método principal com suporte ao BMR real do VisBody
+    public static Macros calculate(double weight, double height, int age, String gender, String bodyType, Double bodyFat, int mealsPerDay, Double visbodyBmrKcal) {
         // 1. Sanitização e normalização de unidades
         weight = sanitizeWeight(weight);
         height = sanitizeHeightCm(height);
 
         String typeKey = (bodyType == null) ? "MESOMORFO" : bodyType.toUpperCase();
 
-        // 2. TMB e Fórmulas
-        boolean usedKatch = (bodyFat != null && bodyFat > 0);
-        double tmb = calculateTMB(weight, height, age, gender, bodyFat, usedKatch);
-        String formulaDescription = usedKatch
-                ? "Katch-McArdle (Alta Precisão: Baseado em Massa Magra)"
-                : "Mifflin-St Jeor (Padrão Biométrico)";
+        // 2. TMB e Fórmulas (Prioridade ao VisBody se disponível)
+        boolean usadoVisbody = (visbodyBmrKcal != null && visbodyBmrKcal > 500.0);
+        boolean usedKatch = !usadoVisbody && (bodyFat != null && bodyFat > 0);
+
+        double tmb;
+        String formulaDescription;
+
+        if (usadoVisbody) {
+            tmb = visbodyBmrKcal;
+            formulaDescription = "Bioimpedância VisBody (Precisão Clínica)";
+        } else if (usedKatch) {
+            tmb = calculateTMB(weight, height, age, gender, bodyFat, true);
+            formulaDescription = "Katch-McArdle (Alta Precisão: Baseado em Massa Magra)";
+        } else {
+            tmb = calculateTMB(weight, height, age, gender, bodyFat, false);
+            formulaDescription = "Mifflin-St Jeor (Padrão Biométrico)";
+        }
 
         // 3. Calorias Totais
         int dailyCalories = getDailyCalories(typeKey, tmb);
@@ -79,8 +96,6 @@ public class MacroCalculator {
 
     /**
      * Normaliza o peso recebido, corrigindo valores fora de gama razoável.
-     * Não faz conversão de unidades (kg é a única unidade suportada) — apenas
-     * aplica um valor de fallback caso o dado seja inválido ou absurdo.
      */
     private static double sanitizeWeight(double weight) {
         if (weight <= 0 || weight < PESO_MIN_KG || weight > PESO_MAX_KG) {
@@ -90,17 +105,13 @@ public class MacroCalculator {
     }
 
     /**
-     * Normaliza a altura recebida. Deteta o erro comum de a altura vir em METROS
-     * (ex: 1.75) em vez de CENTÍMETROS (ex: 175), e corrige automaticamente
-     * multiplicando por 100 nesse caso. Se, mesmo assim, o valor ficar fora
-     * de uma gama humana plausível, usa um fallback seguro.
+     * Normaliza a altura recebida, corrigindo conversões de metros para cm.
      */
     private static double sanitizeHeightCm(double heightCm) {
         if (heightCm <= 0) {
             return 170.0;
         }
 
-        // Erro típico: altura enviada em metros (ex: 1.75) em vez de cm (175)
         if (heightCm < 3.0) {
             heightCm = heightCm * 100;
         }
@@ -164,7 +175,6 @@ public class MacroCalculator {
         if (heightCm <= 0) return 0;
         double heightM = heightCm / 100;
         double imc = weight / (heightM * heightM);
-        // Arredonda a 1 casa decimal para evitar ruído de precisão double
         return Math.round(imc * 10.0) / 10.0;
     }
 
