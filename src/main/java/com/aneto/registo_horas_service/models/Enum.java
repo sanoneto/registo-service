@@ -18,7 +18,13 @@ public class Enum {
         PENDENTE("PENDENTE"),
         FINALIZADO("FINALIZADO"),
         FECHADO("FECHADO"),
-        A_PROCESSAR("A PROCESSAR");
+        A_PROCESSAR("A PROCESSAR"),
+        // NOVO: necessário para o fluxo assíncrono de geração de planos — marca que
+        // as tentativas de geração (até maxRetries) falharam todas em background.
+        // Sem este estado, uma falha durante a geração assíncrona ficaria "presa"
+        // em A_PROCESSAR para sempre, e o cliente em polling nunca saberia que a
+        // geração não vai terminar.
+        ERRO("ERRO");
 
         private final String descricao;
 

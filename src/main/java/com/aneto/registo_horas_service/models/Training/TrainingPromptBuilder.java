@@ -24,7 +24,7 @@ public class TrainingPromptBuilder {
     // protocoloTemMetodologiaPropria(String.valueOf(protocol)), usando um input
     // diferente do que era usado em Training.java (String.valueOf(enum) vs id
     // minúsculo). Isso causava divergência entre o que o prompt dizia à IA e o
-    // que o validador esperava. Agora a flag é calculada uma única vez em
+    // que o validator esperava. Agora a flag é calculada uma única vez em
     // Training.java e passada como parâmetro, garantindo consistência.
     public String buildUserPrompt(UserProfileRequest userRequest,
                                   int weekNumber,
@@ -82,12 +82,6 @@ public class TrainingPromptBuilder {
         String diretrizProtocolo = "DIRETRIZES TÉCNICAS E FISIOLÓGICAS (%s):\n- Séries: %s | Repetições: %s\n- DESCANSO CIENTÍFICO: %s segundos fixos.\n- RITMO (Tempo): %s\n".formatted(protocoloEfetivo, setsEfetivas, repsEfetivas, descansoEfetivo, protocol.getTempo());
 
         // CORRIGIDO: protocol.getSuggestedExercises() é uma lista fixa por protocolo
-        // (definida no enum), sem qualquer conhecimento do histórico do aluno — podia
-        // sugerir exercícios que estavam simultaneamente na lista "PROIBIDO REPETIR".
-        // Filtramos aqui, dinamicamente, contra exerciciosDoS3 (o mesmo histórico usado
-        // em "diretrizVariedade"), com correspondência aproximada para apanhar variações
-        // de escrita do mesmo exercício (ex. "Supino inclinado com halteres" vs.
-        // "Supino Inclinado Halteres").
         Set<String> nomesJaRealizados = (exerciciosDoS3 == null) ? Set.of() : new HashSet<>(exerciciosDoS3);
         String repertorioFiltrado = filtrarRepertorioSugerido(protocol.getSuggestedExercises(), nomesJaRealizados);
         String diretrizBiomecanica = "DIRETRIZES DE SELEÇÃO BIOMECÂNICA ESTREITAS:\n1. REPERTÓRIO: %s.\n2. PROIBIDOS: %s.\n3. ADAPTAÇÃO: Patologia \"%s\".\n".formatted(repertorioFiltrado, protocol.getForbiddenExercises(), pathologyText);
@@ -95,9 +89,6 @@ public class TrainingPromptBuilder {
         String diretrizAquecimento = buildDiretrizAquecimento(pathologyEspecifica, pathologyText);
 
         // CORRIGIDO: a sequência de dias era calculada duas vezes de forma independente
-        // (dentro de buildDiretrizTreino e de buildDiretrizNomenclaturaDias). Passou a
-        // ser calculada uma única vez aqui e reutilizada, o que também permite decidir
-        // com segurança se existe algum dia de CORE nesta divisão.
         List<String> sequenciaDias = gerarSequenciaDivisao(userRequest.getFrequencyPerWeek(), isGluteFocus, aplicaFocoGluteoExtremo);
         boolean temDiaDeCore = sequenciaDias.stream()
                 .map(dia -> dia.split(":", 2)[0].trim())
@@ -110,10 +101,8 @@ public class TrainingPromptBuilder {
         String diretrizFinalizador = permiteFinalizador ? "[FINALIZADOR METABÓLICO/ANAERÓBIO]\n- Adiciona UM exercício FINAL de condicionamento metabólico em cada dia, na categoria FINALIZADOR.\n" : "";
 
         String diretrizNomenclaturaDias = buildDiretrizNomenclaturaDias(userRequest, sequenciaDias);
+
         // CORRIGIDO: diretrizCardioCore era sempre incluída no prompt, mesmo em planos
-        // PUSH/PULL/LEGS sem nenhum dia de CORE — ruído desnecessário (custa tokens) que
-        // podia levar a IA a tentar encaixar cardio obrigatório onde não fazia sentido.
-        // Agora só entra quando a divisão realmente contém um dia de categoria CORE.
         String diretrizCardioCore = temDiaDeCore ? buildDiretrizCardioCore(volumeIdeal) : "";
         String diretrizDicionario = buildDiretrizDicionario(exerciseDictionary);
         String diretrizRelatorioMedico = buildDiretrizRelatorioMedico(userRequest.getMedicalReportText(), pathologyText);
@@ -250,18 +239,30 @@ public class TrainingPromptBuilder {
     }
 
     private List<String> gerarSequenciaDivisao(int frequencia, boolean isGluteFocus, boolean focoExtremo) {
-        if (frequencia <= 1) return List.of("FULL BODY: Corpo Inteiro");
-        if (focoExtremo) return gerarSequenciaFocoGluteoExtremo(frequencia);
-
-        List<String> ciclo = isGluteFocus ?
-                List.of("LEGS: Glúteos e Posterior", "PUSH: Peito, Ombros e Tríceps", "LEGS: Quadríceps e Glúteos", "PULL: Costas e Bíceps") :
-                List.of("PUSH: Peito, Ombros e Tríceps", "PULL: Costas e Bíceps", "LEGS: Quadríceps, Posterior e Glúteos");
-
-        List<String> sequencia = new ArrayList<>();
-        for (int i = 0; i < frequencia; i++) {
-            sequencia.add(ciclo.get(i % ciclo.size()));
+        if (focoExtremo) {
+            return gerarSequenciaFocoGluteoExtremo(frequencia);
         }
-        return sequencia;
+
+        if (isGluteFocus) {
+            return switch (frequencia) {
+                case 1 -> List.of("FULL BODY: Glúteos, Pernas e Tronco");
+                case 2 -> List.of("LOWER: Foco Glúteos e Posterior", "UPPER: Peito, Costas, Ombros e Braços");
+                case 3 -> List.of("LEGS: Glúteos e Posterior", "UPPER: Peito, Costas e Ombros", "LEGS: Quadríceps e Glúteos");
+                case 4 -> List.of("LEGS: Glúteos e Posterior", "PUSH: Peito, Ombros e Tríceps", "LEGS: Quadríceps e Glúteos", "PULL: Costas e Bíceps");
+                case 5 -> List.of("LEGS: Glúteos e Posterior", "PUSH: Peito, Ombros e Tríceps", "LEGS: Quadríceps e Glúteos", "PULL: Costas e Bíceps", "FULL BODY: Foco Glúteos e Core");
+                default -> List.of("LEGS: Glúteos e Posterior", "PUSH: Peito, Ombros e Tríceps", "LEGS: Quadríceps e Glúteos", "PULL: Costas e Bíceps", "FULL BODY: Foco Glúteos e Core", "LEGS: Glúteos e Isquiotibiais");
+            };
+        }
+
+        // Sequência Padrão sem Foco Específico
+        return switch (frequencia) {
+            case 1 -> List.of("FULL BODY: Corpo Inteiro");
+            case 2 -> List.of("UPPER: Peito, Costas, Ombros e Braços", "LOWER: Quadríceps, Posterior e Glúteos");
+            case 3 -> List.of("PUSH: Peito, Ombros e Tríceps", "PULL: Costas e Bíceps", "LEGS: Quadríceps, Posterior e Glúteos");
+            case 4 -> List.of("UPPER: Peito e Costas", "LOWER: Quadríceps e Glúteos", "UPPER: Ombros e Braços", "LOWER: Posterior e Panturrilhas");
+            case 5 -> List.of("PUSH: Peito, Ombros e Tríceps", "PULL: Costas e Bíceps", "LEGS: Quadríceps e Glúteos", "UPPER: Peito, Costas e Ombros", "LOWER: Posterior, Glúteos e Core");
+            default -> List.of("PUSH: Peito e Tríceps", "PULL: Costas e Bíceps", "LEGS: Quadríceps e Panturrilhas", "SHOULDERS: Ombros e Core", "LEGS: Posterior e Glúteos", "FULL BODY: Condicionamento e Mobilidade");
+        };
     }
 
     private List<String> gerarSequenciaFocoGluteoExtremo(int frequencia) {

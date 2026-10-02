@@ -41,7 +41,6 @@ spring:
       ddl-auto: none
     show-sql: true
     open-in-view: true
-    database-platform: org.hibernate.dialect.PostgreSQLDialect
 
   rabbitmq:
     host: ${SPRING_RABBITMQ_HOST:localhost}
@@ -68,7 +67,14 @@ spring:
 
   ai:
     openai:
-      api-key: ${OPENAI_API_KEY}
+      api-key: ${GEMINI_API_KEY}
+      base-url: "https://generativelanguage.googleapis.com/v1beta/openai/"
+      chat:
+        options:
+          model: "models/gemini-3.8-flash"
+
+  #  openai:
+   #   api-key: ${OPENAI_API_KEY}
 
   flyway:
     enabled: false
