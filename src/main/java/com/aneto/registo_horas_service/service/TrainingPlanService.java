@@ -1,10 +1,7 @@
 package com.aneto.registo_horas_service.service;
 
 import com.aneto.registo_horas_service.dto.request.UserProfileRequest;
-import com.aneto.registo_horas_service.dto.response.ExerciseHistoryResponse;
-import com.aneto.registo_horas_service.dto.response.ExerciseProgressLog;
-import com.aneto.registo_horas_service.dto.response.TrainingExercise;
-import com.aneto.registo_horas_service.dto.response.TrainingPlanResponse;
+import com.aneto.registo_horas_service.dto.response.*;
 
 import java.util.List;
 import java.util.Optional;
@@ -25,4 +22,10 @@ public interface TrainingPlanService {
     List<ExerciseHistoryResponse> getProgressLogs(String exerciseName, String username);
 
     void associarPlanoAConta(String planId, String novoUsername);
+
+    boolean isPedidoDeGeracaoCompleto(UserProfileRequest request);
+
+    PlanoResponseDTO iniciarGeracaoAssincrona(UserProfileRequest request, String username, String planId);
+
+    PlanoStatusResponse getStatusDoPlano(String planId);
 }

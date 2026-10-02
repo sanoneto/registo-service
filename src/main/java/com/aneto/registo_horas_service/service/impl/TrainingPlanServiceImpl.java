@@ -2,10 +2,7 @@ package com.aneto.registo_horas_service.service.impl;
 
 import com.aneto.registo_horas_service.dto.request.PlanoRequestDTO;
 import com.aneto.registo_horas_service.dto.request.UserProfileRequest;
-import com.aneto.registo_horas_service.dto.response.ExerciseHistoryResponse;
-import com.aneto.registo_horas_service.dto.response.PlanoResponseDTO;
-import com.aneto.registo_horas_service.dto.response.TrainingExercise;
-import com.aneto.registo_horas_service.dto.response.TrainingPlanResponse;
+import com.aneto.registo_horas_service.dto.response.*;
 import com.aneto.registo_horas_service.mapper.ExerciseHistoryMapper;
 import com.aneto.registo_horas_service.models.Enum;
 import com.aneto.registo_horas_service.models.ExerciseHistoryEntity;
@@ -20,19 +17,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import software.amazon.awssdk.core.ResponseInputStream;
-import software.amazon.awssdk.core.sync.RequestBody;
-import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.GetObjectRequest;
-import software.amazon.awssdk.services.s3.model.GetObjectResponse;
-import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
-import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
-import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -40,12 +30,21 @@ import java.util.stream.Collectors;
 
 /**
  * Convenção de logs:
- *  - DEBUG: diagnóstico detalhado. Desligado por defeito em produção; liga-se/desliga-se
- *           por logger (Actuator /loggers ou variável de ambiente), sem mexer no código.
- *  - INFO : fluxo normal (mantidos os originais).
- *  - WARN / ERROR: falhas reais. Ficam sempre visíveis.
- *
+ * - DEBUG: diagnóstico detalhado. Desligado por defeito em produção; liga-se/desliga-se
+ * por logger (Actuator /loggers ou variável de ambiente), sem mexer no código.
+ * - INFO : fluxo normal (mantidos os originais).
+ * - WARN / ERROR: falhas reais. Ficam sempre visíveis.
+ * <p>
  * Não se logam dados de saúde do aluno (perfil corporal, relatório médico).
+ * <p>
+ * CORRIGIDO/NOVO (fluxo assíncrono):
+ * - loadFromS3/saveToS3 passaram a DELEGAR para PlanoS3Storage (extraído desta classe)
+ * em vez de falar diretamente com o S3Client. Isto quebra uma dependência circular
+ * com o novo TrainingGenerationAsyncService — ver comentário em PlanoS3Storage.java.
+ * O contrato público (a interface TrainingPlanService) mantém-se inalterado.
+ * - getOrGeneratePlan() NÃO foi alterado — continua a existir para quem já o chama de
+ * forma síncrona. O novo fluxo assíncrono vive em métodos novos (iniciarGeracaoAssincrona,
+ * isPedidoDeGeracaoCompleto, getStatusDoPlano), chamados pelo TrainingController.
  */
 @Service
 @RequiredArgsConstructor
@@ -59,10 +58,14 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
     private final ExerciseHistoryMapper exerciseHistoryMapper;
     private final ExerciseHistoryRepository exerciseHistoryRepository;
     private final Training training;
-    private final S3Client s3Client;
 
-    @Value("${spring.cloud.aws.s3.bucket-name}")
-    private String bucketName;
+    // CORRIGIDO: S3Client removido daqui — a leitura/escrita no S3 passou para
+    // PlanoS3Storage (ver loadFromS3/saveToS3 abaixo, agora delegates).
+    private final PlanoS3Storage planoS3Storage;
+
+    // NOVO: dependências do fluxo assíncrono.
+    private final PlanoRegistoHelper planoRegistoHelper;
+    private final TrainingGenerationAsyncService trainingGenerationAsyncService;
 
     @Value("${spring.cloud.aws.s3.folder-name}")
     private String S3FOLDER;
@@ -70,8 +73,8 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
     @Override
     public TrainingPlanResponse getOrGeneratePlan(UserProfileRequest request, String username, String planId) {
         long inicio = System.currentTimeMillis();
-        log.debug("[getOrGeneratePlan] ENTRADA | username='{}' | planId='{}' | request presente? {} | bucket='{}' | folder='{}'",
-                username, planId, request != null, bucketName, S3FOLDER);
+        log.debug("[getOrGeneratePlan] ENTRADA | username='{}' | planId='{}' | request presente? {} | folder='{}'",
+                username, planId, request != null, S3FOLDER);
 
         String key = buscarChaveDoPlano(planId, username, request);
         log.info("Chave determinada: {}", key);
@@ -108,9 +111,6 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
         log.debug("[getOrGeneratePlan] GERAÇÃO | isAlunoSemConta={} | alunoTempId='{}' | studentUsername='{}'",
                 isAlunoSemConta, request.getAlunoTempId(), request.getStudentUsername());
 
-        // 3.1. Busca o plano ativo/concluído anterior — por alunoTempId (aluno sem
-        // conta) ou por username (fluxo normal), para evitar misturar históricos
-        // de alunos fictícios diferentes.
         Optional<PlanoResponseDTO> planoAnteriorOpt = isAlunoSemConta
                 ? planoService.findAtivoAndConcluidoByAlunoTempId(request.getAlunoTempId())
                 : planoService.findAtivoAndConcluidoByUsername(username);
@@ -120,23 +120,7 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
                 planoAnteriorOpt.map(PlanoResponseDTO::getId).orElse(null),
                 planoAnteriorOpt.map(PlanoResponseDTO::getLink).orElse(null));
 
-        List<String> exerciciosParaEvitar = new java.util.ArrayList<>();
-        planoAnteriorOpt.ifPresent(plano -> {
-            Optional<TrainingPlanResponse> antigo = loadFromS3(plano.getLink());
-            if (antigo.isEmpty()) {
-                log.warn("[getOrGeneratePlan] Plano anterior sem ficheiro legível no S3 | link='{}'", plano.getLink());
-            }
-            antigo.ifPresent(oldPlan -> {
-                if (oldPlan.getPlan() != null) {
-                    List<String> names = oldPlan.getPlan().stream()
-                            .flatMap(day -> day.getExercises().stream())
-                            .map(TrainingExercise::getName)
-                            .distinct()
-                            .toList();
-                    exerciciosParaEvitar.addAll(names);
-                }
-            });
-        });
+        List<String> exerciciosParaEvitar = carregarExerciciosParaEvitar(planoAnteriorOpt);
         log.debug("[getOrGeneratePlan] Exercícios a evitar: {}", exerciciosParaEvitar.size());
 
         int weekNumber = calcularProximaSemanaCiclo(planoAnteriorOpt, isAlunoSemConta ? request.getAlunoTempId() : username);
@@ -155,6 +139,121 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
 
         return newPlan;
     }
+
+    // ==================== NOVO: FLUXO ASSÍNCRONO ====================
+
+    /**
+     * NOVO: true quando o UserProfileRequest tem os campos mínimos para gerar um plano
+     * (é a negação exata de isRequestEmpty). Exposta publicamente para o controller
+     * decidir, SEM duplicar a condição, se deve seguir pelo caminho síncrono de leitura
+     * (getOrGeneratePlan) ou pelo novo caminho assíncrono (iniciarGeracaoAssincrona).
+     * <p>
+     * Requer adicionar à interface TrainingPlanService:
+     * boolean isPedidoDeGeracaoCompleto(UserProfileRequest request);
+     */
+    @Override
+    public boolean isPedidoDeGeracaoCompleto(UserProfileRequest request) {
+        return !isRequestEmpty(request);
+    }
+
+    /**
+     * NOVO: regista o plano em estado A_PROCESSAR e dispara a geração pesada em
+     * background, devolvendo de imediato (sem esperar pela IA). Substitui, para o caso
+     * de geração, o bloqueio de 1-2 minutos que getOrGeneratePlan tinha.
+     * <p>
+     * Requer adicionar à interface TrainingPlanService:
+     * PlanoResponseDTO iniciarGeracaoAssincrona(UserProfileRequest request, String username, String planId);
+     */
+    @Override
+    public PlanoResponseDTO iniciarGeracaoAssincrona(UserProfileRequest request, String username, String planId) {
+        if (isRequestEmpty(request)) {
+            throw new IllegalStateException(
+                    "iniciarGeracaoAssincrona não deve ser chamado para pedidos de leitura (request vazio). " +
+                            "Usa isPedidoDeGeracaoCompleto(request) para decidir qual caminho seguir.");
+        }
+
+        String key = buscarChaveDoPlano(planId, username, request);
+        boolean isAlunoSemConta = request.getAlunoTempId() != null && !request.getAlunoTempId().isBlank();
+
+        Optional<PlanoResponseDTO> planoAnteriorOpt = isAlunoSemConta
+                ? planoService.findAtivoAndConcluidoByAlunoTempId(request.getAlunoTempId())
+                : planoService.findAtivoAndConcluidoByUsername(username);
+
+        List<String> exerciciosParaEvitar = carregarExerciciosParaEvitar(planoAnteriorOpt);
+
+        int weekNumber = calcularProximaSemanaCiclo(planoAnteriorOpt, isAlunoSemConta ? request.getAlunoTempId() : username);
+        boolean isDeloadWeek = weekNumber % 4 == 0;
+
+        // Regista já o estado A_PROCESSAR. Se planId vinha vazio (plano novo), isto CRIA a
+        // linha e devolve o id definitivo — esse id (não o "planId" original, que pode ser
+        // null) é o que tem de ser reutilizado em todas as atualizações seguintes.
+        PlanoResponseDTO planoRegistado = planoRegistoHelper.upsert(username, request, key, planId,
+                weekNumber, isDeloadWeek, Enum.EstadoPedido.A_PROCESSAR, null);
+
+        log.info("[iniciarGeracaoAssincrona] Registo A_PROCESSAR criado/atualizado | id='{}' | username='{}'",
+                planoRegistado.getId(), username);
+
+        trainingGenerationAsyncService.gerarEGuardarPlano(
+                request, username, planoRegistado.getId(), key, weekNumber, isDeloadWeek, exerciciosParaEvitar
+        );
+
+        return planoRegistado;
+    }
+
+    /**
+     * NOVO: endpoint de polling. Devolve o estado atual do plano e, só quando já estiver
+     * FINALIZADO, o conteúdo completo (lido do S3).
+     * <p>
+     * Requer adicionar à interface TrainingPlanService:
+     * PlanoStatusResponse getStatusDoPlano(String planId);
+     */
+    @Override
+    public PlanoStatusResponse getStatusDoPlano(String planId) {
+        PlanoResponseDTO plano = planoService.getByPlanoById(UUID.fromString(planId));
+        if (plano == null) {
+            return null;
+        }
+
+        PlanoStatusResponse.PlanoStatusResponseBuilder builder = PlanoStatusResponse.builder()
+                .planId(plano.getId())
+                .estadoPedido(plano.getEstadoPedido())
+                .erroMensagem(plano.getErroMensagem());
+
+        if (Enum.EstadoPedido.FINALIZADO.getDescricao().equalsIgnoreCase(plano.getEstadoPedido())) {
+            loadFromS3(plano.getLink()).ifPresent(builder::plano);
+        }
+
+        return builder.build();
+    }
+
+    /**
+     * NOVO: extrai os nomes dos exercícios do plano anterior, para a lista "PROIBIDO
+     * REPETIR" do prompt. Era antes um bloco de código duplicado dentro de
+     * getOrGeneratePlan; passou a método para ser reutilizado também em
+     * iniciarGeracaoAssincrona, sem copiar a lambda duas vezes.
+     */
+    private List<String> carregarExerciciosParaEvitar(Optional<PlanoResponseDTO> planoAnteriorOpt) {
+        List<String> exerciciosParaEvitar = new ArrayList<>();
+        planoAnteriorOpt.ifPresent(plano -> {
+            Optional<TrainingPlanResponse> antigo = loadFromS3(plano.getLink());
+            if (antigo.isEmpty()) {
+                log.warn("[carregarExerciciosParaEvitar] Plano anterior sem ficheiro legível no S3 | link='{}'", plano.getLink());
+            }
+            antigo.ifPresent(oldPlan -> {
+                if (oldPlan.getPlan() != null) {
+                    List<String> names = oldPlan.getPlan().stream()
+                            .flatMap(day -> day.getExercises().stream())
+                            .map(TrainingExercise::getName)
+                            .distinct()
+                            .toList();
+                    exerciciosParaEvitar.addAll(names);
+                }
+            });
+        });
+        return exerciciosParaEvitar;
+    }
+
+    // ==================== FIM NOVO: FLUXO ASSÍNCRONO ====================
 
     @Override
     public void updatePlan(TrainingPlanResponse newPlan, String username, String planId) {
@@ -221,7 +320,6 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
         }
         log.debug("[saveProgressLogs] {} registos | username='{}' planId='{}'", logs.size(), username, planId);
 
-        // (renomeado de 'log' para 'item' para não sombrear o Logger da classe)
         List<ExerciseHistoryEntity> entities = logs.stream().map(item -> {
             return ExerciseHistoryEntity.builder()
                     .username(username)
@@ -244,41 +342,16 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
         return exerciseHistoryMapper.toResponseList(entities);
     }
 
+    // CORRIGIDO: loadFromS3/saveToS3 passaram a delegar para PlanoS3Storage (extraído
+    // desta classe). O contrato público (interface TrainingPlanService) não muda.
     @Override
     public Optional<TrainingPlanResponse> loadFromS3(String key) {
-        log.debug("[loadFromS3] bucket='{}' key='{}'", bucketName, key);
-        try {
-            GetObjectRequest getRequest = GetObjectRequest.builder().bucket(bucketName).key(key).build();
-            ResponseInputStream<GetObjectResponse> s3Object = s3Client.getObject(getRequest);
-            Instant lastModified = s3Object.response().lastModified();
-            log.debug("[loadFromS3] objeto encontrado | lastModified={} | size={} bytes",
-                    lastModified, s3Object.response().contentLength());
-
-            TrainingPlanResponse plan = objectMapper.readValue(s3Object, TrainingPlanResponse.class);
-            log.debug("[loadFromS3] JSON convertido com sucesso | key='{}'", key);
-            return Optional.of(plan);
-        } catch (NoSuchKeyException e) {
-            log.warn("[loadFromS3] Ficheiro NÃO existe | bucket='{}' key='{}'", bucketName, key);
-            return Optional.empty();
-        } catch (Exception e) {
-            // ERROR com stack trace, sempre visível: credenciais, região, endpoint, JSON inválido, key nula...
-            log.error("[loadFromS3] ERRO a ler | bucket='{}' key='{}'", bucketName, key, e);
-            return Optional.empty();
-        }
+        return planoS3Storage.loadFromS3(key);
     }
 
     @Override
     public void saveToS3(String key, TrainingPlanResponse plan) {
-        log.debug("[saveToS3] bucket='{}' key='{}'", bucketName, key);
-        try {
-            String json = objectMapper.writeValueAsString(plan);
-            s3Client.putObject(PutObjectRequest.builder().bucket(bucketName).key(key).build(),
-                    RequestBody.fromString(json));
-            log.debug("[saveToS3] guardado | key='{}' | {} chars", key, json.length());
-        } catch (Exception e) {
-            log.error("Erro ao salvar no S3 | bucket='{}' key='{}'", bucketName, key, e);
-            throw new RuntimeException("Falha ao salvar o plano de treino no S3: " + e.getMessage(), e);
-        }
+        planoS3Storage.saveToS3(key, plan);
     }
 
     private int calcularProximaSemanaCiclo(Optional<PlanoResponseDTO> planoAnteriorOpt, String identificador) {
@@ -367,7 +440,6 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
                 request.getHeightCm() == null ||
                 request.getAge() == null;
 
-        // Só indica QUAIS campos faltam (sem valores), para perceber porque é tratado como "vazio".
         if (log.isDebugEnabled() && request != null) {
             log.debug("[isRequestEmpty] vazio={} | objective? {} | weightKg? {} | heightCm? {} | age? {}",
                     vazio,
@@ -431,7 +503,7 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
             }
 
             boolean temNomeAluno = request.getStudentName() != null && !request.getStudentName().isBlank();
-            String especialistaAtualizado = temNomeAluno ? username : "Sem Especialista";
+            String especialistaAtualizado = temNomeAluno ? "Sem Especialista" : username;
 
             dto = PlanoRequestDTO.builder()
                     .nomeAluno(planoExistente.getNomeAluno())

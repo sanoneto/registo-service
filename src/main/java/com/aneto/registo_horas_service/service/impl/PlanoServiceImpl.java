@@ -16,18 +16,14 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.NoSuchElementException;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
  * Convenção de logs:
- *  - DEBUG: diagnóstico detalhado (desligado por defeito em produção; liga-se por logger).
- *  - INFO : eventos de escrita relevantes (criar/apagar/atualizar).
- *  - WARN / ERROR: falhas reais, sempre visíveis.
+ * - DEBUG: diagnóstico detalhado (desligado por defeito em produção; liga-se por logger).
+ * - INFO : eventos de escrita relevantes (criar/apagar/atualizar).
+ * - WARN / ERROR: falhas reais, sempre visíveis.
  */
 @Service
 @RequiredArgsConstructor
@@ -95,7 +91,6 @@ public class PlanoServiceImpl implements PlanoService {
                 estadoPlano = Enum.EstadoPlano.valueOf(estadoPlanoStr.toUpperCase());
             } catch (IllegalArgumentException e) {
                 log.warn("[listAllOrName] estadoPlano inválido ('{}') — ignorado.", estadoPlanoStr);
-                estadoPlano = null;
             }
         }
         boolean temEstado = estadoPlano != null;
@@ -110,6 +105,7 @@ public class PlanoServiceImpl implements PlanoService {
             } else if (temEstado) {
                 entidadePage = repository.findByEstadoPlano(estadoPlano, pageable);
             } else {
+                assert pageable != null;
                 entidadePage = repository.findAll(pageable);
             }
         } else if (roles.contains("ROLE_ESPECIALISTA")) {
@@ -130,6 +126,7 @@ public class PlanoServiceImpl implements PlanoService {
                 .collect(Collectors.toCollection(ArrayList::new));
 
         log.debug("[listAllOrName] RESULTADO | {} na página | total={}", dtoList.size(), entidadePage.getTotalElements());
+        assert pageable != null;
         return new PageImpl<>(dtoList, pageable, entidadePage.getTotalElements());
     }
 
@@ -199,15 +196,18 @@ public class PlanoServiceImpl implements PlanoService {
                     return new RuntimeException("Plano não encontrado");
                 });
 
-        if (plano.getEstadoPedido() == Enum.EstadoPedido.PENDENTE ||
-                plano.getEstadoPedido() == Enum.EstadoPedido.A_PROCESSAR) {
+        if (plano.getEstadoPedido() == Enum.EstadoPedido.PENDENTE) {
 
             Enum.EstadoPedido proximoEstado = Enum.EstadoPedido.fromDescricao(newStatus);
-            log.debug("[changeOfProgress] {} -> {} | especialista='{}'", plano.getEstadoPedido(), proximoEstado, username);
-            plano.setEstadoPedido(proximoEstado);
+            log.debug("[changeOfProgress] Estado mantido: {} | novo status informado: {} | especialista='{}'",
+                    plano.getEstadoPedido(), proximoEstado, username);
+
+            // Apenas atualiza o especialista, mantendo o estado atual intacto
             plano.setEspecialista(username);
             repository.save(plano);
-            log.info("[changeOfProgress] Plano {} passou para {} (por '{}')", planId, proximoEstado, username);
+
+            log.info("[changeOfProgress] Plano {} associado a '{}' (estado mantido em {})",
+                    planId, username, plano.getEstadoPedido());
         } else {
             log.debug("[changeOfProgress] IGNORADO: estado atual {} não permite alteração | planId='{}'",
                     plano.getEstadoPedido(), planId);
@@ -256,13 +256,4 @@ public class PlanoServiceImpl implements PlanoService {
         repository.inativarPlanosAtivosPorAlunoTempId(alunoTempId);
     }
 
-    private Enum.EstadoPedido converterParaEnum(String status) {
-        try {
-            String formatado = status.toUpperCase().replace(" ", "_");
-            return Enum.EstadoPedido.valueOf(formatado);
-        } catch (Exception e) {
-            log.warn("[converterParaEnum] status inválido ('{}') — assume PENDENTE.", status);
-            return Enum.EstadoPedido.PENDENTE;
-        }
-    }
 }

@@ -57,4 +57,9 @@ public class PlanoRequestDTO {
     // criação do primeiro plano (UUID string). Fica null quando contaAssociada=true,
     // porque nesse caso já usamos o username real para tudo.
     private String alunoTempId;
+
+    // >>> NOVO (fluxo assíncrono): mensagem de erro resumida, preenchida apenas quando
+    // estadoPedido = ERRO (todas as tentativas de geração em background falharam).
+    // Sem @NotBlank de propósito — fica null/vazio em todos os outros estados.
+    private String erroMensagem;
 }
