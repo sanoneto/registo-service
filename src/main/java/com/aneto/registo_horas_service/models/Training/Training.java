@@ -148,6 +148,12 @@ public class Training {
                         userRequest.getReportVisbobyText()
                 );
 
+                // 3. ADICIONAR VALIDAÇÃO DA PROPORÇÃO POSTURAL UPPER DO VISBODY
+                trainingValidator.validarProporcaoUpperVisbody(
+                        response,
+                        userRequest.getReportVisbobyText()
+                );
+
                 List<TrainingDay> updatedPlan = new ArrayList<>();
                 for (TrainingDay day : response.getPlan()) {
                     List<TrainingExercise> enrichedExercises = new ArrayList<>();
