@@ -35,8 +35,17 @@ public class Training {
 
     public TrainingPlanResponse generateTrainingPlan(UserProfileRequest userRequest, List<String> exerciciosDoS3, int weekNumber) {
 
-        log.info("Iniciando generateTrainingPlan. Tem relatório médico? {}",
-                (userRequest.getMedicalReportText() != null && !userRequest.getMedicalReportText().isBlank()));
+        boolean temRelatorioMedico = userRequest.getMedicalReportText() != null && !userRequest.getMedicalReportText().isBlank();
+        boolean temRelatorioVisbody = userRequest.getReportVisbobyText() != null && !userRequest.getReportVisbobyText().isBlank();
+
+        log.info("Iniciando generateTrainingPlan. Tem relatório médico? {} | Tem relatório VisBody? {}",
+                temRelatorioMedico, temRelatorioVisbody);
+
+        if (temRelatorioVisbody) {
+            log.info("[generateTrainingPlan] CONTEÚDO VISBODY DETETADO (Tamanho: {} chars)", userRequest.getReportVisbobyText().length());
+        } else {
+            log.warn("[generateTrainingPlan] ATENÇÃO: reportVisbobyText veio NULL ou VAZIO do frontend!");
+        }
 
         String objectiveText = defaultIfEmpty(userRequest.getObjective(), "Manutenção de saúde e bem-estar");
         String genderText = (userRequest.getGender() != null) ? userRequest.getGender().name() : "MALE";
@@ -50,13 +59,23 @@ public class Training {
         int volumeIdeal = isDeloadWeek ? Math.max(4, (int) Math.round(volumeIdealBase * 0.7)) : volumeIdealBase;
 
         String pathologyDeclarada = defaultIfEmpty(userRequest.getPathology(), "Nenhuma limitação relatada");
+
+        // Inferência a partir do Relatório Médico
         PatologiaInferida patologiaInferida = trainingValidator.inferirPatologiaDoRelatorio(userRequest.getMedicalReportText());
         String pathologyInferidaRelatorio = (patologiaInferida == null) ? null : patologiaInferida.categorias();
 
-        String pathologyText = (pathologyInferidaRelatorio == null) ? pathologyDeclarada :
-                (pathologyDeclarada.contains("Nenhuma") ? pathologyInferidaRelatorio : pathologyDeclarada + ", " + pathologyInferidaRelatorio);
+        // Construção do texto consolidado de Patologias / Postura
+        StringBuilder pathologyBuilder = new StringBuilder(pathologyDeclarada);
+        if (pathologyInferidaRelatorio != null && !pathologyInferidaRelatorio.isBlank()) {
+            if (pathologyBuilder.toString().contains("Nenhuma")) {
+                pathologyBuilder = new StringBuilder(pathologyInferidaRelatorio);
+            } else {
+                pathologyBuilder.append(", ").append(pathologyInferidaRelatorio);
+            }
+        }
 
-        boolean pathologyEspecifica = !pathologyText.contains("Nenhuma") || (userRequest.getMedicalReportText() != null && !userRequest.getMedicalReportText().isBlank());
+        String pathologyText = pathologyBuilder.toString();
+        boolean pathologyEspecifica = !pathologyText.contains("Nenhuma") || temRelatorioMedico || temRelatorioVisbody;
 
         Macros macros = MacroCalculator.calculate(
                 userRequest.getWeightKg(), userRequest.getHeightCm(), userRequest.getAge(),
@@ -68,7 +87,6 @@ public class Training {
         Map<String, List<String>> exerciseDictionary = carregarDicionario();
         Map<String, Map<String, List<String>>> exerciseDictionaryComSub = carregarDicionarioComSubcategoria(exerciseDictionary);
 
-        // CORRIGIDO: aplicaFocoGluteoExtremo passou a ser calculada UMA ÚNICA VEZ,
         boolean isGluteFocus = objectiveText.toLowerCase().contains("glúteo") || objectiveText.toLowerCase().contains("gluteo");
         boolean aplicaFocoGluteoExtremo = isGluteFocus;
 
@@ -84,7 +102,7 @@ public class Training {
                 userPrompt, totalMinutos, exerciseDictionary, exerciseDictionaryComSub,
                 pathologyText, exerciciosDoS3, pathologyEspecifica,
                 isObjetivoCompativel(objectiveText), userRequest.getWeightKg(),
-                aplicaFocoGluteoExtremo, promptBuilder
+                aplicaFocoGluteoExtremo, promptBuilder, userRequest
         );
 
         resultado.setSummary(garantirFechoMotivacional(resultado.getSummary(), userRequest, isDeloadWeek, weekNumber));
@@ -96,7 +114,7 @@ public class Training {
             Map<String, Map<String, List<String>>> exerciseDictionaryComSub,
             String pathologyText, List<String> exerciciosAnteriores, boolean pathologyEspecifica,
             boolean permiteFinalizador, Double weightKg, boolean aplicaFocoGluteoExtremo,
-            TrainingPromptBuilder promptBuilder) {
+            TrainingPromptBuilder promptBuilder, UserProfileRequest userRequest) {
 
         int maxRetries = 8;
         Set<String> validNames = flattenDictionary(exerciseDictionary);
@@ -114,13 +132,21 @@ public class Training {
             Set<String> nomesUsadosNestaTentativa = new HashSet<>();
             try {
                 Prompt promptComJsonMode = new Prompt(new UserMessage(currentPrompt.toString()), jsonModeOptions);
-                log.info("prompt -> {}",promptComJsonMode);
+                log.info("prompt -> {}", promptComJsonMode);
                 ChatResponse chatResponse = chatModel.call(promptComJsonMode);
                 String cleanedJson = cleanMarkdown(chatResponse.getResult().getOutput().getContent());
 
                 TrainingPlanResponse response = objectMapper.readValue(cleanedJson, TrainingPlanResponse.class);
 
+                // 1. Validação da sequência de dias
                 trainingValidator.validarSequenciaDias(response.getPlan(), aplicaFocoGluteoExtremo);
+
+                // 2. Validação Rígida de Segurança Médica e VisBody (Lança excepção se violar)
+                trainingValidator.validarSegurancaLombarEVisbody(
+                        response,
+                        userRequest.getMedicalReportText(),
+                        userRequest.getReportVisbobyText()
+                );
 
                 List<TrainingDay> updatedPlan = new ArrayList<>();
                 for (TrainingDay day : response.getPlan()) {

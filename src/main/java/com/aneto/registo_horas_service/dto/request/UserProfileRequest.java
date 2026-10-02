@@ -2,6 +2,8 @@ package com.aneto.registo_horas_service.dto.request;
 
 import com.aneto.registo_horas_service.models.Training.BodyType;
 import com.aneto.registo_horas_service.models.Training.Gender;
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -48,8 +50,17 @@ public class UserProfileRequest {
     private String protocol;
     private Double bodyFat;
     private Integer mealsPerDay;
+
     private String medicalReportText;
 
-    // >>> NOVO: identificador estável do aluno "sem conta"
+    @JsonProperty("ReportVisbobyText")
+    @JsonAlias({"reportVisbobyText", "reportVisbodyText", "visualBodyReportText", "ReportVisbodyText"})
+    private String reportVisbobyText;
+
+    // Métricas do VisBody para lógica condicional em Java
+    private Double visbodyBodyFatPct;
+    private Double visbodySkeletalMuscleKg;
+    private Double visbodyBmrKcal;
+
     private String alunoTempId;
 }
