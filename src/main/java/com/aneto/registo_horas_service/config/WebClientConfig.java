@@ -9,20 +9,19 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 @Configuration
 public class WebClientConfig {
+
     @Value("${url.micro_service_auth}")
     private String urlMicroServicoAuth;
 
-    /**
-     * Configura e cria uma única instância (Bean) de WebClient.
-     * Define a URL base para o microsserviço de destino.
-     */
+    @Value("${internal.api-key}")
+    private String internalKey;
+
     @Bean
     public WebClient targetServiceWebClient(WebClient.Builder webClientBuilder) {
         return webClientBuilder
-                // URL base do microsserviço que você quer chamar.
-                // Substitua pela porta e host corretos.
                 .baseUrl(urlMicroServicoAuth)
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                .defaultHeader("X-Internal-Key", internalKey)
                 .build();
     }
 }
