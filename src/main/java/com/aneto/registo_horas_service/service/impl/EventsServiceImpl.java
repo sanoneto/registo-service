@@ -27,7 +27,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
@@ -53,7 +52,6 @@ public class EventsServiceImpl implements EventsService {
     private final TaskScheduler taskScheduler; // Adicionado final
     private final NotificationService notificationService; // Injetado aqui
     private final ObjectMapper objectMapper;
-    private final RestTemplate restTemplate;
     private final WebClient targetServiceWebClient;
     private final TelegramBotService telegramBotService;
 
@@ -111,7 +109,7 @@ public class EventsServiceImpl implements EventsService {
             List<Evento> todosEventosNovos = new java.util.ArrayList<>();
 
             for (CalendarListEntry entry : calendarList.getItems()) {
-                // Ignorar calendários de feriados se desejar, ou filtrar por ID
+                // Ignorar calendários de feriados se desejar, ou filtrar por ‘ID’
                 if ("reader".equals(entry.getAccessRole()) && entry.getId().contains("#holiday")) {
                     log.info("Ignorando calendário de feriados: {}", entry.getSummary());
                     continue;
@@ -125,7 +123,7 @@ public class EventsServiceImpl implements EventsService {
                         .execute();
 
                 for (com.google.api.services.calendar.model.Event gEvent : events.getItems()) {
-                    // Verificação de duplicados por ID de Evento E Utilizador
+                    // Verificação de duplicados por ‘ID’ de Evento E Utilizador
                     if (!eventRepository.existsByGoogleEventIdAndUsername(gEvent.getId(), userId)) {
                         Evento novo = mapGoogleEventToEntity(gEvent, userId);
                         if (novo != null) {
@@ -188,9 +186,7 @@ public class EventsServiceImpl implements EventsService {
             momentoAlerta = Instant.now().plusSeconds(2);
         }
 
-        taskScheduler.schedule(() -> {
-            enviarNotificacaoPush(request.notificationSubscription(), request.title(), request.isMobile(), request.username());
-        }, momentoAlerta);
+        taskScheduler.schedule(() -> enviarNotificacaoPush(request.notificationSubscription(), request.title(), request.isMobile(), request.username()), momentoAlerta);
     }
 
     @Override
@@ -218,7 +214,7 @@ public class EventsServiceImpl implements EventsService {
                     }
 
                     // 2. Apaga no seu banco de dados local
-                    // Isso deve estar FORA do try do Google para garantir que o registro local suma
+                    // Isso deve estar FORA do try do Google para garantir que o registo local suma
                     eventRepository.delete(evento);
                     log.info(">>> Evento com ID {} eliminado localmente.", id);
                 },
@@ -349,26 +345,10 @@ public class EventsServiceImpl implements EventsService {
         } catch (Exception e) {
             String msg = e.getMessage();
             log.error("❌ Falha ao enviar Telegram para {}: {}", username, msg);
-            return false;   // bloqueado ou não, pára
+            return false;   // bloqueado ou não, para
         }
     }
 
-    private Map<String, Object> getStringObjectMap(String titulo, UUID eventoId, String chatId) {
-        // so se aplica a produçao no ambiente
-        String urlConfirmar = "https://www.sanoneto.com/api/v1/eventos/" + eventoId + "/confirmar-alerta";
-
-        Map<String, Object> body = Map.of(
-                "chat_id", chatId,
-                "text", "🚨 *ALERTA TREG*\n\nEvento: " + titulo + "\n_Clique no botão abaixo para confirmar._",
-                "parse_mode", "Markdown",
-                "reply_markup", Map.of(
-                        "inline_keyboard", List.of(
-                                List.of(Map.of("text", "Confirmar ✅", "url", urlConfirmar))
-                        )
-                )
-        );
-        return body;
-    }
 
     private void enviarViaWebPush(PushSubscriptionDTO sub, String titulo, UUID eventoId) {
         if (sub == null || sub.getEndpoint() == null) {
@@ -411,7 +391,7 @@ public class EventsServiceImpl implements EventsService {
                     .setSummary(request.title())
                     .setDescription(request.notes());
 
-            // 1. Defina o formatador padrão RFC3339 que o Google exige
+            // 1. Defina o formato padrão RFC3339 que o Google exige
             DateTimeFormatter rfc3339Formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'");
 
             // 2. Combine data e hora (Assumindo que são LocalDate e LocalTime)
@@ -471,7 +451,6 @@ public class EventsServiceImpl implements EventsService {
         LocalDate hoje = LocalDate.now();
         LocalDateTime agora = LocalDateTime.now();
 
-        // 1. Usa o método otimizado do repositório
         List<Evento> pendentes = eventRepository.findPendentesParaNotificar(hoje);
 
         log.info("### 🔍 Encontrados {} eventos com alertas ativos no banco.", pendentes.size());
