@@ -161,6 +161,10 @@ telegram:
 internal:
   api-key: ${INTERNAL_API_KEY}
 
+migracao:
+  s3:
+    ativa: true
+
 app:
   queries:
     monthly-summary: "SELECT TO_CHAR(data_registo, 'YYYY-MM') AS mes_e_ano, SUM(horas_trabalhadas) AS total_horas_trabalhadas 

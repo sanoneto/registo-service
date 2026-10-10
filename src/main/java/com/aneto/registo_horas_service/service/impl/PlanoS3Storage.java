@@ -43,6 +43,7 @@ public class PlanoS3Storage {
 
     private final ObjectMapper objectMapper;
     private final S3Client s3Client;
+    private final PlanoDbStorage planoDbStorage;
 
     @Value("${spring.cloud.aws.s3.bucket-name}")
     private String bucketName;
@@ -69,6 +70,9 @@ public class PlanoS3Storage {
     }
 
     public void saveToS3(String key, TrainingPlanResponse plan) {
+        log.info("salvar no base de dados :");
+        planoDbStorage.save(key, plan);
+
         log.debug("[saveToS3] bucket='{}' key='{}'", bucketName, key);
         try {
             String json = objectMapper.writeValueAsString(plan);

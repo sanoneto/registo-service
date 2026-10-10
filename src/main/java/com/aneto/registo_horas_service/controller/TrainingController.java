@@ -1,18 +1,18 @@
 package com.aneto.registo_horas_service.controller;
 
 import com.aneto.registo_horas_service.dto.request.UserProfileRequest;
-import com.aneto.registo_horas_service.dto.response.ExerciseHistoryResponse;
-import com.aneto.registo_horas_service.dto.response.PlanoResponseDTO;
-import com.aneto.registo_horas_service.dto.response.PlanoStatusResponse;
-import com.aneto.registo_horas_service.dto.response.TrainingExercise;
-import com.aneto.registo_horas_service.dto.response.TrainingPlanResponse;
+import com.aneto.registo_horas_service.dto.response.*;
 import com.aneto.registo_horas_service.service.MedicalReportExtractionService;
 import com.aneto.registo_horas_service.service.PlanoService;
 import com.aneto.registo_horas_service.service.TrainingPlanService;
+import com.lowagie.text.*;
+import com.lowagie.text.pdf.PdfPCell;
+import com.lowagie.text.pdf.PdfPTable;
+import com.lowagie.text.pdf.PdfWriter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -21,6 +21,9 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.awt.Color;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -104,7 +107,7 @@ public class TrainingController {
                 request != null ? request.getAlunoTempId() : null);
 
         // NOVO: decide entre caminho de leitura (síncrono, inalterado) e caminho de
-        // geração (agora assíncrono). isPedidoDeGeracaoCompleto reutiliza exatamente a
+        // geração (agora assíncrono). isPedidoDeGeracaoCompleto reutiliza a
         // mesma condição que já decidia isto dentro do serviço — sem duplicar lógica.
         boolean pedidoDeGeracaoCompleto = request != null && trainingPlanService.isPedidoDeGeracaoCompleto(request);
 
@@ -130,7 +133,7 @@ public class TrainingController {
         }
 
         // NOVO: CAMINHO DE GERAÇÃO — assíncrono. Regista o plano em A_PROCESSAR, dispara a
-        // geração em background e devolve de imediato (HTTP 202), em vez de bloquear o
+        // geração em formação de base e devolve de imediato (HTTP 202), em vez de bloquear o
         // pedido HTTP pelos ~1-2 minutos que a geração + retries podem levar (ver
         // AsyncRequestNotUsableException / Broken pipe observado em produção).
         PlanoResponseDTO planoIniciado;
@@ -148,7 +151,7 @@ public class TrainingController {
     }
 
     // NOVO: endpoint de polling. O frontend chama isto de poucos em poucos segundos
-    // depois de receber o 202 de /plan, até ver estadoPedido = "FINALIZADO" (ou "ERRO").
+    //  receber o 202 de /plan, até ver estadoPedido = "FINALIZADO" (ou "ERRO").
     @GetMapping("/plan/{planId}/status")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<PlanoStatusResponse> getPlanStatus(@PathVariable String planId) {
@@ -157,6 +160,86 @@ public class TrainingController {
             return ResponseEntity.notFound().build();
         }
         return ResponseEntity.ok(status);
+    }
+
+    // =========================================================================
+    // ROTA NOA: EXPORTAÇÃO DE PDF CLÍNICO DE REABILITAÇÃO (OpenPDF)
+    // =========================================================================
+    @GetMapping("/plan/{planId}/pdf")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<InputStreamResource> downloadClinicalPdf(@PathVariable String planId) {
+        PlanoStatusResponse status = trainingPlanService.getStatusDoPlano(planId);
+        if (status == null || status.getPlano() == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        TrainingPlanResponse plan = status.getPlano();
+        ByteArrayInputStream pdfStream = generateClinicalPdfStream(plan);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.add("Content-Disposition", "attachment; filename=Plano_Reabilitacao_" + planId + ".pdf");
+
+        return ResponseEntity.ok()
+                .headers(headers)
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(new InputStreamResource(pdfStream));
+    }
+
+    private ByteArrayInputStream generateClinicalPdfStream(TrainingPlanResponse plan) {
+        Document document = new Document(PageSize.A4, 30, 30, 30, 30);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+
+        try {
+            PdfWriter.getInstance(document, out);
+            document.open();
+
+            Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 16, new Color(26, 54, 93));
+            Font blockHeaderFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 11, Color.WHITE);
+            Font tableHeaderFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9, Color.BLACK);
+            Font textFont = FontFactory.getFont(FontFactory.HELVETICA, 8, Color.BLACK);
+
+            Paragraph title = new Paragraph("PRESCRIÇÃO DE TREINO & REABILITAÇÃO CLÍNICA", titleFont);
+            title.setAlignment(Element.ALIGN_CENTER);
+            document.add(title);
+            document.add(new Paragraph(" "));
+
+            if (plan.getBlocks() != null && !plan.getBlocks().isEmpty()) {
+                for (ClinicalBlock block : plan.getBlocks()) {
+                    PdfPTable headerTable = new PdfPTable(1);
+                    headerTable.setWidthPercentage(100);
+                    PdfPCell hCell = new PdfPCell(new Phrase(block.getBlockName() + " (" + block.getDurationText() + ")", blockHeaderFont));
+                    hCell.setBackgroundColor(new Color(43, 108, 176));
+                    hCell.setPadding(5);
+                    headerTable.addCell(hCell);
+                    document.add(headerTable);
+
+                    PdfPTable table = new PdfPTable(new float[]{3, 2, 2, 4});
+                    table.setWidthPercentage(100);
+                    table.setSpacingAfter(10);
+
+                    table.addCell(new PdfPCell(new Phrase("Exercício", tableHeaderFont)));
+                    table.addCell(new PdfPCell(new Phrase("Dosagem (Dir / Esq)", tableHeaderFont)));
+                    table.addCell(new PdfPCell(new Phrase("Cadência / RPE", tableHeaderFont)));
+                    table.addCell(new PdfPCell(new Phrase("Técnica & Foco Clínico", tableHeaderFont)));
+
+                    if (block.getExercises() != null) {
+                        for (ClinicalExercise ex : block.getExercises()) {
+                            table.addCell(new PdfPCell(new Phrase(ex.getName(), textFont)));
+                            table.addCell(new PdfPCell(new Phrase((ex.getDosageRight() != null ? ex.getDosageRight() : "") + " " + (ex.getDosageLeft() != null ? ex.getDosageLeft() : ""), textFont)));
+                            table.addCell(new PdfPCell(new Phrase(ex.getTempoRpe(), textFont)));
+                            table.addCell(new PdfPCell(new Phrase(ex.getExecutionInstructions(), textFont)));
+                        }
+                    }
+                    document.add(table);
+                }
+            }
+
+            document.close();
+        } catch (Exception ex) {
+            log.error("Erro ao gerar PDF clínico", ex);
+        }
+
+        return new ByteArrayInputStream(out.toByteArray());
     }
 
     @PostMapping(value = "/visualbody-report", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

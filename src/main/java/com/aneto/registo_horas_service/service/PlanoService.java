@@ -29,4 +29,5 @@ public interface PlanoService {
     Optional<PlanoResponseDTO> findAtivoAndConcluidoByAlunoTempId(String alunoTempId);
 
     void prepararNovoPlanoAtivoPorAlunoTempId(String alunoTempId);
+
 }

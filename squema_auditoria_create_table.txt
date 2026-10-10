@@ -1,4 +1,4 @@
-CREATE SCHEMA auditoria AUTHORIZATION postgres;
+CREATE SCHEMA auditoria AUTHORIZATION horas_user;
 
 
 -- auditoria.tb_emails definition

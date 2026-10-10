@@ -1,6 +1,5 @@
 package com.aneto.registo_horas_service.service;
 
-import com.aneto.registo_horas_service.dto.response.FootballData;
 import com.aneto.registo_horas_service.dto.response.ListJogosResponse;
 
 import java.util.Optional;
