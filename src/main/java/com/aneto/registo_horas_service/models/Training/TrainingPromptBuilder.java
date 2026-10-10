@@ -5,6 +5,7 @@ import com.aneto.registo_horas_service.dto.response.Macros;
 import com.aneto.registo_horas_service.dto.response.MealSuggestion;
 import com.aneto.registo_horas_service.models.Enum;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -18,6 +19,7 @@ import java.util.stream.Stream;
 import static com.aneto.registo_horas_service.models.Training.TrainingRuleConstants.CARDIO_OBRIGATORIO_POR_DIA_CORE;
 import static com.aneto.registo_horas_service.models.Training.TrainingUtils.*;
 
+@Component
 public class TrainingPromptBuilder {
 
     public String buildUserPrompt(UserProfileRequest userRequest,
@@ -38,7 +40,12 @@ public class TrainingPromptBuilder {
         String locationText = defaultIfEmpty(userRequest.getLocation(), "Não especificada");
         String bodyTypeText = (userRequest.getBodyType() != null) ? userRequest.getBodyType().name() : "ECTOMORPH";
         String genderText = (userRequest.getGender() != null) ? userRequest.getGender().name() : "MALE";
-        String weightKg = defaultIfEmpty(String.valueOf(userRequest.getWeightKg()), "70");
+
+        // Garante ponto decimal no peso
+        String weightKg = (userRequest.getWeightKg() != null)
+                ? String.format(Locale.US, "%.1f", userRequest.getWeightKg())
+                : "70.0";
+
         String durationText = defaultIfEmpty(userRequest.getDurationPerSession(), "60 minutos");
 
         String protocolId = (userRequest.getProtocol() == null) ? "nasm_estabilizacao" : userRequest.getProtocol();
@@ -55,7 +62,6 @@ public class TrainingPromptBuilder {
         String setsEfetivas = (isSedentary || isDeloadWeek) ? "2" : protocol.getSets();
         String descansoEfetivo = isDeloadWeek ? calcularDescansoDeload(protocol, objectiveText, weightKg) : calcularDescansoCientifico(objectiveText, weightKg);
 
-        // Declaradas todas as variáveis necessárias antes do Stream
         String diretrizPrioridade = buildDiretrizPrioridadeRelatorios(userRequest.getMedicalReportText(), userRequest.getReportVisbobyText());
         String diretrizPrescricaoVisbody = buildDiretrizPrescricaoVisbody(userRequest.getReportVisbobyText());
         String diretrizAjusteMetabolico = buildDiretrizAjusteMetabolicoVisbody(userRequest.getReportVisbobyText());
@@ -95,7 +101,6 @@ public class TrainingPromptBuilder {
         String diretrizCardioCore = temDiaDeCore ? buildDiretrizCardioCore(volumeIdeal) : "";
         String diretrizDicionario = buildDiretrizDicionario(exerciseDictionary);
 
-        // 1. DECLARAR A NOVA DIRETRIZ DO RÁCIO POSTURAL
         String diretrizRacioVolumePostural = buildDiretrizRacioVolumePostural(userRequest.getReportVisbobyText());
 
         String diretrizRelatorioMedico = buildDiretrizRelatorioMedico(userRequest.getMedicalReportText(), pathologyText);
@@ -116,8 +121,8 @@ public class TrainingPromptBuilder {
                 .filter(s -> s != null && !s.isBlank())
                 .collect(Collectors.joining("\n"));
 
-        String regrasFinais = "REGRAS CRÍTICAS DE FECHAMENTO:\n1. FREQUÊNCIA COMPLETA OBRIGATÓRIA: Gera exatamente %d objetos dentro do array 'plan' (Dia 1 até Dia %d).\n2. DURAÇÃO: O treino deve durar %d minutos. Gera EXATAMENTE %d exercícios por dia.\n3. RITMO E DESCANSO: Ritmo %s e Descanso %s segundos.\n4. TOTAIS DIETA: %d kcal, %dg Prot, %dg Carbs, %dg Fats.\n"
-                .formatted(dias, dias, totalMinutos, volumeIdeal, protocol.getTempo(), descansoEfetivo, macros.dailyCalories(), macros.protein(), macros.carbs(), macros.fats());
+        String regrasFinais = String.format(Locale.US, "REGRAS CRÍTICAS DE FECHAMENTO:\n1. FREQUÊNCIA COMPLETA OBRIGATÓRIA: Gera exatamente %d objetos dentro do array 'plan' (Dia 1 até Dia %d).\n2. DURAÇÃO: O treino deve durar %d minutos. Gera EXATAMENTE %d exercícios por dia.\n3. RITMO E DESCANSO: Ritmo %s e Descanso %s segundos.\n4. TOTAIS DIETA: %d kcal, %dg Prot, %dg Carbs, %dg Fats.\n",
+                dias, dias, totalMinutos, volumeIdeal, protocol.getTempo(), descansoEfetivo, macros.dailyCalories(), macros.protein(), macros.carbs(), macros.fats());
 
         StringBuilder jsonDaysExample = getStringBuilder(dias, protocol, descansoEfetivo);
 
@@ -143,6 +148,7 @@ public class TrainingPromptBuilder {
                   }
                 }
                 """;
+
         return String.format(Locale.US, template,
                 userRequest.getAge(), bodyTypeText, genderText, userRequest.getWeightKg(), objectiveText, pathologyText,
                 blocoDiretrizesCompletas, regrasFinais, dias, protocol.getLabel(), jsonDaysExample.toString(),
@@ -154,7 +160,8 @@ public class TrainingPromptBuilder {
     private static StringBuilder getStringBuilder(int dias, Enum.TrainingProtocol protocol, String descansoEfetivo) {
         StringBuilder jsonDaysExample = new StringBuilder();
         for (int i = 1; i <= dias; i++) {
-            jsonDaysExample.append(String.format("""
+            // Adicionado Locale.US explicitamente para o StringBuilder do JSON
+            jsonDaysExample.append(String.format(Locale.US, """
                     {
                     "day": "Dia %d - [CATEGORIA]: [FOCO]",
                     "exercises": [
@@ -170,6 +177,7 @@ public class TrainingPromptBuilder {
         }
         return jsonDaysExample;
     }
+
     private String buildDiretrizRacioVolumePostural(String reportVisbobyText) {
         if (reportVisbobyText == null || reportVisbobyText.isBlank()) return "";
 
@@ -297,7 +305,6 @@ public class TrainingPromptBuilder {
     private String buildDiretrizRelatorioVisbody(String reportVisbobyText) {
         if (reportVisbobyText == null || reportVisbobyText.isBlank()) return "";
 
-        // Remove marcadores de código markdown (```json e ```) para enviar texto limpo à LLM
         String limpo = reportVisbobyText
                 .replaceAll("(?s)```json\\s*", "")
                 .replaceAll("(?s)```\\s*", "")
@@ -305,10 +312,11 @@ public class TrainingPromptBuilder {
 
         return "\n[RELATÓRIO VISBODY / AVALIAÇÃO POSTURAL E BIOIMPEDÂNCIA ANEXADO]\nConteúdo:\n" + limpo + "\n";
     }
+
     private String buildDiretrizAlimentar(Macros macros) {
         StringBuilder dietTable = new StringBuilder("DIRETRIZES ALIMENTARES:\n");
         for (MealSuggestion m : macros.mealSuggestions()) {
-            dietTable.append("- %s (%s): %d kcal\n".formatted(m.name(), m.time(), (int) (macros.dailyCalories() * m.pctCalories())));
+            dietTable.append(String.format(Locale.US, "- %s (%s): %d kcal\n", m.name(), m.time(), (int) (macros.dailyCalories() * m.pctCalories())));
         }
         return dietTable.toString();
     }
