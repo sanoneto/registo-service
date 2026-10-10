@@ -19,6 +19,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+
 @Slf4j
 @Service
 public class ExerciseVideoServiceImpl implements ExerciseVideoService {
@@ -48,8 +49,6 @@ public class ExerciseVideoServiceImpl implements ExerciseVideoService {
      * ÚNICA fonte de verdade: carrega a tabela inteira UMA vez (cache),
      * indexada por nome normalizado (upper+trim), para servir tanto
      * o dicionário do prompt como a resolução de vídeos.
-     * Se a tabela crescer muito no futuro, isto ainda é barato —
-     * é uma tabela de referência, não transacional.
      */
     @Cacheable(value = "allExercises")
     public Map<String, Exercises> loadExerciseMap() {
@@ -58,7 +57,7 @@ public class ExerciseVideoServiceImpl implements ExerciseVideoService {
                 .collect(Collectors.toMap(
                         e -> e.getName().trim().toUpperCase(),
                         e -> e,
-                        (existing, duplicate) -> existing // guarda o primeiro em caso de nomes duplicados
+                        (existing, duplicate) -> existing
                 ));
     }
 
@@ -70,7 +69,8 @@ public class ExerciseVideoServiceImpl implements ExerciseVideoService {
         Exercises exercise = loadExerciseMap().get(normalizedKey);
 
         if (exercise == null || exercise.getVideoUrl() == null || exercise.getVideoUrl().isBlank()) {
-            return ""; // sem vídeo real associado — deixa o frontend tratar como "SEM VÍDEO"
+            log.warn("[ALERT-VIDEO-MISSING] O exercício '{}' foi prescrito mas NÃO EXISTE na tabela 'exercicio'!", exerciseName);
+            return ""; // Deixa o frontend mostrar o indicador de "Sem Vídeo"
         }
 
         String objectKey = exercise.getVideoUrl();
@@ -122,11 +122,6 @@ public class ExerciseVideoServiceImpl implements ExerciseVideoService {
         return r2Presigner.presignGetObject(presignRequest).url().toString();
     }
 
-    /**
-     * Invalida o cache inteiro — como agora só há UMA fonte de dados,
-     * já não faz sentido invalidar por nome individual: se um exercício
-     * mudou, o mapa todo tem de ser recarregado.
-     */
     @Override
     @CacheEvict(value = "allExercises", allEntries = true)
     public void evictCache(String exerciseName) {
@@ -145,14 +140,13 @@ public class ExerciseVideoServiceImpl implements ExerciseVideoService {
                         e.getName(),
                         e.getCategory(),
                         getVideoUrl(e.getName()),
-                        e.getSubcategory()// reaproveita a lógica de resolução de URL/fallback
+                        e.getSubcategory()
                 ))
                 .sorted(Comparator.comparing(ExerciseCatalogItemDTO::category)
                         .thenComparing(ExerciseCatalogItemDTO::name))
                 .toList();
     }
 
-    // ExerciseVideoServiceImpl.java
     @Override
     public Map<String, Map<String, List<String>>> getExerciseDictionaryComSubcategoria() {
         return loadExerciseMap().values().stream()

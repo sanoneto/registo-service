@@ -22,35 +22,36 @@ public class TrainingValidator {
 
     private final ExerciseVideoService exerciseVideoService;
 
-    // =========================================================================
-    // 1. VALIDAÇÃO RÍGIDA DE SEGURANÇA (MÉDICA & POSTURAL - VISBODY)
-    // =========================================================================
+    // Exercícios proibidos para patologias lombares e anteversão pélvica severa
+    private static final List<String> EXERCICIOS_PROIBIDOS_LOMBAR = List.of(
+            "Agachamento Livre", "Levantamento Terra", "Good Morning",
+            "Agachamento Zercher", "Jefferson Curl", "Thruster", "Agachamento com Barra"
+    );
+
     public void validarSegurancaLombarEVisbody(TrainingPlanResponse response, String medicalReportText, String reportVisbodyText) {
         if (response == null || response.getPlan() == null) return;
 
         String medicoLower = medicalReportText != null ? medicalReportText.toLowerCase() : "";
         String visbodyLower = reportVisbodyText != null ? reportVisbodyText.toLowerCase() : "";
 
-        boolean temLesaoLombar = medicoLower.contains("lombar") || visbodyLower.contains("anteversão") || visbodyLower.contains("pélvica");
+        boolean temLesaoLombar = medicoLower.contains("lombar")
+                || medicoLower.contains("anterolistese")
+                || medicoLower.contains("discal")
+                || visbodyLower.contains("anteversão")
+                || visbodyLower.contains("pélvica");
 
         if (!temLesaoLombar) return;
-
-        // Lista de exercícios com alta compressão ou cisalhamento na coluna lombar
-        List<String> exerciciosProibidosLombar = List.of(
-                "Agachamento Livre", "Levantamento Terra", "Good Morning",
-                "Agachamento Zercher", "Jefferson Curl", "Thruster"
-        );
 
         for (TrainingDay day : response.getPlan()) {
             if (day.getExercises() == null) continue;
             for (TrainingExercise ex : day.getExercises()) {
                 if (ex.getName() == null) continue;
-                for (String proibido : exerciciosProibidosLombar) {
+                for (String proibido : EXERCICIOS_PROIBIDOS_LOMBAR) {
                     if (ex.getName().equalsIgnoreCase(proibido)) {
-                        log.error("[BLOQUEIO DE SEGURANÇA] Exercício proibido detetado: '{}' em '{}", ex.getName(), day.getDay());
+                        log.error("[BLOQUEIO DE SEGURANÇA] Exercício proibido detetado: '{}' no dia '{}'", ex.getName(), day.getDay());
                         throw new IllegalArgumentException(
                                 "VIOLAÇÃO CRÍTICA DE SEGURANÇA MÉDICA: O exercício '" + ex.getName() +
-                                        "' é estritamente PROIBIDO para alunos com lesão lombar e anteversão pélvica."
+                                        "' é estritamente PROIBIDO para utentes com diagnóstico de lesão lombar/anteversão."
                         );
                     }
                 }
@@ -58,15 +59,16 @@ public class TrainingValidator {
         }
     }
 
-    // =========================================================================
-    // 2. ENRIQUECIMENTO E VALIDAÇÃO INDIVIDUAL DE EXERCÍCIO
-    // =========================================================================
     public TrainingExercise enrichExercise(TrainingExercise ex, Set<String> validNames, String pathologyText) {
+        if (ex == null || ex.getName() == null) {
+            throw new IllegalArgumentException("Exercício recebido do modelo de IA não contém nome válido.");
+        }
+
         String correctedName = normalizeExerciseName(ex.getName(), validNames);
 
         if (!validNames.contains(correctedName)) {
-            log.error("[ALERTA DE INVENTÁRIO] Nome fora do dicionário: '{}' (original: '{}')", correctedName, ex.getName());
-            throw new RuntimeException("Exercício fora do inventário: \"" + ex.getName() + "\". Substitui por um nome válido.");
+            log.error("[ALERTA DE INVENTÁRIO] Nome fora do dicionário oficial: '{}' (original: '{}')", correctedName, ex.getName());
+            throw new RuntimeException("Exercício fora do inventário: \"" + ex.getName() + "\". Substitui por um nome do dicionário.");
         }
         validarMobilidadeCondicional(correctedName, pathologyText);
 
@@ -92,10 +94,8 @@ public class TrainingValidator {
                 .build();
     }
 
-    // =========================================================================
-    // 3. VALIDAÇÃO DE SEQUÊNCIA DE DIAS
-    // =========================================================================
     public void validarSequenciaDias(List<TrainingDay> plan, boolean aplicaFocoGluteoExtremo) {
+        if (plan == null) return;
         String categoriaAnterior = null;
         for (TrainingDay day : plan) {
             String categoriaAtual = extrairCategoriaDia(day.getDay());
@@ -115,17 +115,39 @@ public class TrainingValidator {
         return dayLabel.substring(idxTraco + 1, idxDoisPontos).trim();
     }
 
-    public int obterExigenciaCardioDoDia(String dayLabel, String categoriaDoDia) {
-        if ("CORE".equalsIgnoreCase(categoriaDoDia)) return CARDIO_OBRIGATORIO_POR_DIA_CORE;
-        if ("MANUTENÇÃO".equalsIgnoreCase(categoriaDoDia) && dayLabel != null && dayLabel.toLowerCase().contains("core")) {
-            return CARDIO_OBRIGATORIO_POR_DIA_MANUTENCAO;
+    public void validarProporcaoUpperVisbody(TrainingPlanResponse response, String reportVisbodyText) {
+        if (response == null || response.getPlan() == null || reportVisbodyText == null || reportVisbodyText.isBlank()) return;
+
+        boolean temProtracaoOmbros = reportVisbodyText.toLowerCase().contains("protração")
+                || reportVisbodyText.toLowerCase().contains("enrolados")
+                || reportVisbodyText.toLowerCase().contains("cabeça projetada");
+
+        if (!temProtracaoOmbros) return;
+
+        for (TrainingDay day : response.getPlan()) {
+            if (day.getDay() != null && day.getDay().toUpperCase().contains("UPPER")) {
+                long exPeito = day.getExercises().stream()
+                        .filter(e -> e.getMuscleGroup() != null && e.getMuscleGroup().equalsIgnoreCase("Peito"))
+                        .count();
+
+                long exCostasEOmbros = day.getExercises().stream()
+                        .filter(e -> e.getMuscleGroup() != null &&
+                                (e.getMuscleGroup().equalsIgnoreCase("Costas")
+                                        || e.getMuscleGroup().equalsIgnoreCase("Costas / Cintura Escapular")
+                                        || e.getMuscleGroup().equalsIgnoreCase("Ombros")))
+                        .count();
+
+                if (exPeito >= exCostasEOmbros) {
+                    log.warn("[BLOQUEIO POSTURAL] Dia UPPER com {} ex. de Peito e {} de Costas/Ombros.", exPeito, exCostasEOmbros);
+                    throw new IllegalArgumentException(
+                            "VIOLAÇÃO DE CORREÇÃO POSTURAL: Utente apresenta ombros enrolados. " +
+                                    "O número de exercícios de Costas/Cadeia Posterior (" + exCostasEOmbros + ") deve ser o dobro em relação ao Peito (" + exPeito + ")."
+                    );
+                }
+            }
         }
-        return 0;
     }
 
-    // =========================================================================
-    // 4. MAPEAMENTO DE TERMOS MÉDICOS PARA PATOLOGIAS
-    // =========================================================================
     private static final Map<String, String> ACHADOS_MEDICOS_PARA_PATOLOGIA = Map.ofEntries(
             Map.entry("retrolistese", "Lesão Lombar"),
             Map.entry("discopatia", "Lesão Lombar"),
@@ -136,26 +158,13 @@ public class TrainingValidator {
             Map.entry("radicular", "Lesão Lombar"),
             Map.entry("lombar", "Lesão Lombar"),
             Map.entry("espondilose", "Lesão Lombar"),
-            Map.entry("espondilólise", "Lesão Lombar"),
+            Map.entry("anterolistese", "Lesão Lombar"),
             Map.entry("escoliose", "Lesão Lombar"),
             Map.entry("manguito rotador", "Lesão Ombro"),
             Map.entry("bursite subacromial", "Lesão Ombro"),
-            Map.entry("tendinite do supraespinhoso", "Lesão Ombro"),
-            Map.entry("capsulite adesiva", "Lesão Ombro"),
-            Map.entry("luxação do ombro", "Lesão Ombro"),
             Map.entry("menisco", "Lesão Joelho"),
             Map.entry("ligamento cruzado", "Lesão Joelho"),
-            Map.entry("condromalácia", "Lesão Joelho"),
-            Map.entry("condromalacia", "Lesão Joelho"),
-            Map.entry("tendinite patelar", "Lesão Joelho"),
-            Map.entry("síndrome patelofemoral", "Lesão Joelho"),
-            Map.entry("entorse", "Lesão tornozelo"),
-            Map.entry("fascite plantar", "Lesão tornozelo"),
-            Map.entry("tendinite de aquiles", "Lesão tornozelo"),
-            Map.entry("tendinite do tendão de aquiles", "Lesão tornozelo"),
-            Map.entry("epicondilite", "Lesão Cotovelo"),
-            Map.entry("túnel cárpico", "Lesão Punho"),
-            Map.entry("tunel carpico", "Lesão Punho")
+            Map.entry("condromalácia", "Lesão Joelho")
     );
 
     public PatologiaInferida inferirPatologiaDoRelatorio(String medicalReportText) {
@@ -179,39 +188,5 @@ public class TrainingValidator {
                 .collect(Collectors.toCollection(LinkedHashSet::new));
 
         return new PatologiaInferida(categoriasJuntas, todosTermos);
-    }
-
-    // =========================================================================
-    // odes adicionar uma verificação programática no Java para garantir que a IA cumpriu a regra do rácio postural no dia UPPER.
-    // Se a IA gerar mais exercícios de Peito do que de Costas para um utente com protração de ombros, o Java deteta e força um
-    // =========================================================================
-
-    public void validarProporcaoUpperVisbody(TrainingPlanResponse response, String reportVisbodyText) {
-        if (response == null || response.getPlan() == null || reportVisbodyText == null) return;
-
-        boolean temProtracaoOmbros = reportVisbodyText.toLowerCase().contains("protração")
-                || reportVisbodyText.toLowerCase().contains("enrolados");
-
-        if (!temProtracaoOmbros) return;
-
-        for (TrainingDay day : response.getPlan()) {
-            if (day.getDay() != null && day.getDay().toUpperCase().contains("UPPER")) {
-                long exPeito = day.getExercises().stream()
-                        .filter(e -> e.getMuscleGroup() != null && e.getMuscleGroup().equalsIgnoreCase("Peito"))
-                        .count();
-
-                long exCostas = day.getExercises().stream()
-                        .filter(e -> e.getMuscleGroup() != null && (e.getMuscleGroup().equalsIgnoreCase("Costas") || e.getMuscleGroup().equalsIgnoreCase("Ombros")))
-                        .count();
-
-                if (exPeito > exCostas) {
-                    log.warn("[BLOQUEIO POSTURAL] O dia UPPER contem {} exercicios de Peito e apenas {} de Costas/Ombros para utente com ombros enrolados.", exPeito, exCostas);
-                    throw new IllegalArgumentException(
-                            "VIOLAÇÃO DE CORREÇÃO POSTURAL: Utente apresenta ombros enrolados no VisBody. " +
-                                    "O número de exercícios de Costas/Cadeia Posterior (" + exCostas + ") deve ser superior ao de Peito (" + exPeito + ")."
-                    );
-                }
-            }
-        }
     }
 }
