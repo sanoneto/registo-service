@@ -17,6 +17,7 @@ public class TrainingExercise {
     private String intensity;
     private String sets;
     private String reps;
+    private String rpe;
     private String rest;
     private String tempo;
     private String details;

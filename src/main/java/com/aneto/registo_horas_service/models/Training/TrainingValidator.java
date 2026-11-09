@@ -74,23 +74,11 @@ public class TrainingValidator {
 
         String finalUrl = exerciseVideoService.getVideoUrl(correctedName);
 
-        return TrainingExercise.builder()
-                .order(ex.getOrder())
+        // toBuilder preserva todos os campos devolvidos pela IA (ex: rpe, intensity)
+        return ex.toBuilder()
                 .name(correctedName)
-                .muscleGroup(ex.getMuscleGroup())
-                .equipment(ex.getEquipment())
-                .intensity(ex.getIntensity())
-                .sets(ex.getSets())
-                .reps(ex.getReps())
-                .rest(ex.getRest())
-                .tempo(ex.getTempo())
-                .details(ex.getDetails())
-                .notas(ex.getNotas())
-                .weight(ex.getWeight())
-                .cargaAtual(ex.getCargaAtual())
                 .videoUrl(finalUrl)
                 .date(java.time.LocalDate.now().toString())
-                .movementPlane(ex.getMovementPlane())
                 .build();
     }
 

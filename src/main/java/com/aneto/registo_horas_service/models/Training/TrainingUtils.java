@@ -12,10 +12,6 @@ public final class TrainingUtils {
     private TrainingUtils() {
     }
 
-    public static String sanitizarExerciseHistory(String input) {
-        return (input == null || input.isBlank()) ? "Nenhum histórico registado" : input.trim();
-    }
-
     public static String defaultIfEmpty(String value, String defaultValue) {
         return (value == null || value.isBlank()) ? defaultValue : value;
     }
@@ -151,28 +147,10 @@ public final class TrainingUtils {
         return null;
     }
 
-    public static String obterSubstitutoValido(String categoria, String subcategoria,
-                                               Map<String, Map<String, List<String>>> dictComSub,
-                                               Set<String> usadosNestaTentativa, Set<String> nomesAnteriores) {
-        if (categoria == null || dictComSub == null) return null;
-        Map<String, List<String>> subs = dictComSub.get(categoria);
-        if (subs == null) return null;
-
-        if (subcategoria != null && subs.containsKey(subcategoria)) {
-            for (String opcao : subs.get(subcategoria)) {
-                if (!usadosNestaTentativa.contains(opcao) && !nomesAnteriores.contains(opcao)) {
-                    return opcao;
-                }
-            }
-        }
-        for (List<String> lista : subs.values()) {
-            for (String opcao : lista) {
-                if (!usadosNestaTentativa.contains(opcao) && !nomesAnteriores.contains(opcao)) {
-                    return opcao;
-                }
-            }
-        }
-        return null;
+    public static boolean isFocoGluteo(String objectiveText) {
+        if (objectiveText == null || objectiveText.isBlank()) return false;
+        String lower = objectiveText.toLowerCase();
+        return lower.contains("glúteo") || lower.contains("gluteo");
     }
 
     public static Map<String, Map<String, List<String>>> envolverSemSubcategoria(Map<String, List<String>> simpleDict) {
