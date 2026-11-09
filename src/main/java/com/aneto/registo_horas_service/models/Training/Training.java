@@ -35,10 +35,6 @@ public class Training {
 
     private static final int MAX_RETRIES = 5;
 
-    public TrainingPlanResponse generateTrainingPlan(UserProfileRequest userRequest, List<String> exerciciosDoS3) {
-        return generateTrainingPlan(userRequest, exerciciosDoS3, 1);
-    }
-
     public TrainingPlanResponse generateTrainingPlan(UserProfileRequest userRequest, List<String> exerciciosDoS3, int weekNumber) {
 
         boolean ehClinico = isPlanoClinico(userRequest);
@@ -84,15 +80,14 @@ public class Training {
         Map<String, List<String>> exerciseDictionary = carregarDicionario();
         Map<String, Map<String, List<String>>> exerciseDictionaryComSub = carregarDicionarioComSubcategoria(exerciseDictionary);
 
-        boolean isGluteFocus = objectiveText.toLowerCase().contains("glúteo") || objectiveText.toLowerCase().contains("gluteo");
-
+        boolean isGluteFocus = isFocoGluteo(userRequest.getObjective());
         // =========================================================================
         // 💡 APLICAÇÃO DA CONDIÇÃO DE PROMPT (CLÍNICO vs CONVENCIONAL)
         // =========================================================================
         String userPrompt;
         if (ehClinico) {
             // Usa o prompt clínico focado na estrutura de 4 blocos temporizados
-            userPrompt = clinicalPromptBuilder.buildClinicalPrompt(userRequest, macros, exerciciosDoS3);
+            userPrompt = clinicalPromptBuilder.buildClinicalPrompt(userRequest, macros, exerciciosDoS3, volumeIdeal);
         } else {
             // Usa o prompt convencional (divisão Upper/Lower ou Foco Estético)
             userPrompt = promptBuilder.buildUserPrompt(

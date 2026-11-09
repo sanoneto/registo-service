@@ -96,6 +96,7 @@ public class TrainingGenerationAsyncService {
                                         .sets(cEx.getDosageRight() != null ? cEx.getDosageRight() : "3")
                                         .reps(cEx.getDosageLeft() != null ? cEx.getDosageLeft() : "10-12")
                                         .tempo(cEx.getTempoRpe())
+                                        .rpe(cEx.getTempoRpe())
                                         .details(cEx.getExecutionInstructions())
                                         .notas(cEx.getSafetyNotes())
                                         .videoUrl(cEx.getVideoUrl() != null ? cEx.getVideoUrl() : "") // Preserva a URL do vídeo
@@ -130,6 +131,7 @@ public class TrainingGenerationAsyncService {
                                 .sets(cEx.getDosageRight() != null ? cEx.getDosageRight() : "3")
                                 .reps(cEx.getDosageLeft() != null ? cEx.getDosageLeft() : "10-12")
                                 .tempo(cEx.getTempoRpe())
+                                .rpe(cEx.getTempoRpe())
                                 .details(cEx.getExecutionInstructions())
                                 .notas(cEx.getSafetyNotes())
                                 .videoUrl(cEx.getVideoUrl() != null ? cEx.getVideoUrl() : "") // Preserva a URL do vídeo
