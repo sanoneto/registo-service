@@ -39,4 +39,7 @@ public class PlanoDados {
     @UpdateTimestamp
     @Column(name = "atualizado_em")
     private Instant atualizadoEm;
+
+    @Column(name = "username", length = 500)
+    private String username;
 }

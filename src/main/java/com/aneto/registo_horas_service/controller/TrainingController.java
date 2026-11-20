@@ -3,16 +3,12 @@ package com.aneto.registo_horas_service.controller;
 import com.aneto.registo_horas_service.dto.request.UserProfileRequest;
 import com.aneto.registo_horas_service.dto.response.*;
 import com.aneto.registo_horas_service.service.MedicalReportExtractionService;
+import com.aneto.registo_horas_service.service.PdfService;
 import com.aneto.registo_horas_service.service.PlanoService;
 import com.aneto.registo_horas_service.service.TrainingPlanService;
-import com.lowagie.text.*;
-import com.lowagie.text.pdf.PdfPCell;
-import com.lowagie.text.pdf.PdfPTable;
-import com.lowagie.text.pdf.PdfWriter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jetbrains.annotations.NotNull;
-import org.springframework.core.io.InputStreamResource;
+import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -22,9 +18,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.awt.Color;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -41,6 +34,8 @@ public class TrainingController {
 
     private final MedicalReportExtractionService medicalReportExtractionServiceImpl;
     private final MedicalReportExtractionService reportReportVisbodyServiceImpl;
+
+    private final PdfService pdfService;
 
 
     // CORRIGIDO: tipo de retorno passou de ResponseEntity<TrainingPlanResponse> para
@@ -164,67 +159,46 @@ public class TrainingController {
     }
 
     // =========================================================================
-    // ROTA NOA: EXPORTAÇÃO DE PDF CLÍNICO DE REABILITAÇÃO (OpenPDF)
+    // ROTA NOA: EXPORTAÇÃO DE PDF CLÍNICO DE REABILITAÇÃO (OpenPDF Vetorial)
     // =========================================================================
     @GetMapping("/plan/{planId}/pdf")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<InputStreamResource> downloadClinicalPdf(@PathVariable String planId) {
+    public ResponseEntity<byte[]> downloadClinicalPdf(
+            @PathVariable String planId,
+            @RequestHeader(value = X_USER_ID, required = false) String username) {
+
+        TrainingPlanResponse plan = null;
         PlanoStatusResponse status = trainingPlanService.getStatusDoPlano(planId);
-        if (status == null || status.getPlano() == null) {
+
+        if (status != null && status.getPlano() != null) {
+            plan = status.getPlano();
+        } else if (username != null && !username.isBlank()) {
+            plan = trainingPlanService.getOrGeneratePlan(null, username, planId);
+        }
+
+        if (plan == null) {
             return ResponseEntity.notFound().build();
         }
 
-        TrainingPlanResponse plan = status.getPlano();
-        ByteArrayInputStream pdfStream = generateClinicalPdfStream(plan);
+        byte[] pdfBytes = pdfService.generatePdfBytes(plan);
+
+        String studentSlug = (plan.getUserProfile() != null && plan.getUserProfile().getStudentName() != null
+                && !plan.getUserProfile().getStudentName().isBlank())
+                ? plan.getUserProfile().getStudentName().trim().replaceAll("\\s+", "_")
+                : planId;
 
         HttpHeaders headers = new HttpHeaders();
-        headers.add("Content-Disposition", "attachment; filename=Plano_Reabilitacao_" + planId + ".pdf");
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDisposition(
+                ContentDisposition.attachment()
+                        .filename("Plano_Treino_Clinico_" + studentSlug + ".pdf")
+                        .build()
+        );
+        headers.setContentLength(pdfBytes.length);
 
         return ResponseEntity.ok()
                 .headers(headers)
-                .contentType(MediaType.APPLICATION_PDF)
-                .body(new InputStreamResource(pdfStream));
-    }
-
-    private ByteArrayInputStream generateClinicalPdfStream(TrainingPlanResponse plan) {
-        Document document = new Document(PageSize.A4, 30, 30, 30, 30);
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-
-        try {
-            PdfWriter.getInstance(document, out);
-            document.open();
-
-            Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 16, new Color(26, 54, 93));
-            Font blockHeaderFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 11, Color.WHITE);
-            Font tableHeaderFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9, Color.BLACK);
-            Font textFont = FontFactory.getFont(FontFactory.HELVETICA, 8, Color.BLACK);
-            Font dayHeaderFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 13, new Color(26, 54, 93));
-            
-            Paragraph title = new Paragraph("PRESCRIÇÃO DE TREINO & REABILITAÇÃO CLÍNICA", titleFont);
-            title.setAlignment(Element.ALIGN_CENTER);
-            document.add(title);
-            document.add(new Paragraph(" "));
-
-            if (plan.getClinicalPlan() != null && !plan.getClinicalPlan().isEmpty()) {
-                for (ClinicalDay day : plan.getClinicalPlan()) {
-
-                    // 1. Cabeçalho do Dia (Ex: "Dia 1 - Foco Lombar e Core")
-                    if (day.getDay() != null && !day.getDay().isBlank()) {
-                        Paragraph dayHeader = new Paragraph(day.getDay(), dayHeaderFont); // ou reutilize blockHeaderFont em negrito/maior
-                        dayHeader.setSpacingBefore(12);
-                        dayHeader.setSpacingAfter(6);
-                        document.add(dayHeader);
-                    }
-
-                }
-            }
-
-            document.close();
-        } catch (Exception ex) {
-            log.error("Erro ao gerar PDF clínico", ex);
-        }
-
-        return new ByteArrayInputStream(out.toByteArray());
+                .body(pdfBytes);
     }
 
 
