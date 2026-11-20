@@ -11,6 +11,7 @@ import com.lowagie.text.pdf.PdfPTable;
 import com.lowagie.text.pdf.PdfWriter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -197,40 +198,24 @@ public class TrainingController {
             Font blockHeaderFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 11, Color.WHITE);
             Font tableHeaderFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9, Color.BLACK);
             Font textFont = FontFactory.getFont(FontFactory.HELVETICA, 8, Color.BLACK);
-
+            Font dayHeaderFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 13, new Color(26, 54, 93));
+            
             Paragraph title = new Paragraph("PRESCRIÇÃO DE TREINO & REABILITAÇÃO CLÍNICA", titleFont);
             title.setAlignment(Element.ALIGN_CENTER);
             document.add(title);
             document.add(new Paragraph(" "));
 
-            if (plan.getBlocks() != null && !plan.getBlocks().isEmpty()) {
-                for (ClinicalBlock block : plan.getBlocks()) {
-                    PdfPTable headerTable = new PdfPTable(1);
-                    headerTable.setWidthPercentage(100);
-                    PdfPCell hCell = new PdfPCell(new Phrase(block.getBlockName() + " (" + block.getDurationText() + ")", blockHeaderFont));
-                    hCell.setBackgroundColor(new Color(43, 108, 176));
-                    hCell.setPadding(5);
-                    headerTable.addCell(hCell);
-                    document.add(headerTable);
+            if (plan.getClinicalPlan() != null && !plan.getClinicalPlan().isEmpty()) {
+                for (ClinicalDay day : plan.getClinicalPlan()) {
 
-                    PdfPTable table = new PdfPTable(new float[]{3, 2, 2, 4});
-                    table.setWidthPercentage(100);
-                    table.setSpacingAfter(10);
-
-                    table.addCell(new PdfPCell(new Phrase("Exercício", tableHeaderFont)));
-                    table.addCell(new PdfPCell(new Phrase("Dosagem (Dir / Esq)", tableHeaderFont)));
-                    table.addCell(new PdfPCell(new Phrase("Cadência / RPE", tableHeaderFont)));
-                    table.addCell(new PdfPCell(new Phrase("Técnica & Foco Clínico", tableHeaderFont)));
-
-                    if (block.getExercises() != null) {
-                        for (ClinicalExercise ex : block.getExercises()) {
-                            table.addCell(new PdfPCell(new Phrase(ex.getName(), textFont)));
-                            table.addCell(new PdfPCell(new Phrase((ex.getDosageRight() != null ? ex.getDosageRight() : "") + " " + (ex.getDosageLeft() != null ? ex.getDosageLeft() : ""), textFont)));
-                            table.addCell(new PdfPCell(new Phrase(ex.getTempoRpe(), textFont)));
-                            table.addCell(new PdfPCell(new Phrase(ex.getExecutionInstructions(), textFont)));
-                        }
+                    // 1. Cabeçalho do Dia (Ex: "Dia 1 - Foco Lombar e Core")
+                    if (day.getDay() != null && !day.getDay().isBlank()) {
+                        Paragraph dayHeader = new Paragraph(day.getDay(), dayHeaderFont); // ou reutilize blockHeaderFont em negrito/maior
+                        dayHeader.setSpacingBefore(12);
+                        dayHeader.setSpacingAfter(6);
+                        document.add(dayHeader);
                     }
-                    document.add(table);
+
                 }
             }
 
@@ -241,6 +226,7 @@ public class TrainingController {
 
         return new ByteArrayInputStream(out.toByteArray());
     }
+
 
     @PostMapping(value = "/visualbody-report", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("isAuthenticated()")

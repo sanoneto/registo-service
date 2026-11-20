@@ -3,7 +3,8 @@ package com.aneto.registo_horas_service.service.impl;
 import com.aneto.registo_horas_service.dto.request.PlanoRequestDTO;
 import com.aneto.registo_horas_service.dto.request.UserProfileRequest;
 import com.aneto.registo_horas_service.dto.response.PlanoResponseDTO;
-import com.aneto.registo_horas_service.models.Enum;
+import com.aneto.registo_horas_service.models.Enum.EstadoPedido;
+import com.aneto.registo_horas_service.models.Enum.EstadoPlano;
 import com.aneto.registo_horas_service.service.PlanoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -36,7 +37,7 @@ public class PlanoRegistoHelper {
      * segundo registo em vez de atualizar o primeiro).
      */
     public PlanoResponseDTO upsert(String username, UserProfileRequest request, String key, String planId,
-                                   int semanaCiclo, boolean isDeload, Enum.EstadoPedido estadoPedido,
+                                   int semanaCiclo, boolean isDeload, EstadoPedido estadoPedido,
                                    String erroMensagem) {
 
         boolean isAlunoSemConta = request.getAlunoTempId() != null && !request.getAlunoTempId().isBlank();
@@ -51,7 +52,7 @@ public class PlanoRegistoHelper {
                     .nomeAluno(nomeNoPlano)
                     .objetivo(request.getObjective())
                     .especialista(especialista)
-                    .estadoPlano(Enum.EstadoPlano.ATIVO)
+                    .estadoPlano(EstadoPlano.ATIVO)
                     .estadoPedido(estadoPedido)
                     .link(key)
                     .recommended(recommended)
@@ -76,7 +77,7 @@ public class PlanoRegistoHelper {
                 .nomeAluno(planoExistente.getNomeAluno())
                 .objetivo(planoExistente.getObjetivo())
                 .especialista(especialistaAtualizado)
-                .estadoPlano(Enum.EstadoPlano.ATIVO)
+                .estadoPlano(EstadoPlano.ATIVO)
                 .estadoPedido(estadoPedido)
                 .link(key)
                 .recommended(planoExistente.getRecommended())

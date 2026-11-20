@@ -1,6 +1,6 @@
 package com.aneto.registo_horas_service.dto.request;
 
-import com.aneto.registo_horas_service.models.Enum;
+import com.aneto.registo_horas_service.models.Enum.AbsenceType;
 import jakarta.validation.constraints.FutureOrPresent;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -11,7 +11,7 @@ import java.time.LocalDate;
 public record AbsenceRequest(
         @NotNull(message = "O tipo de ausência é obrigatório.")
         String userName,
-        Enum.AbsenceType type,
+        AbsenceType type,
         @NotNull(message = "A data de início é obrigatória.")
         @FutureOrPresent(message = "A data de início deve ser hoje ou futura.")
         LocalDate startDate,

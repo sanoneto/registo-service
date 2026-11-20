@@ -1,5 +1,7 @@
 package com.aneto.registo_horas_service.models;
 
+import com.aneto.registo_horas_service.models.Enum.EstadoPedido;
+import com.aneto.registo_horas_service.models.Enum.EstadoPlano;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -30,10 +32,10 @@ public class Plano {
     private String especialista;
 
     @Enumerated(EnumType.STRING)
-    private Enum.EstadoPlano estadoPlano;
+    private EstadoPlano estadoPlano;
 
     @Enumerated(EnumType.STRING)
-    private Enum.EstadoPedido estadoPedido;
+    private EstadoPedido estadoPedido;
 
     private String link;
 

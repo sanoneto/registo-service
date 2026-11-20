@@ -3,7 +3,8 @@ package com.aneto.registo_horas_service.service.impl;
 import com.aneto.registo_horas_service.dto.request.PlanoRequestDTO;
 import com.aneto.registo_horas_service.dto.response.PlanoResponseDTO;
 import com.aneto.registo_horas_service.mapper.PlanoMapper;
-import com.aneto.registo_horas_service.models.Enum;
+import com.aneto.registo_horas_service.models.Enum.EstadoPedido;
+import com.aneto.registo_horas_service.models.Enum.EstadoPlano;
 import com.aneto.registo_horas_service.models.Plano;
 import com.aneto.registo_horas_service.repository.PlanoRepository;
 import com.aneto.registo_horas_service.service.PlanoService;
@@ -85,10 +86,10 @@ public class PlanoServiceImpl implements PlanoService {
         String nomeFiltro = (nomeAluno != null && !nomeAluno.trim().isEmpty()) ? nomeAluno.trim() : null;
         boolean temNome = nomeFiltro != null;
 
-        Enum.EstadoPlano estadoPlano = null;
+        EstadoPlano estadoPlano = null;
         if (estadoPlanoStr != null && !estadoPlanoStr.isBlank()) {
             try {
-                estadoPlano = Enum.EstadoPlano.valueOf(estadoPlanoStr.toUpperCase());
+                estadoPlano = EstadoPlano.valueOf(estadoPlanoStr.toUpperCase());
             } catch (IllegalArgumentException e) {
                 log.warn("[listAllOrName] estadoPlano inválido ('{}') — ignorado.", estadoPlanoStr);
             }
@@ -137,8 +138,8 @@ public class PlanoServiceImpl implements PlanoService {
         try {
             Optional<PlanoResponseDTO> resultado = repository.findByNomeAlunoContainingAndEstadoPlanoAndEstadoPedido(
                     username,
-                    Enum.EstadoPlano.ATIVO,
-                    Enum.EstadoPedido.FINALIZADO
+                    EstadoPlano.ATIVO,
+                    EstadoPedido.FINALIZADO
             ).map(mapper::toResponse);
 
             log.debug("[findAtivoAndConcluidoByUsername] username='{}' -> {} | id={} | link='{}'",
@@ -196,9 +197,9 @@ public class PlanoServiceImpl implements PlanoService {
                     return new RuntimeException("Plano não encontrado");
                 });
 
-        if (plano.getEstadoPedido() == Enum.EstadoPedido.PENDENTE) {
+        if (plano.getEstadoPedido() == EstadoPedido.PENDENTE) {
 
-            Enum.EstadoPedido proximoEstado = Enum.EstadoPedido.fromDescricao(newStatus);
+            EstadoPedido proximoEstado = EstadoPedido.fromDescricao(newStatus);
             log.debug("[changeOfProgress] Estado mantido: {} | novo status informado: {} | especialista='{}'",
                     plano.getEstadoPedido(), proximoEstado, username);
 
@@ -233,8 +234,8 @@ public class PlanoServiceImpl implements PlanoService {
         try {
             Optional<PlanoResponseDTO> resultado = repository.findByAlunoTempIdAndEstadoPlanoAndEstadoPedido(
                     alunoTempId,
-                    Enum.EstadoPlano.ATIVO,
-                    Enum.EstadoPedido.FINALIZADO
+                    EstadoPlano.ATIVO,
+                    EstadoPedido.FINALIZADO
             ).map(mapper::toResponse);
 
             log.debug("[findAtivoAndConcluidoByAlunoTempId] alunoTempId='{}' -> {} | id={}",

@@ -16,5 +16,5 @@ public class ClinicalDay {
     private String day; // Ex: "Dia 1 - Foco Lombar e Core"
 
     @Builder.Default
-    private List<ClinicalBlock> blocks = new ArrayList<>(); // 4 blocos específicos para este dia
+    private List<TrainingExercise> exercises = new ArrayList<>();// 4 blocos específicos para este dia
 }
