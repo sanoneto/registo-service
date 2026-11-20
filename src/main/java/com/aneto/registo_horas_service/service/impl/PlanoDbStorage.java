@@ -49,7 +49,7 @@ public class PlanoDbStorage {
             throw new IllegalArgumentException("Chave do plano vazia.");
         }
         JsonNode node = objectMapper.valueToTree(plan);
-        repository.save(new PlanoDados(key, node, null));
+        repository.save(new PlanoDados(key, node, null, plan.getUserProfile().getStudentName()));
     }
 
     @Transactional(readOnly = true)

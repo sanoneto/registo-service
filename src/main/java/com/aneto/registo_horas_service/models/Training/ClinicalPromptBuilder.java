@@ -224,34 +224,27 @@ public class ClinicalPromptBuilder {
               "clinicalPlan": [
                 {
                   "day": "<Nome do Dia conforme a Diretriz de Planeamento>",
-                  "totalDayDuration": "{{DURATION_TEXT}}",
-                  "blocks": [
+                  "exercises": [
                     {
-                      "blockName": "BLOCO 1: LIBERTAÇÃO, MOBILIDADE & ATIVAÇÃO NEURAL",
-                      "durationText": "<Duração do bloco, ex: 10 Minutos>",
-                      "exercises": [
-                        {
-                          "order": 1,
-                          "exerciseId": 0,
-                          "name": "<Nome exato do catálogo>",
-                          "muscleGroup": "<Grupo muscular>",
-                          "movementPlane": "<Sagital | Frontal | Transverso | Multiplanar>",
-                          "equipment": "<Equipamento>",
-                          "tempo": "<Ex: 3-1-2-1>",
-                          "sets": "<Ex: 3>",
-                          "reps": "<Ex: 10-12>",
-                          "rest": "<Ex: 45s>",
-                          "rpe": "<Ex: RPE 5 ou RPE 7-8>",
-                          "executionDuration": "<Tempo ativo por série, ex: 40s por série>",
-                          "totalExerciseTime": "<Tempo total incluindo séries e descanso, ex: 5 Minutos>",
-                          "weight": "<Carga sugerida, ex: 0kg ou 4kg>",
-                          "cargaAtual": "<Ex: RPE 7-8 (RIR 2-3)>",
-                          "videoUrl": "",
-                          "details": "<Instrução técnica detalhada de execução>",
-                          "notas": "<Justificação clínica e segurança biomecânica específica para este utente>",
-                          "date": ""
-                        }
-                      ]
+                      "order": 1,
+                      "exerciseId": 0,
+                      "name": "<Nome exato do catálogo>",
+                      "muscleGroup": "<Grupo muscular>",
+                      "movementPlane": "<Sagital | Frontal | Transverso | Multiplanar>",
+                      "equipment": "<Equipamento>",
+                      "tempo": "<Ex: 3-1-2-1>",
+                      "sets": "<Ex: 3>",
+                      "reps": "<Ex: 10-12>",
+                      "rest": "<Ex: 45s>",
+                      "rpe": "<Ex: RPE 5 ou RPE 7-8>",
+                      "executionDuration": "<Tempo ativo por série, ex: 40s por série>",
+                      "totalExerciseTime": "<Tempo total incluindo séries e descanso, ex: 5 Minutos>",
+                      "weight": "<Carga sugerida, ex: 0kg ou 4kg>",
+                      "cargaAtual": "",
+                      "videoUrl": "",
+                      "details": "<Instrução técnica detalhada de execução>",
+                      "notas": "<Justificação clínica e segurança biomecânica específica para este utente>",
+                      "date": ""
                     }
                   ]
                 }
