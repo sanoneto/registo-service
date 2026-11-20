@@ -4,35 +4,42 @@ import com.aneto.registo_horas_service.dto.request.PlanoRequestDTO;
 import com.aneto.registo_horas_service.dto.request.UserProfileRequest;
 import com.aneto.registo_horas_service.dto.response.*;
 import com.aneto.registo_horas_service.mapper.ExerciseHistoryMapper;
-import com.aneto.registo_horas_service.models.Enum;
+import com.aneto.registo_horas_service.models.Enum.EstadoPedido;
+import com.aneto.registo_horas_service.models.Enum.EstadoPlano;
 import com.aneto.registo_horas_service.models.ExerciseHistoryEntity;
 import com.aneto.registo_horas_service.models.Training.Training;
 import com.aneto.registo_horas_service.repository.ExerciseHistoryRepository;
 import com.aneto.registo_horas_service.service.PlanoService;
 import com.aneto.registo_horas_service.service.TrainingPlanService;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.transaction.Transactional;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class TrainingPlanServiceImpl implements TrainingPlanService {
-    private static final Logger log = LoggerFactory.getLogger(TrainingPlanServiceImpl.class);
 
     private static final int DIAS_LIMITE_PARA_REINICIAR_CICLO = 14;
+    private static final int SEMANAS_POR_CICLO = 4; // a última semana do ciclo é de deload
+    private static final DateTimeFormatter TIMESTAMP_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
 
-    private final ObjectMapper objectMapper;
+    private static final String SEM_ESPECIALISTA = "Sem Especialista";
+    private static final String FOCO_PADRAO = "Reabilitação";
+    private static final String SERIES_PADRAO = "3";
+    private static final String REPS_PADRAO = "10-12";
+
     private final PlanoService planoService;
     private final ExerciseHistoryMapper exerciseHistoryMapper;
     private final ExerciseHistoryRepository exerciseHistoryRepository;
@@ -46,42 +53,39 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
     // Só serve para formar o prefixo do "link" do plano. Com valor por omissão,
     // a configuração do S3 pode ser removida sem partir o arranque.
     @Value("${spring.cloud.aws.s3.folder-name:planos/}")
-    private String S3FOLDER;
+    private String s3Folder;
+
+    /** Dados necessários para gerar um novo plano (partilhados entre geração síncrona e assíncrona). */
+    private record ContextoGeracao(List<String> exerciciosParaEvitar, int semanaCiclo, boolean deload) {
+    }
+
+    // =========================================================================
+    // Leitura / geração
+    // =========================================================================
 
     @Override
     public TrainingPlanResponse getOrGeneratePlan(UserProfileRequest request, String username, String planId) {
         long inicio = System.currentTimeMillis();
         String key = buscarChaveDoPlano(planId, username, request);
 
-        // 1. Leitura direta (S3 com fallback para a BD; modo consulta / sem body no request)
-        if (isRequestEmpty(request)) {
+        // 1. Modo consulta (pedido sem dados suficientes): leitura direta, S3 com fallback para a BD
+        if (isPerfilIncompleto(request)) {
             Optional<TrainingPlanResponse> loaded = loadFromS3(key);
-            if (loaded.isPresent()) {
-                TrainingPlanResponse planLoaded = loaded.get();
-                sincronizarBlocosComPlanoClassico(planLoaded);
-                return planLoaded;
+            if (loaded.isEmpty()) {
+                log.warn("[getOrGeneratePlan] Plano não encontrado (S3 nem BD) para a chave '{}'.", key);
             }
-            log.warn("[getOrGeneratePlan] Plano não encontrado (S3 nem BD) para a chave '{}'.", key);
-            return null;
+            return loaded.orElse(null);
         }
 
         // 2. Geração síncrona com IA
-        boolean isAlunoSemConta = request.getAlunoTempId() != null && !request.getAlunoTempId().isBlank();
-        Optional<PlanoResponseDTO> planoAnteriorOpt = isAlunoSemConta
-                ? planoService.findAtivoAndConcluidoByAlunoTempId(request.getAlunoTempId())
-                : planoService.findAtivoAndConcluidoByUsername(username);
+        ContextoGeracao ctx = prepararContextoGeracao(request, username);
 
-        List<String> exerciciosParaEvitar = carregarExerciciosParaEvitar(planoAnteriorOpt);
-        int weekNumber = calcularProximaSemanaCiclo(planoAnteriorOpt, isAlunoSemConta ? request.getAlunoTempId() : username);
-        boolean isDeloadWeek = weekNumber % 4 == 0;
+        TrainingPlanResponse newPlan = training.generateTrainingPlan(
+                request, ctx.exerciciosParaEvitar(), ctx.semanaCiclo());
 
-        TrainingPlanResponse newPlan = training.generateTrainingPlan(request, exerciciosParaEvitar, weekNumber);
-
-        // Mapeia os dados do clinicalPlan/blocks para a lista legada 'plan'
         sincronizarBlocosComPlanoClassico(newPlan);
-
         configurarNovoPlano(newPlan, request);
-        salvarDadosDoPlano(username, request, key, newPlan, planId, false, weekNumber, isDeloadWeek);
+        salvarDadosDoPlano(username, request, key, newPlan, planId, false, ctx.semanaCiclo(), ctx.deload());
 
         log.info("[getOrGeneratePlan] Plano gerado e guardado em {} ms", System.currentTimeMillis() - inicio);
         return newPlan;
@@ -89,39 +93,31 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
 
     @Override
     public boolean isPedidoDeGeracaoCompleto(UserProfileRequest request) {
-        return !isRequestEmpty(request);
+        return !isPerfilIncompleto(request);
     }
 
     @Override
     public PlanoResponseDTO iniciarGeracaoAssincrona(UserProfileRequest request, String username, String planId) {
-        if (isRequestEmpty(request)) {
+        if (isPerfilIncompleto(request)) {
             throw new IllegalStateException("Pedido vazio. Utilize a leitura direta do plano.");
         }
 
         String key = buscarChaveDoPlano(planId, username, request);
-        boolean isAlunoSemConta = request.getAlunoTempId() != null && !request.getAlunoTempId().isBlank();
-
-        Optional<PlanoResponseDTO> planoAnteriorOpt = isAlunoSemConta
-                ? planoService.findAtivoAndConcluidoByAlunoTempId(request.getAlunoTempId())
-                : planoService.findAtivoAndConcluidoByUsername(username);
-
-        List<String> exerciciosParaEvitar = carregarExerciciosParaEvitar(planoAnteriorOpt);
-        int weekNumber = calcularProximaSemanaCiclo(planoAnteriorOpt, isAlunoSemConta ? request.getAlunoTempId() : username);
-        boolean isDeloadWeek = weekNumber % 4 == 0;
+        ContextoGeracao ctx = prepararContextoGeracao(request, username);
 
         PlanoResponseDTO planoRegistado = planoRegistoHelper.upsert(username, request, key, planId,
-                weekNumber, isDeloadWeek, Enum.EstadoPedido.A_PROCESSAR, null);
+                ctx.semanaCiclo(), ctx.deload(), EstadoPedido.A_PROCESSAR, null);
 
         trainingGenerationAsyncService.gerarEGuardarPlano(
-                request, username, planoRegistado.getId(), key, weekNumber, isDeloadWeek, exerciciosParaEvitar
-        );
+                request, username, planoRegistado.getId(), key,
+                ctx.semanaCiclo(), ctx.deload(), ctx.exerciciosParaEvitar());
 
         return planoRegistado;
     }
 
     @Override
     public PlanoStatusResponse getStatusDoPlano(String planId) {
-        PlanoResponseDTO plano = planoService.getByPlanoById(UUID.fromString(planId));
+        PlanoResponseDTO plano = buscarPlanoPorId(planId).orElse(null);
         if (plano == null) return null;
 
         PlanoStatusResponse.PlanoStatusResponseBuilder builder = PlanoStatusResponse.builder()
@@ -129,152 +125,103 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
                 .estadoPedido(plano.getEstadoPedido())
                 .erroMensagem(plano.getErroMensagem());
 
-        String estado = plano.getEstadoPedido();
-        // Permite carregar o plano se estiver FINALIZADO ou PENDENTE
-        if (Enum.EstadoPedido.FINALIZADO.getDescricao().equalsIgnoreCase(estado) ||
-                Enum.EstadoPedido.PENDENTE.getDescricao().equalsIgnoreCase(estado)) {
-            loadFromS3(plano.getLink()).ifPresent(p -> {
-                sincronizarBlocosComPlanoClassico(p);
-                builder.plano(p);
-            });
+        // O plano pode ser carregado se estiver FINALIZADO ou PENDENTE.
+        // loadFromS3 já sincroniza os blocos com a estrutura legada.
+        if (planoDisponivelParaLeitura(plano.getEstadoPedido()) && isLinkValido(plano.getLink())) {
+            loadFromS3(plano.getLink()).ifPresent(builder::plano);
         }
 
         return builder.build();
     }
 
+    private ContextoGeracao prepararContextoGeracao(UserProfileRequest request, String username) {
+        Optional<PlanoResponseDTO> planoAnterior = isAlunoSemConta(request)
+                ? planoService.findAtivoAndConcluidoByAlunoTempId(request.getAlunoTempId())
+                : planoService.findAtivoAndConcluidoByUsername(username);
+
+        int semanaCiclo = calcularProximaSemanaCiclo(planoAnterior);
+        return new ContextoGeracao(
+                carregarExerciciosParaEvitar(planoAnterior),
+                semanaCiclo,
+                semanaCiclo % SEMANAS_POR_CICLO == 0);
+    }
+
+    private boolean planoDisponivelParaLeitura(String estadoPedido) {
+        return EstadoPedido.FINALIZADO.getDescricao().equalsIgnoreCase(estadoPedido)
+                || EstadoPedido.PENDENTE.getDescricao().equalsIgnoreCase(estadoPedido);
+    }
+
+    // =========================================================================
+    // Conversão clinicalPlan/blocks -> plan (legado)
+    // =========================================================================
+
     /**
-     * Mapeia e sincroniza tanto a lista 'clinicalPlan' (multi-dias) como a lista 'blocks' (dia único)
-     * para a estrutura 'plan' legada, garantindo que a resposta ao Frontend nunca vá vazia.
+     * Mapeia a lista 'clinicalPlan' (multi-dias) para a estrutura 'plan' legada,
+     * garantindo que a resposta ao Frontend nunca vá vazia.
      */
-    private void sincronizarBlocosComPlanoClassico(TrainingPlanResponse newPlan) {
-        if (newPlan == null) return;
+    private void sincronizarBlocosComPlanoClassico(TrainingPlanResponse plan) {
+        if (plan == null || !nullSafe(plan.getPlan()).isEmpty()) return; // já tem exercícios válidos
+        if (nullSafe(plan.getClinicalPlan()).isEmpty()) return;
 
-        // Se 'plan' já contiver exercícios válidos, nada a fazer
-        if (newPlan.getPlan() != null && !newPlan.getPlan().isEmpty()) {
-            return;
-        }
-
-        // 1. Prioridade: Sincronizar a partir de 'clinicalPlan' (Multi-Dias)
-        if (newPlan.getClinicalPlan() != null && !newPlan.getClinicalPlan().isEmpty()) {
-            List<TrainingDay> days = new ArrayList<>();
-
-            for (ClinicalDay cDay : newPlan.getClinicalPlan()) {
-                TrainingDay day = new TrainingDay();
-                day.setDay(cDay.getDay());
-
-                List<TrainingExercise> exercises = new ArrayList<>();
-                if (cDay.getBlocks() != null) {
-                    for (ClinicalBlock block : cDay.getBlocks()) {
-                        if (block.getExercises() != null) {
-                            for (ClinicalExercise cEx : block.getExercises()) {
-                                TrainingExercise ex = TrainingExercise.builder()
-                                        .order(cEx.getOrder())
-                                        .name(cEx.getName())
-                                        .muscleGroup("[" + block.getBlockName() + "] " + (cEx.getTargetFocus() != null ? cEx.getTargetFocus() : "Reabilitação"))
-                                        .sets(cEx.getDosageRight() != null ? cEx.getDosageRight() : "3")
-                                        .reps(cEx.getDosageLeft() != null ? cEx.getDosageLeft() : "10-12")
-                                        .tempo(cEx.getTempoRpe())
-                                        .details(cEx.getExecutionInstructions())
-                                        .notas(cEx.getSafetyNotes())
-                                        .videoUrl(cEx.getVideoUrl())
-                                        .build();
-                                exercises.add(ex);
-                            }
-                        }
-                    }
-                }
-                day.setExercises(exercises);
-                days.add(day);
-            }
-            newPlan.setPlan(days);
-            return;
-        }
-
-        // 2. Fallback: Sincronizar a partir de 'blocks' (Dia Único)
-        if (newPlan.getBlocks() != null && !newPlan.getBlocks().isEmpty()) {
-            List<TrainingDay> days = new ArrayList<>();
-
-            for (ClinicalBlock block : newPlan.getBlocks()) {
-                TrainingDay day = new TrainingDay();
-                day.setDay(block.getBlockName() + (block.getDurationText() != null ? " (" + block.getDurationText() + ")" : ""));
-
-                List<TrainingExercise> exercises = new ArrayList<>();
-                if (block.getExercises() != null) {
-                    for (ClinicalExercise cEx : block.getExercises()) {
-                        TrainingExercise ex = TrainingExercise.builder()
-                                .order(cEx.getOrder())
-                                .name(cEx.getName())
-                                .muscleGroup(cEx.getTargetFocus())
-                                .sets(cEx.getDosageRight() != null ? cEx.getDosageRight() : "3")
-                                .reps(cEx.getDosageLeft() != null ? cEx.getDosageLeft() : "10-12")
-                                .tempo(cEx.getTempoRpe())
-                                .details(cEx.getExecutionInstructions())
-                                .notas(cEx.getSafetyNotes())
-                                .videoUrl(cEx.getVideoUrl())
-                                .build();
-                        exercises.add(ex);
-                    }
-                }
-                day.setExercises(exercises);
-                days.add(day);
-            }
-            newPlan.setPlan(days);
-        }
+        plan.setPlan(plan.getClinicalPlan().stream()
+                .map(this::converterDia)
+                .collect(Collectors.toCollection(ArrayList::new)));
     }
 
-    private List<String> carregarExerciciosParaEvitar(Optional<PlanoResponseDTO> planoAnteriorOpt) {
-        List<String> exerciciosParaEvitar = new ArrayList<>();
-        planoAnteriorOpt.ifPresent(plano -> {
-            Optional<TrainingPlanResponse> antigo = loadFromS3(plano.getLink());
-            antigo.ifPresent(oldPlan -> {
-                sincronizarBlocosComPlanoClassico(oldPlan);
-                if (oldPlan.getPlan() != null) {
-                    List<String> names = oldPlan.getPlan().stream()
-                            .flatMap(day -> day.getExercises().stream())
-                            .map(TrainingExercise::getName)
-                            .filter(Objects::nonNull)
-                            .distinct()
-                            .toList();
-                    exerciciosParaEvitar.addAll(names);
-                }
-            });
-        });
-        return exerciciosParaEvitar;
+    private TrainingDay converterDia(ClinicalDay clinicalDay) {
+        TrainingDay day = new TrainingDay();
+        day.setDay(clinicalDay.getDay());
+        day.setExercises(clinicalDay.getExercises());
+        return day;
     }
+
+
+    private List<String> carregarExerciciosParaEvitar(Optional<PlanoResponseDTO> planoAnterior) {
+        return planoAnterior
+                .filter(p -> isLinkValido(p.getLink()))
+                .flatMap(p -> loadFromS3(p.getLink())) // já sincroniza com a estrutura legada
+                .map(antigo -> nullSafe(antigo.getPlan()).stream()
+                        .flatMap(day -> nullSafe(day.getExercises()).stream())
+                        .map(TrainingExercise::getName)
+                        .filter(Objects::nonNull)
+                        .distinct()
+                        .collect(Collectors.toCollection(ArrayList::new)))
+                .orElseGet(ArrayList::new);
+    }
+
+    // =========================================================================
+    // Atualização / associação
+    // =========================================================================
 
     @Override
     public void updatePlan(TrainingPlanResponse newPlan, String username, String planId) {
-        String key = buscarChaveDoPlano(planId, username, null);
-        configurarNovoPlano(newPlan, newPlan.getUserProfile());
-
-        int semanaCiclo = 1;
-        boolean isDeload = false;
-        if (planId != null && !planId.isBlank()) {
-            try {
-                PlanoResponseDTO existente = planoService.getByPlanoById(UUID.fromString(planId));
-                if (existente != null) {
-                    semanaCiclo = existente.getSemanaCiclo();
-                    isDeload = existente.isDeload();
-                }
-            } catch (Exception ignored) {
-            }
+        UserProfileRequest perfil = newPlan.getUserProfile();
+        if (perfil == null) {
+            throw new IllegalArgumentException("O plano a atualizar não contém o perfil do utilizador.");
         }
 
-        salvarDadosDoPlano(username, newPlan.getUserProfile(), key, newPlan, planId, true, semanaCiclo, isDeload);
+        String key = buscarChaveDoPlano(planId, username, null);
+        configurarNovoPlano(newPlan, perfil);
+
+        Optional<PlanoResponseDTO> existente = buscarPlanoPorId(planId);
+        int semanaCiclo = existente.map(PlanoResponseDTO::getSemanaCiclo).orElse(1);
+        boolean deload = existente.map(PlanoResponseDTO::isDeload).orElse(false);
+
+        salvarDadosDoPlano(username, perfil, key, newPlan, planId, true, semanaCiclo, deload);
     }
 
     @Override
     @Transactional
     public void associarPlanoAConta(String planId, String novoUsername) {
-        PlanoResponseDTO plano = planoService.getByPlanoById(UUID.fromString(planId));
-        if (plano == null) throw new RuntimeException("Plano não encontrado: " + planId);
+        PlanoResponseDTO plano = buscarPlanoPorId(planId)
+                .orElseThrow(() -> new EntityNotFoundException("Plano não encontrado: " + planId));
 
         PlanoRequestDTO dto = PlanoRequestDTO.builder()
                 .nomeAluno(novoUsername)
                 .objetivo(plano.getObjetivo())
                 .especialista(plano.getEspecialista())
-                .estadoPlano(Enum.EstadoPlano.valueOf(plano.getEstadoPlano()))
-                .estadoPedido(Enum.EstadoPedido.valueOf(plano.getEstadoPedido()))
+                .estadoPlano(EstadoPlano.valueOf(plano.getEstadoPlano()))
+                .estadoPedido(EstadoPedido.fromDescricao(plano.getEstadoPedido()))
                 .link(plano.getLink())
                 .recommended(plano.getRecommended())
                 .semanaCiclo(plano.getSemanaCiclo())
@@ -286,29 +233,41 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
         planoService.updatePlano(planId, dto);
     }
 
+    // =========================================================================
+    // Histórico de progresso
+    // =========================================================================
+
     @Override
     @Transactional
     public void saveProgressLogs(List<TrainingExercise> logs, String username, String planId) {
         if (logs == null || logs.isEmpty()) return;
 
-        List<ExerciseHistoryEntity> entities = logs.stream().map(item -> ExerciseHistoryEntity.builder()
-                .username(username)
-                .planId(planId)
-                .exerciseName(item.getName())
-                .muscleGroup(item.getMuscleGroup())
-                .weight(item.getWeight())
-                .registeredAt(LocalDateTime.now())
-                .clientDate(item.getDate())
-                .build()).collect(Collectors.toList());
+        LocalDateTime agora = LocalDateTime.now();
+        List<ExerciseHistoryEntity> entities = logs.stream()
+                .map(item -> ExerciseHistoryEntity.builder()
+                        .username(username)
+                        .planId(planId)
+                        .exerciseName(item.getName())
+                        .muscleGroup(item.getMuscleGroup())
+                        .cargaSugerida(item.getCargaSugerida())
+                        .registeredAt(agora)
+                        .clientDate(item.getDate())
+                        .build())
+                .toList();
 
         exerciseHistoryRepository.saveAll(entities);
     }
 
     @Override
     public List<ExerciseHistoryResponse> getProgressLogs(String exerciseName, String username) {
-        var entities = exerciseHistoryRepository.findByUsernameAndExerciseNameOrderByRegisteredAtDesc(username, exerciseName);
+        var entities = exerciseHistoryRepository
+                .findByUsernameAndExerciseNameOrderByRegisteredAtDesc(username, exerciseName);
         return exerciseHistoryMapper.toResponseList(entities);
     }
+
+    // =========================================================================
+    // Storage
+    // =========================================================================
 
     // Os nomes loadFromS3/saveToS3 mantêm-se por causa da interface TrainingPlanService
     // (e dos controllers que a usam). Por dentro: lê do S3 e, se der erro ou não existir, da BD.
@@ -324,58 +283,144 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
         planoStorage.save(key, plan);
     }
 
-    private int calcularProximaSemanaCiclo(Optional<PlanoResponseDTO> planoAnteriorOpt, String identificador) {
-        if (planoAnteriorOpt.isEmpty()) return 1;
-        PlanoResponseDTO anterior = planoAnteriorOpt.get();
-        String dataReferenciaStr = (anterior.getDataUpdate() != null && !anterior.getDataUpdate().isBlank())
-                ? anterior.getDataUpdate() : anterior.getDataCreate();
+    // =========================================================================
+    // Ciclo de treino
+    // =========================================================================
+
+    private int calcularProximaSemanaCiclo(Optional<PlanoResponseDTO> planoAnterior) {
+        return planoAnterior.map(this::proximaSemana).orElse(1);
+    }
+
+    private int proximaSemana(PlanoResponseDTO anterior) {
+        String dataReferenciaStr = isLinkValido(anterior.getDataUpdate())
+                ? anterior.getDataUpdate()
+                : anterior.getDataCreate();
 
         if (dataReferenciaStr == null || dataReferenciaStr.isBlank()) return 1;
 
         try {
-            LocalDate dataReferencia = LocalDate.parse(dataReferenciaStr);
-            long diasDesdeUltimoPlano = ChronoUnit.DAYS.between(dataReferencia, LocalDate.now());
-            if (diasDesdeUltimoPlano > DIAS_LIMITE_PARA_REINICIAR_CICLO) return 1;
-            return anterior.getSemanaCiclo() + 1;
-        } catch (Exception e) {
+            long dias = ChronoUnit.DAYS.between(LocalDate.parse(dataReferenciaStr), LocalDate.now());
+            return dias > DIAS_LIMITE_PARA_REINICIAR_CICLO ? 1 : anterior.getSemanaCiclo() + 1;
+        } catch (DateTimeParseException e) {
+            log.warn("[proximaSemana] Data de referência inválida '{}'. O ciclo será reiniciado.", dataReferenciaStr);
             return 1;
         }
     }
 
-    private String buscarChaveDoPlano(String planId, String username, UserProfileRequest request) {
-        if (planId != null && !planId.isBlank()) {
-            try {
-                PlanoResponseDTO plano = planoService.getByPlanoById(UUID.fromString(planId));
-                if (plano != null && isLinkValido(plano.getLink())) return plano.getLink();
-            } catch (IllegalArgumentException ignored) {
+    // =========================================================================
+    // Persistência do plano (BD + storage)
+    // =========================================================================
+
+    private void salvarDadosDoPlano(String username, UserProfileRequest request, String key,
+                                    TrainingPlanResponse plan, String planId, boolean update,
+                                    int semanaCiclo, boolean deload) {
+        // 1. Conteúdo primeiro: se falhar, o registo nunca aponta para um ficheiro inexistente
+        //    e o plano ativo anterior mantém-se. Um órfão no storage é inofensivo.
+        saveToS3(key, plan);
+
+        // 2. Só depois o registo na BD
+        if (update) {
+            if (isAlunoSemConta(request)) {
+                planoService.prepararNovoPlanoAtivoPorAlunoTempId(request.getAlunoTempId());
+            } else {
+                planoService.prepararNovoPlanoAtivo(username);
             }
         }
 
-        if (request == null) {
-            return planoService.findAtivoAndConcluidoByUsername(username)
-                    .map(PlanoResponseDTO::getLink)
-                    .filter(this::isLinkValido)
-                    .orElseGet(() -> gerarCaminhoPadrao(username));
+        if (planId == null || planId.isBlank()) {
+            criarRegistoDoPlano(username, request, key, semanaCiclo, deload);
         } else {
-            return gerarCaminhoPadrao(username);
+            atualizarRegistoDoPlano(planId, username, request, key, semanaCiclo, deload);
         }
     }
 
-    private boolean isLinkValido(String link) {
-        return link != null && !link.isBlank();
+    private void criarRegistoDoPlano(String username, UserProfileRequest request, String key,
+                                     int semanaCiclo, boolean deload) {
+        boolean semConta = isAlunoSemConta(request);
+        boolean temNomeAluno = temNomeAluno(request);
+
+        PlanoRequestDTO dto = PlanoRequestDTO.builder()
+                .nomeAluno(temNomeAluno ? request.getStudentName() : username)
+                .objetivo(request.getObjective())
+                .especialista(resolverEspecialista(request, username))
+                .estadoPlano(EstadoPlano.ATIVO)
+                .estadoPedido(EstadoPedido.FINALIZADO)
+                .link(key)
+                .recommended(temNomeAluno ? request.getRecommended() : username)
+                .semanaCiclo(semanaCiclo)
+                .deload(deload)
+                .contaAssociada(!semConta)
+                .alunoTempId(semConta ? request.getAlunoTempId() : null)
+                .build();
+
+        planoService.createPlano(dto);
+    }
+
+    private void atualizarRegistoDoPlano(String planId, String username, UserProfileRequest request, String key,
+                                         int semanaCiclo, boolean deload) {
+        PlanoResponseDTO existente = buscarPlanoPorId(planId)
+                .orElseThrow(() -> new EntityNotFoundException("Plano não encontrado para o ID: " + planId));
+
+        String especialista = resolverEspecialista(request, username);
+
+        PlanoRequestDTO dto = PlanoRequestDTO.builder()
+                .nomeAluno(existente.getNomeAluno())
+                .objetivo(existente.getObjetivo())
+                .especialista(especialista)
+                .estadoPlano(EstadoPlano.ATIVO)
+                .estadoPedido(EstadoPedido.FINALIZADO)
+                .link(key)
+                .recommended(existente.getRecommended())
+                .semanaCiclo(semanaCiclo)
+                .deload(deload)
+                .contaAssociada(existente.isContaAssociada())
+                .alunoTempId(existente.getAlunoTempId())
+                .build();
+
+        planoService.updatePlano(planId, dto);
+    }
+
+    // =========================================================================
+    // Helpers
+    // =========================================================================
+
+    private Optional<PlanoResponseDTO> buscarPlanoPorId(String planId) {
+        if (planId == null || planId.isBlank()) return Optional.empty();
+        try {
+            return Optional.ofNullable(planoService.getByPlanoById(UUID.fromString(planId)));
+        } catch (IllegalArgumentException e) {
+            log.warn("[buscarPlanoPorId] planId inválido: '{}'", planId);
+            return Optional.empty();
+        }
+    }
+
+    private String buscarChaveDoPlano(String planId, String username, UserProfileRequest request) {
+        Optional<String> linkDoPlano = buscarPlanoPorId(planId)
+                .map(PlanoResponseDTO::getLink)
+                .filter(this::isLinkValido);
+        if (linkDoPlano.isPresent()) return linkDoPlano.get();
+
+        if (request != null) return gerarCaminhoPadrao(username);
+
+        return planoService.findAtivoAndConcluidoByUsername(username)
+                .map(PlanoResponseDTO::getLink)
+                .filter(this::isLinkValido)
+                .orElseGet(() -> gerarCaminhoPadrao(username));
     }
 
     private String gerarCaminhoPadrao(String username) {
-        String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
-        return String.format("%s%s/plan/%s_%s.json", S3FOLDER, username, username, timestamp);
+        String pasta = s3Folder.endsWith("/") ? s3Folder : s3Folder + "/";
+        String timestamp = LocalDateTime.now().format(TIMESTAMP_FORMAT);
+        return String.format("%s%s/plan/%s_%s.json", pasta, username, username, timestamp);
     }
 
-    private boolean isRequestEmpty(UserProfileRequest request) {
-        return request == null ||
-                (request.getObjective() == null || request.getObjective().isBlank()) ||
-                request.getWeightKg() == null ||
-                request.getHeightCm() == null ||
-                request.getAge() == null;
+    /** Perfil insuficiente para gerar um plano => o pedido é só de consulta. */
+    private boolean isPerfilIncompleto(UserProfileRequest request) {
+        return request == null
+                || isBlank(request.getObjective())
+                || request.getWeightKg() == null
+                || request.getHeightCm() == null
+                || request.getAge() == null;
     }
 
     private void configurarNovoPlano(TrainingPlanResponse plan, UserProfileRequest request) {
@@ -383,62 +428,28 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
         plan.setUserProfile(request);
     }
 
-    private void salvarDadosDoPlano(String username, UserProfileRequest request, String key, TrainingPlanResponse plan,
-                                    String planId, boolean update, int semanaCiclo, boolean isDeload) {
-        PlanoRequestDTO dto;
-        boolean isAlunoSemConta = request.getAlunoTempId() != null && !request.getAlunoTempId().isBlank();
+    private boolean isAlunoSemConta(UserProfileRequest request) {
+        return request != null && !isBlank(request.getAlunoTempId());
+    }
 
-        if (update) {
-            if (isAlunoSemConta) {
-                planoService.prepararNovoPlanoAtivoPorAlunoTempId(request.getAlunoTempId());
-            } else {
-                planoService.prepararNovoPlanoAtivo(username);
-            }
-        }
+    /** Com nome de aluno, quem pede é o especialista; caso contrário o plano é pessoal. */
+    private String resolverEspecialista(UserProfileRequest request, String username) {
+        return temNomeAluno(request) ? username : SEM_ESPECIALISTA;
+    }
 
-        if (planId == null || planId.isEmpty()) {
-            boolean temNomeAluno = request.getStudentName() != null && !request.getStudentName().isBlank();
-            String nomeNoPlano = temNomeAluno ? request.getStudentName() : username;
-            String especialista = temNomeAluno ? username : "Sem Especialista";
-            String recommended = temNomeAluno ? request.getRecommended() : username;
+    private boolean temNomeAluno(UserProfileRequest request) {
+        return request != null && !isBlank(request.getStudentName());
+    }
 
-            dto = PlanoRequestDTO.builder()
-                    .nomeAluno(nomeNoPlano)
-                    .objetivo(request.getObjective())
-                    .especialista(especialista)
-                    .estadoPlano(Enum.EstadoPlano.ATIVO)
-                    .estadoPedido(Enum.EstadoPedido.FINALIZADO)
-                    .link(key)
-                    .recommended(recommended)
-                    .semanaCiclo(semanaCiclo)
-                    .deload(isDeload)
-                    .contaAssociada(!isAlunoSemConta)
-                    .alunoTempId(isAlunoSemConta ? request.getAlunoTempId() : null)
-                    .build();
-            planoService.createPlano(dto);
-        } else {
-            PlanoResponseDTO planoExistente = planoService.getByPlanoById(UUID.fromString(planId));
-            if (planoExistente == null) throw new RuntimeException("Plano não encontrado para o ID: " + planId);
+    private boolean isLinkValido(String link) {
+        return !isBlank(link);
+    }
 
-            boolean temNomeAluno = request.getStudentName() != null && !request.getStudentName().isBlank();
-            String especialistaAtualizado = temNomeAluno ? "Sem Especialista" : username;
+    private static boolean isBlank(String s) {
+        return s == null || s.isBlank();
+    }
 
-            dto = PlanoRequestDTO.builder()
-                    .nomeAluno(planoExistente.getNomeAluno())
-                    .objetivo(planoExistente.getObjetivo())
-                    .especialista(especialistaAtualizado)
-                    .estadoPlano(Enum.EstadoPlano.ATIVO)
-                    .estadoPedido(Enum.EstadoPedido.FINALIZADO)
-                    .link(key)
-                    .recommended(planoExistente.getRecommended())
-                    .semanaCiclo(semanaCiclo)
-                    .deload(isDeload)
-                    .contaAssociada(planoExistente.isContaAssociada())
-                    .alunoTempId(planoExistente.getAlunoTempId())
-                    .build();
-            planoService.updatePlano(planId, dto);
-        }
-
-        saveToS3(key, plan);
+    private static <T> List<T> nullSafe(List<T> list) {
+        return list != null ? list : List.of();
     }
 }

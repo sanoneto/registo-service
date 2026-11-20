@@ -1,13 +1,10 @@
 package com.aneto.registo_horas_service.service.impl;
 
 import com.aneto.registo_horas_service.dto.request.UserProfileRequest;
-import com.aneto.registo_horas_service.dto.response.ClinicalBlock;
 import com.aneto.registo_horas_service.dto.response.ClinicalDay;
-import com.aneto.registo_horas_service.dto.response.ClinicalExercise;
 import com.aneto.registo_horas_service.dto.response.TrainingDay;
-import com.aneto.registo_horas_service.dto.response.TrainingExercise;
 import com.aneto.registo_horas_service.dto.response.TrainingPlanResponse;
-import com.aneto.registo_horas_service.models.Enum;
+import com.aneto.registo_horas_service.models.Enum.EstadoPedido;
 import com.aneto.registo_horas_service.models.Training.Training;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -47,7 +44,7 @@ public class TrainingGenerationAsyncService {
 
             // 3. Atualiza estado na BD (só depois de o JSON estar gravado)
             planoRegistoHelper.upsert(username, request, key, planId, weekNumber, isDeloadWeek,
-                    Enum.EstadoPedido.PENDENTE, null);
+                    EstadoPedido.PENDENTE, null);
 
             log.info("[gerarEGuardarPlano] CONCLUÍDO com sucesso | username='{}' | planId='{}'", username, planId);
 
@@ -56,7 +53,7 @@ public class TrainingGenerationAsyncService {
                     username, planId, e);
             try {
                 planoRegistoHelper.upsert(username, request, key, planId, weekNumber, isDeloadWeek,
-                        Enum.EstadoPedido.ERRO, resumirErro(e));
+                        EstadoPedido.ERRO, resumirErro(e));
             } catch (Exception erroAoRegistar) {
                 log.error("[gerarEGuardarPlano] Falha ADICIONAL ao tentar registar o estado de erro | username='{}' | planId='{}'",
                         username, planId, erroAoRegistar);
@@ -83,65 +80,12 @@ public class TrainingGenerationAsyncService {
             for (ClinicalDay cDay : newPlan.getClinicalPlan()) {
                 TrainingDay day = new TrainingDay();
                 day.setDay(cDay.getDay());
-
-                List<TrainingExercise> exercises = new ArrayList<>();
-                if (cDay.getBlocks() != null) {
-                    for (ClinicalBlock block : cDay.getBlocks()) {
-                        if (block.getExercises() != null) {
-                            for (ClinicalExercise cEx : block.getExercises()) {
-                                TrainingExercise ex = TrainingExercise.builder()
-                                        .order(cEx.getOrder())
-                                        .name(cEx.getName())
-                                        .muscleGroup("[" + block.getBlockName() + "] " + (cEx.getTargetFocus() != null ? cEx.getTargetFocus() : "Reabilitação"))
-                                        .sets(cEx.getDosageRight() != null ? cEx.getDosageRight() : "3")
-                                        .reps(cEx.getDosageLeft() != null ? cEx.getDosageLeft() : "10-12")
-                                        .tempo(cEx.getTempoRpe())
-                                        .details(cEx.getExecutionInstructions())
-                                        .notas(cEx.getSafetyNotes())
-                                        .videoUrl(cEx.getVideoUrl() != null ? cEx.getVideoUrl() : "") // Preserva a URL do vídeo
-                                        .build();
-                                exercises.add(ex);
-                            }
-                        }
-                    }
-                }
-                day.setExercises(exercises);
-                days.add(day);
-            }
-            newPlan.setPlan(days);
-            return;
-        }
-
-        // 2. Processamento a partir de 'blocks' (Plano Clínico de Dia Único)
-        if (newPlan.getBlocks() != null && !newPlan.getBlocks().isEmpty()) {
-            List<TrainingDay> days = new ArrayList<>();
-
-            for (ClinicalBlock block : newPlan.getBlocks()) {
-                TrainingDay day = new TrainingDay();
-                day.setDay(block.getBlockName() + (block.getDurationText() != null ? " (" + block.getDurationText() + ")" : ""));
-
-                List<TrainingExercise> exercises = new ArrayList<>();
-                if (block.getExercises() != null) {
-                    for (ClinicalExercise cEx : block.getExercises()) {
-                        TrainingExercise ex = TrainingExercise.builder()
-                                .order(cEx.getOrder())
-                                .name(cEx.getName())
-                                .muscleGroup(cEx.getTargetFocus())
-                                .sets(cEx.getDosageRight() != null ? cEx.getDosageRight() : "3")
-                                .reps(cEx.getDosageLeft() != null ? cEx.getDosageLeft() : "10-12")
-                                .tempo(cEx.getTempoRpe())
-                                .details(cEx.getExecutionInstructions())
-                                .notas(cEx.getSafetyNotes())
-                                .videoUrl(cEx.getVideoUrl() != null ? cEx.getVideoUrl() : "") // Preserva a URL do vídeo
-                                .build();
-                        exercises.add(ex);
-                    }
-                }
-                day.setExercises(exercises);
+                day.setExercises(cDay.getExercises());
                 days.add(day);
             }
             newPlan.setPlan(days);
         }
+
     }
 
     private String resumirErro(Exception e) {

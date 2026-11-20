@@ -1,6 +1,7 @@
 package com.aneto.registo_horas_service.dto.request;
 
-import com.aneto.registo_horas_service.models.Enum;
+import com.aneto.registo_horas_service.models.Enum.EstadoPedido;
+import com.aneto.registo_horas_service.models.Enum.EstadoPlano;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -31,10 +32,10 @@ public class PlanoRequestDTO {
 
     // CORREÇÃO: Enums usam @NotNull, não @NotBlank
     @NotNull(message = "O estado do plano é obrigatório")
-    private Enum.EstadoPlano estadoPlano;
+    private EstadoPlano estadoPlano;
 
     @NotNull(message = "O estado do pedido é obrigatório")
-    private Enum.EstadoPedido estadoPedido;
+    private EstadoPedido estadoPedido;
 
     @NotBlank(message = "O link é obrigatório")
     private String link;

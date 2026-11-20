@@ -1,7 +1,7 @@
 package com.aneto.registo_horas_service.dto.request;
 
-import com.aneto.registo_horas_service.models.Training.BodyType;
-import com.aneto.registo_horas_service.models.Training.Gender;
+import com.aneto.registo_horas_service.models.Enum.BodyType;
+import com.aneto.registo_horas_service.models.Enum.Gender;
 import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.*;

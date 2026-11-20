@@ -32,6 +32,8 @@ public final class TrainingRuleConstants {
     public static final Map<String, String> EXERCISE_MAP;
     static {
         Map<String, String> map = new java.util.HashMap<>();
+
+        // --- Treino Convencional ---
         map.put("agachamento cálice", "Agachamento Goblet");
         map.put("agachamento goblet", "Agachamento Goblet");
         map.put("puxada corda", "Pulldown Corda");
@@ -51,43 +53,72 @@ public final class TrainingRuleConstants {
         map.put("deadbug", "Dead Bug");
         map.put("dips", "Dips");
         map.put("paralelas", "Dips");
-        map.put("Dips / Paralelas", "Dips");
+        map.put("dips / paralelas", "Dips");
         map.put("stiff", "Stiff");
         map.put("rdl", "Stiff");
-        map.put("Stiff / RDL", "Stiff");
-        map.put("elevações", "Elevações");
-        map.put("pull-ups", "Elevações");
-        map.put("Elevações / Pull-ups", "Elevações");
+        map.put("stiff / rdl", "Stiff");
+        map.put("elevações", "Pull-ups");
+        map.put("pull-ups", "Pull-ups");
+        map.put("elevações / pull-ups", "Pull-ups");
         map.put("lunge", "Lunge");
         map.put("afundo", "Lunge");
-        map.put("Lunge / Afundo", "Lunge");
+        map.put("lunge / afundo", "Lunge");
 
-        // Mapeamentos e Aliases para normalização de entrada
-        map.put("push-up com pés elevados", "Flexões com Pés Elevados");
-        map.put("push up com pés elevados", "Flexões com Pés Elevados");
+        // --- Mapeamentos e Aliases para Normalização ---
+        map.put("push-up com pés elevados", "Flexões com Mãos Elevadas");
+        map.put("push up com pés elevados", "Flexões com Mãos Elevadas");
         map.put("puxada à frente na polia", "Puxada à Frente");
         map.put("puxada com barra na polia", "Puxada à Frente");
-        map.put("crucifixo invertido com halteres", "Crucifixo Invertido");
+        map.put("crucifixo invertido com halteres", "Crucifixo Invertido com Halteres no Banco");
         map.put("step up com halteres", "Step Up");
         map.put("cadeira flexora", "Cadeira Flexora");
-        map.put("stiff com halteres", "Stiff");
+        map.put("stiff com halteres", "Stiff com Halteres");
         map.put("lunge com halteres", "Lunge");
-        map.put("elevação pélvica unipodal", "Elevação Pélvica Unilateral");
-        map.put("elevação pélvica com halteres em decúbito superior", "Elevação Pélvica");
-        map.put("abdução de anca em pé", "Abdução de Anca na Máquina");
-        map.put("hip thrust com halteres", "Elevação Pélvica");
+        map.put("elevação pélvica unipodal", "Ponte Unipodal");
+        map.put("elevação pélvica com halteres em decúbito superior", "Elevação Pélvica com Halteres");
+        map.put("abdução de anca em pé", "Abdução de Anca em Pé na Polia");
+        map.put("hip thrust com halteres", "Elevação Pélvica com Halteres");
         map.put("hip thrust", "Elevação Pélvica");
         map.put("deadlift unilateral", "Stiff Unilateral");
+
+        // --- Exercícios Clínicos & Reabilitação (IDs 311 - 330) ---
+        map.put("descompressão lombo-pélvica", "Descompressão Lombo-Pélvica em Supino");
+        map.put("descompressão lombar", "Descompressão Lombo-Pélvica em Supino");
+        map.put("deslizamento neural femoral", "Deslizamento Neural do Nervo Femoral");
+        map.put("neurodinâmica femoral", "Deslizamento Neural do Nervo Femoral");
+        map.put("deslizamento neural ciático", "Deslizamento Neural do Nervo Ciático");
+        map.put("neurodinâmica ciática", "Deslizamento Neural do Nervo Ciático");
+        map.put("ativação escapular", "Libertação e Ativação Escapular com Banda");
+        map.put("retração escapular", "Retração Escapular em Decúbito Ventral");
+        map.put("ponte pélvica isométrica", "Ponte Pélvica com Isometria");
+        map.put("basculação pélvica", "BASCULAÇÃO PÉLVICA EM SUPINO");
+        map.put("extensão torácica rolo", "Extensão Torácica no Rolo (Foam Roller)");
+        map.put("mobilidade 90/90", "Mobilidade de Anca em 90/90 com Rotação");
+        map.put("ativação vasto medial", "Ativação de Vasto Medial Unilateral");
+        map.put("prancha joelhos", "Prancha Abdominal com Apoio de Joelhos");
+        map.put("dorsiflexão passiva", "Dorsiflexão Passiva de Tornozelo");
+        map.put("alongamento flexores anca", "Alongamento Dinâmico de Flexores de Anca");
+        map.put("isquiotibiais em supino", "Alongamento Ativo de Isquiotibiais em Supino");
+        map.put("clamshell 90", "Abdução de Anca em Decúbito Lateral (Clamshell 90º)");
+        map.put("rotação interna ombro", "Rotação Interna de Ombro com Elástico");
+        map.put("press pallof isométrico", "Press Pallof Isométrico");
+        map.put("quadrado lombar", "Alongamento do Quadrado Lombar em Cadeira");
+        map.put("passar a agulha", "Thread the Needle (Passar a Agulha)");
+        map.put("thread the needle", "Thread the Needle (Passar a Agulha)");
+        map.put("estabilização lombar", "Estabilização Segmentar Lombar");
 
         EXERCISE_MAP = Collections.unmodifiableMap(map);
     }
 
     public static final Map<String, java.util.Set<String>> GRUPO_MUSCULAR_KEYWORDS = Map.of(
-            "PEITO", java.util.Set.of("peito", "supino", "crossover", "peck", "flex", "push-up", "push up"),
-            "COSTAS", java.util.Set.of("costas", "dorsal", "remada", "puxada", "pull"),
-            "PERNAS", java.util.Set.of("pernas", "perna", "quadríceps", "quadriceps", "isquio", "gluteo", "glúteo", "agachamento", "leg", "coxa", "anca", "tornozelo", "gémeo", "gemeo", "thrust", "deadlift"),
-            "OMBROS", java.util.Set.of("ombro", "deltoide", "lateral", "desenvolvimento", "arnold"),
-            "BRAÇOS", java.util.Set.of("braço", "braco", "tríceps", "triceps", "bíceps", "biceps", "rosca")
+            "PEITO", java.util.Set.of("peito", "supino", "crossover", "peck", "flex", "push-up", "push up", "dips", "chest"),
+            "COSTAS", java.util.Set.of("costas", "dorsal", "remada", "puxada", "pull", "pulldown", "pullover"),
+            "PERNAS", java.util.Set.of("pernas", "perna", "quadríceps", "quadriceps", "isquio", "gluteo", "glúteo", "agachamento", "leg", "coxa", "anca", "tornozelo", "gémeo", "gemeo", "thrust", "deadlift", "lunge"),
+            "OMBROS", java.util.Set.of("ombro", "deltoide", "lateral", "desenvolvimento", "arnold", "press"),
+            "BRAÇOS", java.util.Set.of("braço", "braco", "tríceps", "triceps", "bíceps", "biceps", "rosca", "curl"),
+            "REABILITAÇÃO", java.util.Set.of("reabilitação", "reabilitacao", "descompressão", "descompressao", "neurodinamica", "escapular", "isometria", "dorsiflexão", "estabilização"),
+            "MOBILIDADE", java.util.Set.of("mobilidade", "rotação", "90/90", "foam roller", "needle", "stretch", "cat cow"),
+            "ALONGAMENTO", java.util.Set.of("alongamento", "flexores", "isquiotibiais", "pombo", "borboleta", "quadrado lombar")
     );
 
     public static final Map<String, java.util.Set<String>> GRUPO_ALVO_EXERCICIO_MOBILIDADE = Map.ofEntries(
@@ -99,25 +130,118 @@ public final class TrainingRuleConstants {
             Map.entry("Alongamento borboleta", java.util.Set.of("PERNAS")),
             Map.entry("Alongamento do músculo grande dorsal", java.util.Set.of("COSTAS")),
             Map.entry("Walking Lunges with Reach", java.util.Set.of("PERNAS")),
-            Map.entry("Frankenstein Walk", java.util.Set.of("PERNAS"))
+            Map.entry("Frankenstein Walk", java.util.Set.of("PERNAS")),
+            Map.entry("Thread the Needle (Passar a Agulha)", java.util.Set.of("COSTAS", "OMBROS")),
+            Map.entry("Mobilidade de Anca em 90/90 com Rotação", java.util.Set.of("PERNAS")),
+            Map.entry("Extensão Torácica no Rolo (Foam Roller)", java.util.Set.of("COSTAS"))
     );
 
     public static final Map<String, String> MOBILIDADE_ESPECIFICA_PARA_PATOLOGIA = Map.of(
             "Rotação Externa", "ombro",
-            "Clamshell", "joelho"
+            "Clamshell", "joelho",
+            "Libertação e Ativação Escapular com Banda", "ombro",
+            "Descompressão Lombo-Pélvica em Supino", "lombar",
+            "Deslizamento Neural do Nervo Femoral", "lombar"
     );
 
     public static final Map<String, List<String>> FALLBACK_DICTIONARY;
     static {
         Map<String, List<String>> map = new LinkedHashMap<>();
-        map.put("PEITO", List.of("Supino Plano", "Supino Inclinado", "Supino Declinado", "Supino Plano com Halteres", "Supino Inclinado com Halteres", "Supino Declinado com Halteres", "Peck Deck", "Crossover", "Crossover Baixo para Cima", "Flexões", "Flexões Diamond", "Flexões com Pés Elevados", "Push-Up com Pés Elevados", "Dips", "Aberturas com Halteres", "Aberturas Inclinadas com Halteres", "Supino Máquina", "Pullover com Halter", "Chest Press Máquina"));
-        map.put("COSTAS", List.of("Puxada à Frente", "Puxada à Frente na Polia", "Puxada com Barra na Polia", "Puxada Pega Estreita", "Puxada Pega Neutra", "Remada Curvada", "Remada Curvada com Halteres", "Remada Unilateral", "Pulldown Corda", "Remada Baixa", "Remada Cavalinho", "Elevações", "Remada Máquina", "Remada T-Bar", "Face Pull", "Encolhimentos com Halteres", "Extensão Lombar", "Puxada com Corda Neutra", "Remada Invertida"));
-        map.put("PERNAS", List.of("Agachamento Livre", "Agachamento Goblet", "Agachamento Búlgaro", "Agachamento Sumô", "Leg Press 45", "Hack Squat", "Cadeira Extensora", "Cadeira Flexora", "Mesa Flexora", "Cadeira Flexora em Pé", "Stiff", "Stiff com Halteres", "Stiff Unilateral", "Deadlift Unilateral", "Elevação Pélvica", "Hip Thrust com Halteres", "Elevação Pélvica Unilateral", "Elevação Pélvica Unipodal", "Elevação Pélvica com Halteres em Decúbito Superior", "Lunge", "Lunge com Halteres", "Lunge Reverso", "Gémeos em Pé", "Gémeos Sentado", "Abdução de Anca na Máquina", "Abdução de Anca em Pé", "Adução de Anca na Máquina", "Step Up", "Step Up com Halteres"));
-        map.put("OMBROS", List.of("Desenvolvimento", "Desenvolvimento com Halteres", "Arnold Press", "Elevação Lateral", "Elevação Lateral Polia", "Elevação Lateral Máquina", "Elevação Frontal", "Elevação Frontal com Barra", "Face Pull", "Remada Alta", "Crucifixo Invertido", "Crucifixo Invertido com Halteres", "Crucifixo Invertido na Máquina", "Desenvolvimento Máquina", "Encolhimentos com Barra"));
-        map.put("BRAÇOS", List.of("Rosca Direta", "Rosca Direta com Barra", "Rosca Direta com Barra EZ", "Rosca Martelo", "Rosca Concentrada", "Rosca Scott", "Rosca Alternada com Halteres", "Tríceps Corda", "Tríceps Pulley", "Tríceps Testa", "Tríceps Testa com Halter", "Tríceps Francês", "Extensão de Tríceps com Halteres", "Mergulho no Banco", "Tríceps Coice com Halter", "Rosca no Cabo"));
-        map.put("CORE", List.of("Dead Bug", "Dead Bug com Carga", "Prancha Abdominal", "Prancha Lateral", "Bird Dog", "Abdominal na Polia", "Elevação de Pernas Suspenso", "Abdominal na Bola Suíça", "Russian Twist", "Prancha com Toque no Ombro"));
-        map.put("CARDIO", List.of("Saltar Corda", "Air Bike", "Ski Erg", "Remo", "Jumping Jacks", "bicicleta", "Passadeira", "Eliptica", "Escadas"));
-        map.put("REAB/MOBILIDADE", List.of("Cat Cow", "Clamshell", "Y-W-T", "Rotação Externa", "Knee-to-Wall", "Cossack Squat", "Equilíbrio Unipodal", "Open Books", "Bird Dog Isométrico", "Mobilidade Torácica"));
+
+        map.put("PEITO", List.of(
+                "Bench Press Halters", "Supino Inclinado Barra", "Peck Deck", "Flexões",
+                "Dumbbell Flyes", "Chest Press Bar", "Cruxifixo na polia baixa", "PullOver chest",
+                "Flexões Diamond", "Supino Inclinado com Halteres em Banco 30º", "Crossover Low to High Pulley",
+                "Chest Press Machine", "Svend Press com Discos", "Top-Down Crossover", "Flexões com Mãos Elevadas",
+                "Chest Press Smith", "Decline Bench Bar", "Decline dumbbell press", "Supino declinado Maquina","Bench Press Smith"
+        ));
+
+        map.put("COSTAS", List.of(
+                "Puxada à Frente", "Remada Curvada", "Remada Unilateral", "Pulldown Corda",
+                "Remada Baixa", "Pull-ups", "Puxada Neutra", "Remada Cavalinho", "Face Pull Pronado",
+                "Remada Serrote", "PullOver back", "Puxada Pega Aberta", "Puxada Unilateral na Polia",
+                "Remada Curvada com Halteres", "Remada T-Bar", "Remada Máquina", "Remada Invertida",
+                "Encolhimentos com Halteres", "Extensão Lombar na Máquina", "Hiperextensão Lombar",
+                "Puxada ao Peito com Pegada Invertida", "Puxada Unilateral articulada", "Remada Meadows com Halter",
+                "Remada no Banco Inclinado com Halteres", "Remada Pendlay", "Good Morning com Barra Z",
+                "Extensão de Anca em Banco GHD", "Puxada Assistida (Pull-up Assistido)", "Remada Chest Supported", "Superman"
+        ));
+
+        map.put("PERNAS", List.of(
+                "Agachamento Livre", "Leg Press 45", "Cadeira Extensora", "Mesa Flexora",
+                "Stiff / RDL", "Gémeos em Pé", "Lunge / Afundo", "Elevação Pélvica", "Agachamento Goblet",
+                "Agachamento Búlgaro", "Glute Bridge", "Stiff Unilateral", "Lunge Reverso", "Lunge Lateral",
+                "Step Up", "Cadeira Flexora em Pé", "Gémeos Sentado", "Good Morning", "Elevação Pélvica na Máquina",
+                "Coice de Glúteo na Polia", "Coice de Glúteo na Máquina", "Abdução de Anca em Pé na Polia",
+                "Adução de Anca em Pé na Polia", "Cadeira Adutora", "Cadeira Abdutora", "Agachamento Sumô", "Hack Squat", "Gémeos na maquina"
+        ));
+
+        map.put("OMBROS", List.of(
+                "Desenvolvimento com Halteres", "Elevação Lateral", "Face Pull", "Elevação Frontal Halteres",
+                "Arnold Press", "Elevação Lateral Unilateral Polia", "Elevação Lateral sentado", "Desenvolvimento Máquina",
+                "Remada Alta com Barra", "Crucifixo Invertido na Máquina", "Encolhimentos com Barra",
+                "Desenvolvimento Militar com Barra", "Landmine Press Unilateral", "Elevação Lateral no Banco Inclinado",
+                "Elevação Lateral Y-Raise na Polia", "Crucifixo Invertido com Halteres no Banco", "Face Pull com Pegada Supinada",
+                "Lateral Raise on the Pulley", "Elevação Lateral Unilateral Polia Inclinado", "Push Press"
+        ));
+
+        map.put("BRAÇOS", List.of(
+                "CURL / Bicep com Barra Directa", "Tríceps na Polia com Corda", "CURL Martelo com Halteres",
+                "Tríceps Testa Deitado com Halteres", "CURL Concentrado", "Tríceps na Polia com Barra",
+                "CURL / Bicep com Halteres", "CURL / Bicep na Máquina", "Tríceps Francês com Halter",
+                "Tríceps Francês na Polia", "Tríceps Testa no Banco Inclinado", "Curl Inclinado com Halteres",
+                "Curl Spider com Barra Z", "Curl Preacher Unilateral na Polia", "Curl Inverso com Barra Z",
+                "Tríceps Coice Unilateral na Polia", "Tríceps JM Press com Barra", "Dips no Banco com Carga",
+                "Curl 21 com Barra", "Rosca Scott com Halteres", "Zottman Curl", "Skull Crusher na Polia", "Rosca de Punho"
+        ));
+
+        map.put("CORE", List.of(
+                "Crunch Abdominal", "Crunch na Polia", "Bicycle Crunch", "Reverse Crunch", "V-Up",
+                "Flutter Kicks", "Elevação de Joelhos Suspenso", "Windshield Wipers", "Woodchopper na Polia",
+                "Landmine Rotation", "Copenhagen Plank", "Suitcase Carry", "Body Saw", "Prancha com Elevação de Perna",
+                "Dead Bug", "Prancha Abdominal", "Bird Dog", "Prancha Lateral", "Dead Bug com Carga",
+                "Prancha com Toque no Ombro", "Russian Twist", "Elevação de Pernas Suspenso", "Thruster", "Pallof Press",
+                "Abdominal Wheel Rollout", "Prancha RKC (Tensão Máxima)", "Hollow Body Hold", "Dragon Flag", "Prancha Abdominal com Apoio de Joelhos", "Press Pallof Isométrico"
+        ));
+
+        map.put("CARDIO", List.of(
+                "High Knees", "Skater Jumps", "Tuck Jump", "Shuttle Run", "Corrida em Intervalos (HIIT)",
+                "Bear Crawl", "Escadas", "Eliptica", "Passadeira", "bicicleta", "Remo", "Ski Erg",
+                "Air Bike", "Saltar Corda", "Jumping Jacks", "Double Unders (Corda)", "Box Jump", "Assault Bike Sprints"
+        ));
+
+        map.put("REABILITAÇÃO", List.of(
+                "Clamshell", "Rotação Externa", "Equilíbrio Unipodal", "Bird Dog com Rotação", "Ponte Unipodal",
+                "Wall Slide (Ombro)", "Mobilização do Tornozelo em Carga", "Ativação de Glúteo Médio em Decúbito Lateral",
+                "Descompressão Lombo-Pélvica em Supino", "Deslizamento Neural do Nervo Femoral", "Deslizamento Neural do Nervo Ciático",
+                "Libertação e Ativação Escapular com Banda", "Retração Escapular em Decúbito Ventral", "Ponte Pélvica com Isometria",
+                "BASCULAÇÃO PÉLVICA EM SUPINO", "Ativação de Vasto Medial Unilateral", "Dorsiflexão Passiva de Tornozelo",
+                "Abdução de Anca em Decúbito Lateral (Clamshell 90º)", "Rotação Interna de Ombro com Elástico", "Estabilização Segmentar Lombar"
+        ));
+
+        map.put("MOBILIDADE", List.of(
+                "Cat Cow", "Y-W-T", "Knee-to-Wall", "Open Books", "Mobilidade Torácica em Quatro Apoios",
+                "Rotação de Tronco Deitado", "90/90 Hip Switch", "World's Greatest Stretch", "Cossack Squat",
+                "Extensão Torácica no Rolo (Foam Roller)", "Mobilidade de Anca em 90/90 com Rotação", "Alongamento Dinâmico de Flexores de Anca",
+                "Thread the Needle (Passar a Agulha)", "Mobilidade de Anca em Frog Pose", "Jefferson Curl", "Deep Squat Hold", "Rotação Torácica com Halter"
+        ));
+
+        map.put("ALONGAMENTO", List.of(
+                "Flexores da Anca", "Alongamento borboleta", "Alongamento do músculo grande dorsal",
+                "Walking Lunges with Reach", "Frankenstein Walk", "Alongamento de Isquiotibiais em Pé",
+                "Alongamento Peitoral", "Alongamento de Flexores do Punho", "Alongamento de Trapézio",
+                "Alongamento de Adutores", "Alongamento do Glúteo (Pombo)", "Alongamento do Quadrado Lombar em Cadeira",
+                "Alongamento Ativo de Isquiotibiais em Supino", "Alongamento de Quadríceps Ajoelhado (Couch Stretch)"
+        ));
+
+        map.put("FINALIZADOR", List.of(
+                "Medicine Ball Slam", "Kettlebell Snatch", "Kettlebell Clean and Press", "Sled Pull / Puxar Trenó",
+                "Sandbag Carry", "Man Makers", "Tabata de Agachamento com Salto", "Burpees", "Mountain Climbers",
+                "Kettlebell Swing", "Corda de Saltar", "Battle Rope", "Jump Squat", "Remo Curto Intervalado",
+                "Circuito Metabólico AMRAP", "Sprint na Bike Estática", "Sled Push / Empurrar Trenó", "Farmer's Walk com Halteres",
+                "Wall Balls", "Devil Press"
+        ));
+
         FALLBACK_DICTIONARY = Collections.unmodifiableMap(map);
     }
 }

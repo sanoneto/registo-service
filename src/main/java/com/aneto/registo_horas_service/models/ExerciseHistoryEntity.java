@@ -28,7 +28,7 @@ public class ExerciseHistoryEntity {
     private String planId;
     private String exerciseName;
     private String muscleGroup;
-    private String weight; // O Hibernate salvou o "25" aqui, mantenha este nome.
+    private String cargaSugerida; // O Hibernate salvou o "25" aqui, mantenha este nome.
 
     @Builder.Default
     private LocalDateTime registeredAt = LocalDateTime.now();

@@ -22,10 +22,6 @@ public class TrainingPlanResponse implements Serializable {
     @JsonAlias("clinicalSummary")
     private String summary;
 
-    @Builder.Default
-    @JsonProperty("plan")
-    private List<TrainingDay> plan = new ArrayList<>();
-
     @JsonProperty("dietPlan")
     private DietPlan dietPlan;
 
@@ -46,10 +42,10 @@ public class TrainingPlanResponse implements Serializable {
     private List<String> safetyDirectives = new ArrayList<>();
 
     @Builder.Default
-    @JsonProperty("blocks")
-    private List<ClinicalBlock> blocks = new ArrayList<>();
-
-    @Builder.Default
     @JsonProperty("clinicalPlan")
     private List<ClinicalDay> clinicalPlan = new ArrayList<>();
+
+    @Builder.Default
+    @JsonProperty("plan")
+    private List<TrainingDay> plan = new ArrayList<>();
 }

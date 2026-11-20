@@ -15,6 +15,8 @@ import org.springframework.ai.openai.api.ResponseFormat;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static com.aneto.registo_horas_service.models.Training.TrainingRuleConstants.*;
@@ -31,13 +33,19 @@ public class Training {
     private final TrainingValidator trainingValidator;
     private final TrainingPromptBuilder promptBuilder;
     private final ClinicalPromptBuilder clinicalPromptBuilder;
-    private final ClinicalTrainingValidator clinicalTrainingValidator;
+
 
     private static final int MAX_RETRIES = 5;
 
-    public TrainingPlanResponse generateTrainingPlan(UserProfileRequest userRequest, List<String> exerciciosDoS3) {
-        return generateTrainingPlan(userRequest, exerciciosDoS3, 1);
-    }
+    private static final List<String> DESVIOS_CLINICOS_KEYWORDS = List.of(
+            "anteversão", "anteversao",
+            "protração", "protracao",
+            "assimetria",
+            "hiperextensão", "hiperextensao",
+            "défice", "defice",
+            "sequestrado",
+            "compressão", "compressao"
+    );
 
     public TrainingPlanResponse generateTrainingPlan(UserProfileRequest userRequest, List<String> exerciciosDoS3, int weekNumber) {
 
@@ -45,7 +53,6 @@ public class Training {
 
         log.info("[TrainingPlan] Início da geração. Semana: {} | Modo Clínico Ativo? {}", weekNumber, ehClinico);
 
-        String objectiveText = defaultIfEmpty(userRequest.getObjective(), "Manutenção de saúde e bem-estar");
         String genderText = (userRequest.getGender() != null) ? userRequest.getGender().name() : "MALE";
         String bodyTypeText = (userRequest.getBodyType() != null) ? userRequest.getBodyType().name() : "ECTOMORPH";
 
@@ -56,23 +63,10 @@ public class Training {
         boolean isDeloadWeek = weekNumber > 0 && weekNumber % 4 == 0;
         int volumeIdeal = isDeloadWeek ? Math.max(4, (int) Math.round(volumeIdealBase * 0.7)) : volumeIdealBase;
 
-        String pathologyDeclarada = defaultIfEmpty(userRequest.getPathology(), "Nenhuma limitação relatada");
-
-        // Inferência a partir do Relatório Médico
-        PatologiaInferida patologiaInferida = trainingValidator.inferirPatologiaDoRelatorio(userRequest.getMedicalReportText());
-        String pathologyInferidaRelatorio = (patologiaInferida == null) ? null : patologiaInferida.categorias();
-
-        StringBuilder pathologyBuilder = new StringBuilder(pathologyDeclarada);
-        if (pathologyInferidaRelatorio != null && !pathologyInferidaRelatorio.isBlank()) {
-            if (pathologyBuilder.toString().contains("Nenhuma")) {
-                pathologyBuilder = new StringBuilder(pathologyInferidaRelatorio);
-            } else {
-                pathologyBuilder.append(", ").append(pathologyInferidaRelatorio);
-            }
-        }
-
-        String pathologyText = pathologyBuilder.toString();
-        boolean pathologyEspecifica = !pathologyText.contains("Nenhuma") || userRequest.getMedicalReportText() != null || userRequest.getReportVisbobyText() != null;
+        String pathologyText = resolverPatologiaCompleta(userRequest);
+        boolean pathologyEspecifica = !pathologyText.contains("Nenhuma")
+                || userRequest.getMedicalReportText() != null
+                || userRequest.getReportVisbobyText() != null;
 
         Macros macros = MacroCalculator.calculate(
                 userRequest.getWeightKg(), userRequest.getHeightCm(), userRequest.getAge(),
@@ -84,24 +78,16 @@ public class Training {
         Map<String, List<String>> exerciseDictionary = carregarDicionario();
         Map<String, Map<String, List<String>>> exerciseDictionaryComSub = carregarDicionarioComSubcategoria(exerciseDictionary);
 
-        boolean isGluteFocus = objectiveText.toLowerCase().contains("glúteo") || objectiveText.toLowerCase().contains("gluteo");
+        boolean isGluteFocus = isFocoGluteo(userRequest.getObjective());
 
-        // =========================================================================
-        // 💡 APLICAÇÃO DA CONDIÇÃO DE PROMPT (CLÍNICO vs CONVENCIONAL)
-        // =========================================================================
-        String userPrompt;
-        if (ehClinico) {
-            // Usa o prompt clínico focado na estrutura de 4 blocos temporizados
-            userPrompt = clinicalPromptBuilder.buildClinicalPrompt(userRequest, macros, exerciciosDoS3);
-        } else {
-            // Usa o prompt convencional (divisão Upper/Lower ou Foco Estético)
-            userPrompt = promptBuilder.buildUserPrompt(
-                    userRequest, weekNumber, isDeloadWeek, volumeIdeal, totalMinutos,
-                    pathologyText, pathologyEspecifica, macros, exerciseDictionary,
-                    exerciseDictionaryComSub, exerciciosDoS3,
-                    isGluteFocus
-            );
-        }
+        String userPrompt = ehClinico
+                ? clinicalPromptBuilder.buildClinicalPrompt(userRequest, macros, exerciciosDoS3, volumeIdeal)
+                : promptBuilder.buildUserPrompt(
+                userRequest, weekNumber, isDeloadWeek, volumeIdeal, totalMinutos,
+                pathologyText, pathologyEspecifica, macros, exerciseDictionary,
+                exerciseDictionaryComSub, exerciciosDoS3,
+                isGluteFocus
+        );
 
         TrainingPlanResponse resultado = executeGeneration(
                 userPrompt, totalMinutos, exerciseDictionary,
@@ -136,13 +122,14 @@ public class Training {
                 Prompt promptComJsonMode = new Prompt(new UserMessage(promptSanitizado), jsonModeOptions);
 
                 ChatResponse chatResponse = chatModel.call(promptComJsonMode);
-                log.info("[chatResponse]: {}", chatResponse);
+                log.debug("[chatResponse]: {}", chatResponse);
 
                 String cleanedJson = cleanMarkdown(chatResponse.getResult().getOutput().getContent());
                 TrainingPlanResponse response = objectMapper.readValue(cleanedJson, TrainingPlanResponse.class);
 
-                // Validações
+                // Validações específicas por modo (Clínico vs Convencional)
                 trainingValidator.validarSequenciaDias(response.getPlan(), aplicaFocoGluteoExtremo);
+
                 trainingValidator.validarSegurancaLombarEVisbody(
                         response,
                         userRequest.getMedicalReportText(),
@@ -153,72 +140,40 @@ public class Training {
                         userRequest.getReportVisbobyText()
                 );
 
-                // 1. Processa e enriquece o plano clássico ('plan') se existir
-                List<TrainingDay> updatedPlan = new ArrayList<>();
-                if (response.getPlan() != null) {
-                    for (TrainingDay day : response.getPlan()) {
-                        List<TrainingExercise> enrichedExercises = new ArrayList<>();
-                        if (day.getExercises() != null) {
-                            for (TrainingExercise ex : day.getExercises()) {
-                                TrainingExercise enriched = trainingValidator.enrichExercise(ex, validNames, pathologyText);
-                                nomesUsadosNestaTentativa.add(enriched.getName());
-                                enrichedExercises.add(enriched);
-                            }
-                        }
+                // Processa e enriquece 'plan' sem duplicação de código
+                List<TrainingDay> updatedPlan = enriquecerListaDeDias(
+                        response.getPlan(),
+                        TrainingDay::getDay,
+                        TrainingDay::getExercises,
+                        TrainingDay::new,
+                        validNames,
+                        pathologyText,
+                        exerciseDictionary,
+                        weightKg,
+                        totalMinutos,
+                        nomesUsadosNestaTentativa
+                );
 
-                        List<TrainingExercise> exercisesComEstimativa = anexarEstimativaCalorica(enrichedExercises, exerciseDictionary, weightKg, totalMinutos);
-                        updatedPlan.add(new TrainingDay(day.getDay(), exercisesComEstimativa));
-                    }
-                }
-
-                // 2. Plano clínico multi-dias ('clinicalPlan'): enriquece com vídeos sem rejeitar nomes fora do dicionário
-                if (ehClinico && response.getClinicalPlan() != null) {
-                    for (ClinicalDay cDay : response.getClinicalPlan()) {
-                        if (cDay.getBlocks() == null) continue;
-                        for (ClinicalBlock block : cDay.getBlocks()) {
-                            if (block.getExercises() == null) continue;
-                            for (ClinicalExercise cEx : block.getExercises()) {
-                                clinicalTrainingValidator.enriquecerExercicoComVideo(cEx);
-                                nomesUsadosNestaTentativa.add(cEx.getName());
-                            }
-                        }
-                    }
-                }
-
-                // 3. Processa e enriquece os blocos do PLANO CLÍNICO ('blocks') para incluir os links de vídeo S3
-                if (ehClinico && response.getBlocks() != null) {
-                    for (ClinicalBlock block : response.getBlocks()) {
-                        if (block.getExercises() != null) {
-                            block.getExercises().forEach(clinicalTrainingValidator::enriquecerExercicoComVideo);
-                        }
-                    }
-                } else if (response.getBlocks() != null) {
-                    for (ClinicalBlock block : response.getBlocks()) {
-                        if (block.getExercises() != null) {
-                            for (ClinicalExercise cEx : block.getExercises()) {
-                                // Mapeia temporariamente para TrainingExercise para obter a URL do vídeo via S3/Dicionário
-                                TrainingExercise tempEx = TrainingExercise.builder()
-                                        .name(cEx.getName())
-                                        .muscleGroup(cEx.getTargetFocus())
-                                        .videoUrl(cEx.getVideoUrl())
-                                        .build();
-
-                                TrainingExercise enrichedTemp = trainingValidator.enrichExercise(tempEx, validNames, pathologyText);
-
-                                // Atribui o videoUrl encontrado de volta ao ClinicalExercise
-                                cEx.setVideoUrl(enrichedTemp.getVideoUrl());
-                                nomesUsadosNestaTentativa.add(cEx.getName());
-                            }
-                        }
-                    }
-                }
+                // Processa e enriquece 'clinicalPlan' reutilizando exatamente a mesma lógica
+                List<ClinicalDay> updatedClinicalPlan = enriquecerListaDeDias(
+                        response.getClinicalPlan(),
+                        ClinicalDay::getDay,
+                        ClinicalDay::getExercises,
+                        ClinicalDay::new,
+                        validNames,
+                        pathologyText,
+                        exerciseDictionary,
+                        weightKg,
+                        totalMinutos,
+                        nomesUsadosNestaTentativa
+                );
 
                 return TrainingPlanResponse.builder()
                         .isExistingPlan(false)
+                        .userProfile(userRequest)
                         .summary(response.getSummary())
                         .plan(updatedPlan)
-                        .blocks(response.getBlocks()) // Os blocos agora contêm os videoUrls preenchidos!
-                        .clinicalPlan(response.getClinicalPlan())
+                        .clinicalPlan(updatedClinicalPlan)
                         .primaryDiagnosis(response.getPrimaryDiagnosis())
                         .primaryObjective(response.getPrimaryObjective())
                         .validationStatus(response.getValidationStatus())
@@ -231,11 +186,73 @@ public class Training {
                 if (attempt >= MAX_RETRIES) {
                     throw new RuntimeException("Falha crítica na geração do plano de treino após " + (MAX_RETRIES + 1) + " tentativas.", e);
                 }
-                currentPrompt.append(promptBuilder.buildFeedbackDeErro(e.getMessage(), nomesUsadosNestaTentativa, pathologyEspecifica, exerciseDictionary, nomesAnteriores));
+                currentPrompt.append(promptBuilder.buildFeedbackDeErro(
+                        e.getMessage(),
+                        nomesUsadosNestaTentativa,
+                        pathologyEspecifica,
+                        exerciseDictionary,
+                        nomesAnteriores
+                ));
             }
         }
         throw new RuntimeException("Falha inesperada na geração do plano.");
     }
+
+    /**
+     * Elimina a duplicação entre o processamento de TrainingDay e ClinicalDay,
+     * enriquecendo cada exercício com metadados/vídeos e anexando a estimativa calórica.
+     */
+    private <T> List<T> enriquecerListaDeDias(
+            List<T> dias,
+            Function<T, String> dayNameExtractor,
+            Function<T, List<TrainingExercise>> exercisesExtractor,
+            BiFunction<String, List<TrainingExercise>, T> dayConstructor,
+            Set<String> validNames,
+            String pathologyText,
+            Map<String, List<String>> exerciseDictionary,
+            Double weightKg,
+            int totalMinutos,
+            Set<String> nomesUsadosNestaTentativa) {
+
+        if (dias == null || dias.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        List<T> updatedDays = new ArrayList<>(dias.size());
+        for (T day : dias) {
+            List<TrainingExercise> rawExercises = exercisesExtractor.apply(day);
+            List<TrainingExercise> enrichedExercises = new ArrayList<>();
+
+            if (rawExercises != null) {
+                for (TrainingExercise ex : rawExercises) {
+                    TrainingExercise enriched = trainingValidator.enrichExercise(ex, validNames, pathologyText);
+                    nomesUsadosNestaTentativa.add(enriched.getName());
+                    enrichedExercises.add(enriched);
+                }
+            }
+
+            List<TrainingExercise> exercisesComEstimativa = anexarEstimativaCalorica(
+                    enrichedExercises, exerciseDictionary, weightKg, totalMinutos
+            );
+            updatedDays.add(dayConstructor.apply(dayNameExtractor.apply(day), exercisesComEstimativa));
+        }
+        return updatedDays;
+    }
+
+    private String resolverPatologiaCompleta(UserProfileRequest userRequest) {
+        String pathologyDeclarada = defaultIfEmpty(userRequest.getPathology(), "Nenhuma limitação relatada");
+        PatologiaInferida patologiaInferida = trainingValidator.inferirPatologiaDoRelatorio(userRequest.getMedicalReportText());
+        String pathologyInferidaRelatorio = (patologiaInferida == null) ? null : patologiaInferida.categorias();
+
+        if (pathologyInferidaRelatorio == null || pathologyInferidaRelatorio.isBlank()) {
+            return pathologyDeclarada;
+        }
+        if (pathologyDeclarada.contains("Nenhuma")) {
+            return pathologyInferidaRelatorio;
+        }
+        return pathologyDeclarada + ", " + pathologyInferidaRelatorio;
+    }
+
     private Map<String, List<String>> carregarDicionario() {
         try {
             Map<String, List<String>> dict = exerciseVideoService.getExerciseDictionary();
@@ -257,7 +274,7 @@ public class Training {
 
     /**
      * Avalia se o pedido contém relatórios ou diagnósticos clínicos ativos
-     * que exigem uma estrutura de treino em 4 blocos temporizados de reabilitação.
+     * que exigem uma estrutura de treino clínica de reabilitação.
      */
     public boolean isPlanoClinico(UserProfileRequest userRequest) {
         if (userRequest == null) return false;
@@ -273,26 +290,15 @@ public class Training {
                 && !userRequest.getPathology().equalsIgnoreCase("Nenhuma")
                 && !userRequest.getPathology().equalsIgnoreCase("Nenhuma limitação relatada");
 
-        return temRelatorioMedico || temPatologiaDeclarada || (temRelatorioVisbody && contemDesviosClinicos(userRequest.getReportVisbobyText()));
+        return temRelatorioMedico
+                || temPatologiaDeclarada
+                || (temRelatorioVisbody && contemDesviosClinicos(userRequest.getReportVisbobyText()));
     }
 
     private boolean contemDesviosClinicos(String visbodyText) {
         if (visbodyText == null || visbodyText.isBlank()) return false;
         String lower = visbodyText.toLowerCase();
-
-        // Palavras-chave que indicam necessidade de intervenção clínica postural/neuromuscular
-        return lower.contains("anteversão")
-                || lower.contains("anteversao")
-                || lower.contains("protração")
-                || lower.contains("protracao")
-                || lower.contains("assimetria")
-                || lower.contains("hiperextensão")
-                || lower.contains("hiperextensao")
-                || lower.contains("défice")
-                || lower.contains("defice")
-                || lower.contains("sequestrado")
-                || lower.contains("compressão")
-                || lower.contains("compressao");
+        return DESVIOS_CLINICOS_KEYWORDS.stream().anyMatch(lower::contains);
     }
 
     /**

@@ -70,8 +70,6 @@ public class PlanoS3Storage {
     }
 
     public void saveToS3(String key, TrainingPlanResponse plan) {
-        log.info("salvar no base de dados :");
-        planoDbStorage.save(key, plan);
 
         log.debug("[saveToS3] bucket='{}' key='{}'", bucketName, key);
         try {
