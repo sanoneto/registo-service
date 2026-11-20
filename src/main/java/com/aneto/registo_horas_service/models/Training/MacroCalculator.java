@@ -2,6 +2,7 @@ package com.aneto.registo_horas_service.models.Training;
 
 import com.aneto.registo_horas_service.dto.response.Macros;
 import com.aneto.registo_horas_service.dto.response.MealSuggestion;
+import com.aneto.registo_horas_service.models.Enum.MealDistribution;
 import lombok.NoArgsConstructor;
 import org.springframework.stereotype.Component;
 

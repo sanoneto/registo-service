@@ -22,7 +22,7 @@ public class TrainingExercise {
     private String tempo;
     private String details;
     private String notas;
-    private String weight;
+    private String cargaSugerida;
     private String cargaAtual;
     private String videoUrl;
     private String date;

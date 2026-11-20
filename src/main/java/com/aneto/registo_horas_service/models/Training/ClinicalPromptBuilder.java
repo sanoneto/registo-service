@@ -18,63 +18,86 @@ public class ClinicalPromptBuilder {
 
     private final ExerciseRepository exercicioRepository;
 
-    /**
-     * Gera a instrução dinâmica de divisão de treino, duração e volume por sessão.
-     */
     private String buildDiretrizTreino(List<String> sequencia, String durationText, int volumeIdeal) {
-        return "REGRAS DE DIVISÃO: " + String.join(" -> ", sequencia) + " | Duração: " + durationText + " | Volume: " + volumeIdeal + " ex/dia.";
+        return "REGRAS DE DIVISÃO: " + String.join(" -> ", sequencia)
+                + " | Duração Total: " + durationText
+                + " | Volume Exato: " + volumeIdeal + " exercícios/dia.";
     }
 
-    /**
-     * Obtém a diretriz de treino calculada com base na frequência semanal do utente.
-     */
-    private String obterDiretrizPorFrequencia(int freqSemanal, int volumeIdeal , String durationText) {
+    private String obterDiretrizPorFrequencia(int freqSemanal, int volumeIdeal, String durationText) {
         return switch (freqSemanal) {
-            // 1 a 2 dias: Full Body Funcional (Garante estímulo de todo o corpo na mesma sessão)
             case 1, 2 -> buildDiretrizTreino(
                     List.of(
-                            "Dia A (Full Body - Foco Estabilidade Pélvica & Cadeia Posterior)",
-                            "Dia B (Full Body - Foco Estabilidade Escapular & Quadríceps)"
+                            "Dia A (Full Body - Estabilidade Pélvica, Cadeia Posterior Controlada & Empurrar Horizontal)",
+                            "Dia B (Full Body - Estabilidade Escapular, Cadeia Anterior & Carregamento Anti-Cisalhamento)"
                     ),
                     durationText, volumeIdeal
             );
-
-            // 3 dias: Divisão Clássica Adaptada (Superiores / Inferiores / Postural & Integrado)
             case 3 -> buildDiretrizTreino(
                     List.of(
-                            "Dia 1 (Membros Superiores - Peitoral, Dorsal & Escápulas)",
-                            "Dia 2 (Membros Inferiores - Quadríceps, Glúteos & Anca)",
-                            "Dia 3 (Cadeia Posterior, Mobilidade Global & Antirrotação)"
+                            "Dia A (Membros Superiores - Peitoral, Dorsal & Estabilidade Escapular)",
+                            "Dia B (Membros Inferiores - Quadríceps, Glúteos & Controlo de Anca)",
+                            "Dia C (Cadeia Posterior, Mobilidade Global & Core Anti-Rotação)"
                     ),
                     durationText, volumeIdeal
             );
-
-            // 4 dias: Upper / Lower / Postural / Full Body
             case 4 -> buildDiretrizTreino(
                     List.of(
-                            "Dia A (Superiores - Empurrar & Puxar)",
-                            "Dia B (Inferiores - Foco Dominante de Anca e Glúteo)",
-                            "Dia C (Estabilidade Postural & Correção Cervico-Torácica)",
-                            "Dia D (Inferiores & Core - Foco Dominante de Joelho)"
+                            "Dia A (Superiores - Empurrar & Puxar Horizontal/Vertical)",
+                            "Dia B (Inferiores - Dominante de Anca, Glúteo & Cadeia Posterior)",
+                            "Dia C (Estabilidade Postural, Correção Cervico-Torácica & Core)",
+                            "Dia D (Inferiores - Dominante de Joelho & Estabilidade Unilateral)"
                     ),
                     durationText, volumeIdeal
             );
-
-            // Default (ex: 5+ dias): Distribuição equilibrada
             default -> buildDiretrizTreino(
                     List.of(
-                            "Dia 1 (Membros Superiores & Estabilidade Escapular)",
-                            "Dia 2 (Membros Inferiores & Alinhamento Pélvico)",
-                            "Dia 3 (Mobilidade Global, Core & Recondicionamento)"
+                            "Dia A (Membros Superiores - Foco Empurrar & Estabilidade Escapular)",
+                            "Dia B (Membros Inferiores - Dominante de Joelho & Controlo Articular)",
+                            "Dia C (Membros Superiores - Foco Puxar & Reequilíbrio Postural)",
+                            "Dia D (Membros Inferiores - Cadeia Posterior & Glúteos)",
+                            "Dia E (Condicionamento Metabólico, Mobilidade Global & Core)"
                     ),
                     durationText, volumeIdeal
             );
         };
     }
 
-    /**
-     * Procura dinamicamente todos os exercícios na BD e formata o catálogo para o LLM.
-     */
+    private String calcularEstruturaBlocos(String durationText, int volumeIdeal) {
+        int totalMin = 60;
+        if (durationText != null) {
+            String digits = durationText.replaceAll("[^0-9]", "");
+            if (!digits.isEmpty()) {
+                totalMin = Integer.parseInt(digits);
+            }
+        }
+
+        int b1Min = Math.max(5, (int) Math.round(totalMin * 0.17));
+        int b2Min = Math.max(10, (int) Math.round(totalMin * 0.25));
+        int b4Min = 5;
+        int b3Min = Math.max(15, totalMin - b1Min - b2Min - b4Min);
+
+        int b1Ex = Math.max(1, volumeIdeal / 4);
+        int b2Ex = Math.max(1, volumeIdeal / 4);
+        int b4Ex = 1;
+        int b3Ex = Math.max(2, volumeIdeal - b1Ex - b2Ex - b4Ex);
+
+        return String.format(Locale.US, """
+                Para CADA DIA (%d Minutos totais / %d exercícios), divide a sessão obrigatoriamente nestes 4 blocos:
+                1. BLOCO 1: LIBERTAÇÃO, MOBILIDADE & ATIVAÇÃO NEURAL (%d Minutos | ~%d exercícios) -> Intensidade alvo: RPE 4-5
+                2. BLOCO 2: ESTABILIZAÇÃO DO CORE & COLUNA ANTI-CISALHAMENTO (%d Minutos | ~%d exercícios) -> Intensidade alvo: RPE 6-7 (RIR 3-4)
+                3. BLOCO 3: FORTALECIMENTO ESPECÍFICO & HIPERTROFIA PROTEGIDA (%d Minutos | ~%d exercícios) -> Intensidade alvo: RPE 7-8.5 (RIR 1.5-3)
+                4. BLOCO 4: RETORNO À CALMA & DESCOMPRESSÃO NEURAL (%d Minutos | %d exercício) -> Intensidade alvo: RPE 3-4
+                NOTA: A soma de 'totalExerciseTime' de todos os exercícios de cada dia TEM de totalizar exatamente "%d Minutos".""",
+                totalMin, volumeIdeal,
+                b1Min, b1Ex,
+                b2Min, b2Ex,
+                b3Min, b3Ex,
+                b4Min, b4Ex,
+                totalMin
+        );
+    }
+
     private String carregarCatalogoDinamico() {
         List<Exercises> exercises = exercicioRepository.findAll();
 
@@ -96,8 +119,11 @@ public class ClinicalPromptBuilder {
         String studentName = (userRequest.getStudentName() != null && !userRequest.getStudentName().isBlank())
                 ? userRequest.getStudentName() : "Utente";
 
-        String medicalReport = userRequest.getMedicalReportText() != null ? userRequest.getMedicalReportText() : "Nenhum relatório médico inserido.";
-        String visbodyReport = userRequest.getReportVisbobyText() != null ? userRequest.getReportVisbobyText() : "Nenhum relatório Visbody inserido.";
+        String medicalReport = (userRequest.getMedicalReportText() != null && !userRequest.getMedicalReportText().isBlank())
+                ? userRequest.getMedicalReportText() : "Nenhum relatório médico inserido (aplicar princípios gerais de proteção articular e coluna neutra).";
+
+        String visbodyReport = (userRequest.getReportVisbobyText() != null && !userRequest.getReportVisbobyText().isBlank())
+                ? userRequest.getReportVisbobyText() : "Nenhum relatório Visbody inserido.";
 
         String listaAnteriores = (exerciciosAnteriores == null || exerciciosAnteriores.isEmpty())
                 ? "Nenhum" : String.join(", ", exerciciosAnteriores);
@@ -106,93 +132,124 @@ public class ClinicalPromptBuilder {
         double height = userRequest.getHeightCm() != null ? userRequest.getHeightCm() : 170.0;
         int age = userRequest.getAge() != null ? userRequest.getAge() : 30;
         int freq = userRequest.getFrequencyPerWeek() > 0 ? userRequest.getFrequencyPerWeek() : 3;
-        String durationText = defaultIfEmpty(userRequest.getDurationPerSession(), "60 minutos");
+        int diasAGerar = Math.min(freq, 5);
+        String durationText = defaultIfEmpty(userRequest.getDurationPerSession(), "60 Minutos");
 
-
-        // Obter catálogo dinâmico da BD e diretriz de treino calculada
         String catalogoDinamico = carregarCatalogoDinamico();
-        String diretrizTreino = obterDiretrizPorFrequencia(freq, volumeIdeal, durationText);
+        String diretrizTreino = obterDiretrizPorFrequencia(diasAGerar, volumeIdeal, durationText);
+        String estruturaBlocos = calcularEstruturaBlocos(durationText, volumeIdeal);
 
         String template = """
-            ATUAÇÃO: Especialista em Prescrição de Treino Clínico e Reabilitação Neuromuscular Profissional em Portugal.
+            ATUAÇÃO: Especialista Sénior em Prescrição de Exercício Clínico, Reabilitação Neuromuscular e Biomecânica Aplicada em Portugal.
+
             PERFIL DO UTENTE:
-            - Nome: %s
-            - Idade: %d anos
-            - Peso: %.1f kg | Altura: %.1f cm
-            - Frequência Semanal: %d dias/semana
+            - Nome: {{STUDENT_NAME}}
+            - Idade: {{AGE}} anos
+            - Peso: {{WEIGHT}} kg | Altura: {{HEIGHT}} cm
+            - Frequência Semanal: {{FREQ}} dias/semana
 
             DIRETRIZ DE PLANEAMENTO DO TREINO:
-            %s
+            {{DIRETRIZ_TREINO}}
 
-            RELATÓRIO MÉDICO / RESSONÂNCIA MAGNÉTICA:
-            %s
+            RELATÓRIO MÉDICO / EXAMES COMPLEMENTARES:
+            {{MEDICAL_REPORT}}
 
-            RELATÓRIO VISBODY / AVALIAÇÃO POSTURAL:
-            %s
+            RELATÓRIO VISBODY / AVALIAÇÃO POSTURAL E COMPOSIÇÃO CORPORAL:
+            {{VISBODY_REPORT}}
 
             CATÁLOGO OFICIAL DE EXERCÍCIOS DA APLICAÇÃO:
-            %s
+            {{CATALOGO_DINAMICO}}
 
             SISTEMA DE PRESCRIÇÃO CLÍNICA MULTI-DIAS EM 4 BLOCOS:
-            Gera OBRIGATORIAMENTE um array 'clinicalPlan' contendo EXATAMENTE %d DIAS DIFERENTES de acordo com as regras de divisão acima.
+            Gera OBRIGATORIAMENTE um array 'clinicalPlan' contendo EXATAMENTE {{DIAS_GERAR}} DIAS DIFERENTES de acordo com a diretriz de divisão acima.
 
-            Para CADA DIA, divide a sessão nos 4 blocos temporizados:
-            1. BLOCO 1: LIBERTAÇÃO, MOBILIDADE & ATIVAÇÃO (10 Minutos)
-            2. BLOCO 2: ESTABILIZAÇÃO DO CORE & COLUNA (10 Minutos)
-            3. BLOCO 3: FORTALECIMENTO ESPECÍFICO (20 Minutos)
-            4. BLOCO 4: RETORNO À CALMA & DESCOMPRESSÃO (5 Minutos)
+            {{ESTRUTURA_BLOCOS}}
 
-            REGRAS CRÍTICAS DE PREENCHIMENTO E TEMPOS:
-            - SELEÇÃO DE EXERCÍCIOS: Escolher OBRIGATORIAMENTE do catálogo acima. Preencher 'exerciseId' e 'name'.
-            - DURAÇÃO E TEMPOS:
-              * 'executionDuration': Tempo ativo por série/repetição (ex: "40s por série", "12 reps (~36s)").
-              * 'totalExerciseTime': Tempo total do exercício incluindo séries e descanso (ex: "4 Minutos").
-              * 'totalDayDuration': Duração total acumulada do dia (ex: "45 Minutos").
-            - PREENCHIMENTO DE TODOS OS CAMPOS DO EXERCÍCIO:
-              * 'order', 'exerciseId', 'name', 'muscleGroup', 'movementPlane', 'equipment', 'tempo', 'sets', 'reps', 'rest', 'executionDuration', 'totalExerciseTime', 'weight', 'cargaAtual', 'videoUrl', 'details', 'notas', 'date'.
-            - RESTRIÇÕES DE SEGURANÇA: Proibido agachamento livre com barra, deadlift ou cargas axiais sobre a coluna.
-            - EXERCÍCIOS A EVITAR REPETIR: %s.
+            REGRAS CLÍNICAS, SEGURANÇA E CONTROLO DE INTENSIDADE (RPE / RIR):
+            1. SELEÇÃO DE EXERCÍCIOS: Escolher OBRIGATORIAMENTE apenas exercícios existentes no Catálogo Oficial acima ('exerciseId' e 'name' exatos).
+            2. CONTROLO DE ESFORÇO (RPE E RIR):
+               - Prescrever obrigatoriamente o campo 'rpe' (escala 1-10) e refletir a relação RPE/RIR em 'cargaAtual' e no 'progressionProtocol' (ex: RPE 7-8 corresponde a RIR 2-3).
+               - Nunca prescrever RPE 9.5-10 (falha concêntrica) em exercícios que envolvam estabilidade da coluna, ombro ou joelho com desvio postural.
+            3. RESTRIÇÕES BIOMECÂNICAS DINÂMICAS:
+               - Analisa rigorosamente o Relatório Médico e o Visbody acima.
+               - Se existir listese, discopatia, hérnia/protrusão ou conflito radicular: proíbe cargas axiais compressivas sobre a coluna (agachamento livre com barra, good morning, desenvolvimento militar em pé) e movimentos que agravem o cisalhamento ou estiramento neural.
+               - Se existirem desvios posturais no Visbody (ex: hiperextensão de joelho, anteversão pélvica, protração escapular, anteriorização da cabeça): adapta a seleção e escreve cuidados específicos nas 'notas' de cada exercício.
+            4. QUALIDADE DO TEXTO CLÍNICO:
+               - Nos campos 'details' e 'notas', escreve instruções técnicas precisas e justificadas biomecanicamente (COMO executar e PORQUÊ protege a estrutura lesionada ou corrige a postura).
+            5. PLANO ALIMENTAR ('dietPlan.meals'):
+               - Preenche o array 'meals' com 4 a 5 refeições diárias equilibradas (ex: Pequeno-Almoço, Almoço, Lanche, Jantar, Ceia), utilizando alimentos comuns em Portugal e com quantidades em gramas no array 'ingredients'.
+               - A soma das calorias e macronutrientes ('calories', 'protein', 'carbs', 'fats') das refeições deve aproximar-se de {{DAILY_CALORIES}} kcal ({{PROTEIN}}g P, {{CARBS}}g HC, {{FATS}}g G).
+            6. EXERCÍCIOS A EVITAR REPETIR DO CICLO ANTERIOR: {{LISTA_ANTERIORES}}.
+            7. PREENCHIMENTO DE CAMPOS: Preenche TODOS os campos obrigatórios do esquema JSON. Responde APENAS com JSON válido, sem markdown ou texto extra.
 
             FORMATO JSON OBRIGATÓRIO:
             {
               "isExistingPlan": false,
-              "clientName": "%s",
-              "primaryDiagnosis": "Compressão da Raiz L3 Direita e Anterolistese L5",
-              "primaryObjective": "Reativação Neuromuscular do Quadríceps Direito e Estabilidade Pélvica",
-              "clinicalSummary": "Síntese médica do cruzamento entre a RM Lombar e a bioimpedância/postura do VisBody...",
+              "clientName": "{{STUDENT_NAME}}",
+              "primaryDiagnosis": "<Diagnóstico clínico extraído estritamente do Relatório Médico ou avaliação funcional>",
+              "primaryObjective": "<Objetivo principal de reabilitação, estabilidade e recomposição corporal>",
+              "clinicalSummary": "<Síntese clínica detalhada cruzando o Relatório Médico com a bioimpedância e desvios posturais do Visbody>",
               "validationStatus": "REQUIERE_VALIDACAO_MEDICA",
+              "biomechanicalGuidelines": [
+                "<Diretriz Biomecânica 1: Controlo articular/vertebral específico para as patologias do utente>",
+                "<Diretriz Biomecânica 2: Proteção neural/discal e amplitude segura>",
+                "<Diretriz Biomecânica 3: Estratégia de reequilíbrio postural baseada no Visbody>"
+              ],
               "safetyDirectives": [
-                "Sinal de Alarme: Interrupção imediata se manifestar dor aguda ou parestesia.",
-                "Contraindicação Absoluta: Cargas axiais sobre a coluna e forças de cisalhamento em L5-S1."
+                "<Movimentos Contraindicados: Lista explícita de exercícios e padrões proibidos para este caso>",
+                "<Critério de Interrupção 1: Dor aguda localizada na região afetada>",
+                "<Critério de Interrupção 2: Sinais neurológicos como choque, dormência, parestesia ou dor irradiada>",
+                "<Critério de Interrupção 3: Perda de força motora ou instabilidade articular>"
+              ],
+              "progressionProtocol": [
+                {
+                  "period": "Semanas 1 a 4",
+                  "rpe": "RPE 7 - 7.5",
+                  "rir": "RIR 2-3 (deixar 2 a 3 reps antes da falha técnica)",
+                  "criteria": "Consolidação dos padrões motores e controlo postural. Fase excêntrica controlada (2-3s) mantendo alinhamento neutro."
+                },
+                {
+                  "period": "Semanas 5 a 8",
+                  "rpe": "RPE 8",
+                  "rir": "RIR 2",
+                  "criteria": "Regra de Dupla Progressão: Ao completar o topo das repetições prescritas em todas as séries com técnica perfeita e RPE <= 8, aumentar a carga em 2,5% a 5% na sessão seguinte e regressar à base das repetições."
+                },
+                {
+                  "period": "Semanas 9 a 12",
+                  "rpe": "RPE 8 - 8.5 (multiarticulares) | RPE 7 - 7.5 (core/ombro)",
+                  "rir": "RIR 1-2 (nos exercícios multiarticulares principais)",
+                  "criteria": "Intensificação controlada nos exercícios principais (mantendo RIR 2-3 / RPE 7-7.5 no core e estabilizadores). Reavaliar composição corporal e sintomatologia ao final da semana 12."
+                }
               ],
               "clinicalPlan": [
                 {
-                  "day": "Dia 1 - Foco Lombar e Mobilidade Pélvica",
-                  "totalDayDuration": "45 Minutos",
+                  "day": "<Nome do Dia conforme a Diretriz de Planeamento>",
+                  "totalDayDuration": "{{DURATION_TEXT}}",
                   "blocks": [
                     {
-                      "blockName": "BLOCO 1: LIBERTAÇÃO & MOBILIDADE",
-                      "durationText": "10 Minutos",
+                      "blockName": "BLOCO 1: LIBERTAÇÃO, MOBILIDADE & ATIVAÇÃO NEURAL",
+                      "durationText": "<Duração do bloco, ex: 10 Minutos>",
                       "exercises": [
                         {
                           "order": 1,
-                          "exerciseId": 66,
-                          "name": "Cat Cow",
-                          "muscleGroup": "Coluna Toracolombar",
-                          "movementPlane": "Sagital",
-                          "equipment": "Colchonete",
-                          "tempo": "3-1-3-1",
-                          "sets": "3",
-                          "reps": "10",
-                          "rest": "45s",
-                          "executionDuration": "40s por série",
-                          "totalExerciseTime": "4 Minutos",
-                          "weight": "0kg",
-                          "cargaAtual": "RPE 4 (Sem carga)",
+                          "exerciseId": 0,
+                          "name": "<Nome exato do catálogo>",
+                          "muscleGroup": "<Grupo muscular>",
+                          "movementPlane": "<Sagital | Frontal | Transverso | Multiplanar>",
+                          "equipment": "<Equipamento>",
+                          "tempo": "<Ex: 3-1-2-1>",
+                          "sets": "<Ex: 3>",
+                          "reps": "<Ex: 10-12>",
+                          "rest": "<Ex: 45s>",
+                          "rpe": "<Ex: RPE 5 ou RPE 7-8>",
+                          "executionDuration": "<Tempo ativo por série, ex: 40s por série>",
+                          "totalExerciseTime": "<Tempo total incluindo séries e descanso, ex: 5 Minutos>",
+                          "weight": "<Carga sugerida, ex: 0kg ou 4kg>",
+                          "cargaAtual": "<Ex: RPE 7-8 (RIR 2-3)>",
                           "videoUrl": "",
-                          "details": "Em quatro apoios, alternar suavemente entre flexão e extensão torácica.",
-                          "notas": "Manter respiração fluida e evitar forçar a amplitude na extensão lombar.",
-                          "date": "Data"
+                          "details": "<Instrução técnica detalhada de execução>",
+                          "notas": "<Justificação clínica e segurança biomecânica específica para este utente>",
+                          "date": ""
                         }
                       ]
                     }
@@ -200,29 +257,52 @@ public class ClinicalPromptBuilder {
                 }
               ],
               "dietPlan": {
-                "dailyCalories": %d,
-                "imc": %.1f,
-                "imcCategory": "%s",
+                "dailyCalories": {{DAILY_CALORIES}},
+                "imc": {{IMC}},
+                "imcCategory": "{{IMC_CATEGORY}}",
                 "macroDistribution": {
-                  "protein": "%dg",
-                  "carbs": "%dg",
-                  "fats": "%dg"
+                  "protein": "{{PROTEIN}}g",
+                  "carbs": "{{CARBS}}g",
+                  "fats": "{{FATS}}g"
                 },
-                "meals": []
+                "meals": [
+                  {
+                    "time": "08:00",
+                    "description": "Pequeno-Almoço",
+                    "ingredients": [
+                      "2 ovos inteiros mexidos",
+                      "50g de pão integral",
+                      "1 peça de fruta"
+                    ],
+                    "calories": 420,
+                    "protein": 22,
+                    "carbs": 45,
+                    "fats": 16
+                  }
+                ]
               }
             }
             """;
 
-        return String.format(Locale.US, template,
-                studentName, age, weight, height, freq,          // %s, %d, %.1f, %.1f, %d
-                diretrizTreino,                                   // %s (Gerado pelo buildDiretrizTreino)
-                medicalReport, visbodyReport,                      // %s, %s
-                catalogoDinamico,                                 // %s (Catálogo da BD)
-                freq,                                             // %d (Quantidade de dias)
-                listaAnteriores,                                  // %s (Exercícios a evitar)
-                studentName,                                      // %s (clientName no JSON)
-                macros.dailyCalories(), macros.imc(), macros.imcCategory(), // %d, %.1f, %s
-                macros.protein(), macros.carbs(), macros.fats()    // %d, %d, %d
-        );
+        return template
+                .replace("{{STUDENT_NAME}}", studentName)
+                .replace("{{AGE}}", String.valueOf(age))
+                .replace("{{WEIGHT}}", String.format(Locale.US, "%.1f", weight))
+                .replace("{{HEIGHT}}", String.format(Locale.US, "%.1f", height))
+                .replace("{{FREQ}}", String.valueOf(freq))
+                .replace("{{DIRETRIZ_TREINO}}", diretrizTreino)
+                .replace("{{MEDICAL_REPORT}}", medicalReport)
+                .replace("{{VISBODY_REPORT}}", visbodyReport)
+                .replace("{{CATALOGO_DINAMICO}}", catalogoDinamico)
+                .replace("{{DIAS_GERAR}}", String.valueOf(diasAGerar))
+                .replace("{{ESTRUTURA_BLOCOS}}", estruturaBlocos)
+                .replace("{{LISTA_ANTERIORES}}", listaAnteriores)
+                .replace("{{DURATION_TEXT}}", durationText)
+                .replace("{{DAILY_CALORIES}}", String.valueOf(macros.dailyCalories()))
+                .replace("{{IMC}}", String.format(Locale.US, "%.2f", macros.imc()))
+                .replace("{{IMC_CATEGORY}}", macros.imcCategory())
+                .replace("{{PROTEIN}}", String.valueOf(macros.protein()))
+                .replace("{{CARBS}}", String.valueOf(macros.carbs()))
+                .replace("{{FATS}}", String.valueOf(macros.fats()));
     }
 }

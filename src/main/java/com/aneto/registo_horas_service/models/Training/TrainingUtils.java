@@ -2,7 +2,7 @@ package com.aneto.registo_horas_service.models.Training;
 
 import com.aneto.registo_horas_service.dto.request.UserProfileRequest;
 import com.aneto.registo_horas_service.dto.response.TrainingExercise;
-import com.aneto.registo_horas_service.models.Enum;
+import com.aneto.registo_horas_service.models.Enum.TrainingProtocol;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.*;
@@ -44,7 +44,7 @@ public final class TrainingUtils {
         return "60";
     }
 
-    public static String calcularDescansoDeload(Enum.TrainingProtocol protocol, String objective, String cargaAtual) {
+    public static String calcularDescansoDeload(TrainingProtocol protocol, String objective, String cargaAtual) {
         String base = calcularDescansoCientifico(objective, cargaAtual);
         try {
             int segundosBase = Integer.parseInt(base.replaceAll("[^0-9]", ""));

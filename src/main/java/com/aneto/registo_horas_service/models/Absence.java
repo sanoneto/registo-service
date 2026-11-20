@@ -1,5 +1,7 @@
 package com.aneto.registo_horas_service.models;
 
+import com.aneto.registo_horas_service.models.Enum.AbsenceStatus;
+import com.aneto.registo_horas_service.models.Enum.AbsenceType;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -28,7 +30,7 @@ public class Absence {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private Enum.AbsenceType type;
+    private AbsenceType type;
 
     @Column(nullable = false)
     private LocalDate startDate;
@@ -44,7 +46,7 @@ public class Absence {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private Enum.AbsenceStatus status;
+    private AbsenceStatus status;
 
     // Construtor, Getters e Setters
 
@@ -52,7 +54,7 @@ public class Absence {
     protected void onCreate() {
         this.publicId = UUID.randomUUID().toString();
         this.registrationDate = LocalDate.now();
-        this.status = Enum.AbsenceStatus.PENDENTE; // Todos os pedidos começam como Pendentes
+        this.status = AbsenceStatus.PENDENTE; // Todos os pedidos começam como Pendentes
     }
 }
 

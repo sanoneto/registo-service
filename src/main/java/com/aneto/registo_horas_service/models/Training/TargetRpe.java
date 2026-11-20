@@ -18,9 +18,9 @@ public record TargetRpe(
      */
     public String toPromptString() {
         if (minRpe == maxRpe) {
-            return String.format(Locale.US, "RPE %.1f (%d a %d RIR - %s)", minRpe, rirMin, rirMax, focoFisiologico);
+            return String.format(Locale.US, " %.1f (%d a %d RIR)", minRpe, rirMin, rirMax);
         }
-        return String.format(Locale.US, "RPE %.1f-%.1f (%d a %d RIR - %s)", minRpe, maxRpe, rirMin, rirMax, focoFisiologico);
+        return String.format(Locale.US, " %.1f-%.1f (%d a %d RIR)", minRpe, maxRpe, rirMin, rirMax);
     }
 
     // Presets Fisiológicos Reutilizáveis

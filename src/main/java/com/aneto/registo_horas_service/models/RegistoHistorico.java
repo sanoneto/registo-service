@@ -1,5 +1,6 @@
 package com.aneto.registo_horas_service.models;
 
+import com.aneto.registo_horas_service.models.Enum.OperacaoAuditoria;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -26,7 +27,7 @@ public class RegistoHistorico {
     private String registoPublicId; // FK para RegistoHoras.publicId
 
     @Enumerated(EnumType.STRING)
-    private Enum.OperacaoAuditoria operacao; // ENUM: UPDATE, DELETE, CREATE
+    private OperacaoAuditoria operacao; // ENUM: UPDATE, DELETE, CREATE
 
     private LocalDateTime dataAlteracao;
 

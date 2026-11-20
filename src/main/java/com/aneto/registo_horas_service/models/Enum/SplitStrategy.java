@@ -1,4 +1,4 @@
-package com.aneto.registo_horas_service.models.Training;
+package com.aneto.registo_horas_service.models.Enum;
 
 import lombok.Getter;
 

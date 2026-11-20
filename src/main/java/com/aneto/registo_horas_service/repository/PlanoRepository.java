@@ -1,6 +1,7 @@
 package com.aneto.registo_horas_service.repository;
 
-import com.aneto.registo_horas_service.models.Enum;
+import com.aneto.registo_horas_service.models.Enum.EstadoPedido;
+import com.aneto.registo_horas_service.models.Enum.EstadoPlano;
 import com.aneto.registo_horas_service.models.Plano;
 import jakarta.transaction.Transactional;
 import org.springframework.data.domain.Page;
@@ -23,12 +24,12 @@ public interface PlanoRepository extends JpaRepository<Plano, UUID> {
 
     Optional<Plano> findByNomeAlunoContainingAndEstadoPlanoAndEstadoPedido(
             String nomeAluno,
-            Enum.EstadoPlano estadoPlano,
-            Enum.EstadoPedido estadoPedido
+            EstadoPlano estadoPlano,
+            EstadoPedido estadoPedido
     );
     Page<Plano> findByNomeAlunoContainingIgnoreCase(String nomeAluno, Pageable pageable);
 
-    List<Plano>  findByNomeAlunoAndEstadoPlano (String username, Enum.EstadoPlano estadoPlano);
+    List<Plano>  findByNomeAlunoAndEstadoPlano (String username, EstadoPlano estadoPlano);
     @Query("SELECT p FROM Plano p WHERE (p.especialista = :nome " +
             "OR p.especialista IS NULL " +
             "OR p.especialista = '' " +
@@ -50,9 +51,9 @@ public interface PlanoRepository extends JpaRepository<Plano, UUID> {
     /*  3 novos metodo para adicionar o estado doplano   */
 
     Page<Plano> findByNomeAlunoContainingIgnoreCaseAndEstadoPlano(
-            String nomeAluno, Enum.EstadoPlano estadoPlano, Pageable pageable);
+            String nomeAluno, EstadoPlano estadoPlano, Pageable pageable);
 
-    Page<Plano> findByEstadoPlano(Enum.EstadoPlano estadoPlano, Pageable pageable);
+    Page<Plano> findByEstadoPlano(EstadoPlano estadoPlano, Pageable pageable);
 
     @Query("SELECT p FROM Plano p WHERE (p.especialista = :nome " +
             "OR p.especialista IS NULL " +
@@ -60,16 +61,16 @@ public interface PlanoRepository extends JpaRepository<Plano, UUID> {
             "OR p.especialista = 'Sem Especialista') " +
             "AND p.estadoPlano = :estadoPlano " +
             "AND (:nomeAluno IS NULL OR :nomeAluno = '' OR LOWER(p.nomeAluno) LIKE LOWER(CONCAT('%', :nomeAluno, '%')))")
-    Page<Plano> findForEspecialista(@Param("nome") String nome, @Param("estadoPlano") Enum.EstadoPlano estadoPlano, @Param("nomeAluno") String nomeAluno, Pageable pageable);
+    Page<Plano> findForEspecialista(@Param("nome") String nome, @Param("estadoPlano") EstadoPlano estadoPlano, @Param("nomeAluno") String nomeAluno, Pageable pageable);
 
     @Query("SELECT p FROM Plano p WHERE p.nomeAluno = :nome AND p.estadoPlano = :estadoPlano")
-    Page<Plano> findForEstagiario(@Param("nome") String nome, @Param("estadoPlano") Enum.EstadoPlano estadoPlano, Pageable pageable);
+    Page<Plano> findForEstagiario(@Param("nome") String nome, @Param("estadoPlano") EstadoPlano estadoPlano, Pageable pageable);
 
     // >>> NOVO: busca de plano ativo+concluído para aluno SEM conta, por alunoTempId
     Optional<Plano> findByAlunoTempIdAndEstadoPlanoAndEstadoPedido(
             String alunoTempId,
-            Enum.EstadoPlano estadoPlano,
-            Enum.EstadoPedido estadoPedido
+            EstadoPlano estadoPlano,
+            EstadoPedido estadoPedido
     );
 
     // >>> NOVO: inativação de planos ativos para aluno SEM conta (por alunoTempId,

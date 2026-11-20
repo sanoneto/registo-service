@@ -3,7 +3,8 @@ package com.aneto.registo_horas_service.models.Training;
 import com.aneto.registo_horas_service.dto.request.UserProfileRequest;
 import com.aneto.registo_horas_service.dto.response.Macros;
 import com.aneto.registo_horas_service.dto.response.MealSuggestion;
-import com.aneto.registo_horas_service.models.Enum;
+import com.aneto.registo_horas_service.models.Enum.SplitStrategy;
+import com.aneto.registo_horas_service.models.Enum.TrainingProtocol;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
 
@@ -42,7 +43,7 @@ public class TrainingPromptBuilder {
         String durationText = defaultIfEmpty(userRequest.getDurationPerSession(), "60 minutos");
 
         String protocolId = (userRequest.getProtocol() == null) ? "nasm_estabilizacao" : userRequest.getProtocol();
-        Enum.TrainingProtocol protocol = Enum.TrainingProtocol.fromId(protocolId);
+        TrainingProtocol protocol = TrainingProtocol.fromId(protocolId);
 
         boolean isGluteFocus = isFocoGluteo(userRequest.getObjective());
         boolean isSedentary = "sedentary".equalsIgnoreCase(userRequest.getExerciseHistory());
@@ -174,7 +175,7 @@ public class TrainingPromptBuilder {
                 
                 %s
                 
-                FORMATO JSON OBRIGATÓRIO (DEVE CONTER EXACTAMENTE %d DIAS NO ARRAY 'plan'):
+                FORMATO JSON OBRIGATÓRIO (DEVE CONTER EXATAMENTE %d DIAS NO ARRAY 'plan'):
                 {
                 "summary": "Explicação técnica da estratégia %s.",
                 "plan": [
@@ -196,7 +197,7 @@ public class TrainingPromptBuilder {
     }
 
     @NotNull
-    private static StringBuilder getStringBuilder(int dias, Enum.TrainingProtocol protocol, String descansoEfetivo, String rpeEfetivo) {
+    private static StringBuilder getStringBuilder(int dias, TrainingProtocol protocol, String descansoEfetivo, String rpeEfetivo) {
         StringBuilder jsonDaysExample = new StringBuilder();
         for (int i = 1; i <= dias; i++) {
             jsonDaysExample.append(String.format(Locale.US, """
@@ -289,7 +290,7 @@ public class TrainingPromptBuilder {
                 """;
     }
 
-    private String buildDiretrizFocoEspecial(boolean aplicaFocoGluteoExtremo, boolean isGluteFocus, Enum.TrainingProtocol protocol, Map<String, Map<String, List<String>>> dictComSub) {
+    private String buildDiretrizFocoEspecial(boolean aplicaFocoGluteoExtremo, boolean isGluteFocus, TrainingProtocol protocol, Map<String, Map<String, List<String>>> dictComSub) {
         if (aplicaFocoGluteoExtremo) {
             return """
                     [FOCO PRIORITÁRIO EXTREMO: GLÚTEOS]
