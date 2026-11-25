@@ -6,36 +6,36 @@ import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-// ... (Outros imports)
-
 @Configuration
 public class RabbitMQConfig {
 
-    // 🔑 CORREÇÃO: Defina a constante da fila como public static final
     public static final String EMAIL_QUEUE = "email.queue";
     public static final String EMAIL_EXCHANGE = "email.exchange";
     public static final String EMAIL_ROUTING_KEY = "email.send";
 
+    public static final String EMAIL_ATTACHMENT_QUEUE = "email.attachment.queue";
+    public static final String EMAIL_ATTACHMENT_ROUTING_KEY = "email.attachment.routingKey";
 
-    @Bean("rabbitJsonConverter") // Dê um nome específico ao bean
+    @Bean("rabbitJsonConverter")
     public MessageConverter jsonMessageConverter() {
         return new Jackson2JsonMessageConverter();
     }
 
-    // 1. Declaração da Queue (Fila)
     @Bean
     public Queue emailQueue() {
-        // Usa a constante para garantir consistência
         return new Queue(EMAIL_QUEUE, true);
     }
 
-    // 2. Declaração do Exchange (Trocador)
+    @Bean
+    public Queue emailAttachmentQueue() {
+        return new Queue(EMAIL_ATTACHMENT_QUEUE, true);
+    }
+
     @Bean
     public Exchange emailExchange() {
         return new DirectExchange(EMAIL_EXCHANGE, true, false);
     }
 
-    // 3. Vinculação (Binding)
     @Bean
     public Binding bindingEmail(Queue emailQueue, Exchange emailExchange) {
         return BindingBuilder
@@ -45,5 +45,12 @@ public class RabbitMQConfig {
                 .noargs();
     }
 
-    // ... (Outras configurações, se houver)
+    @Bean
+    public Binding bindingEmailAttachment(Queue emailAttachmentQueue, Exchange emailExchange) {
+        return BindingBuilder
+                .bind(emailAttachmentQueue)
+                .to(emailExchange)
+                .with(EMAIL_ATTACHMENT_ROUTING_KEY)
+                .noargs();
+    }
 }

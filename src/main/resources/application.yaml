@@ -7,7 +7,6 @@ spring:
       max-file-size: 10MB
       max-request-size: 10MB
 
-  # Configuração de Cache corrigida para Redis
   cache:
     type: redis
   data:
@@ -17,7 +16,6 @@ spring:
       password: ${SPRING_DATA_REDIS_PASSWORD:}
       repositories:
         enabled: false
-      # Configuração de TTL (24 horas)
   redis:
     time-to-live: 86400000
 
@@ -73,9 +71,6 @@ spring:
         options:
           model: "models/gemini-3.8-flash"
 
-  #  openai:
-   #   api-key: ${OPENAI_API_KEY}
-
   flyway:
     enabled: false
     locations: classpath:db/migration
@@ -84,10 +79,7 @@ spring:
 
 logging:
   level:
-    # Controle dinâmico da sua aplicação via variável APP_LOG_LEVEL (padrão: INFO)
     com.aneto.registo_horas_service: ${APP_LOG_LEVEL:INFO}
-
-    # Níveis de log das bibliotecas/frameworks
     org.hibernate.orm.jdbc.bind: TRACE
     org.hibernate.SQL: DEBUG
     org.springframework.security.web.ObservationFilterChainDecorator: ERROR
@@ -109,7 +101,7 @@ management:
     mail:
       enabled: false
     redis:
-      enabled: false  # Isso impede que o erro do Redis derrube o Health Check
+      enabled: false
     db:
       enabled: true
 
@@ -155,7 +147,6 @@ telegram:
   bot:
     token:
       anetoBot: ${TELEGRAM_BOT_TOKEN}
-
 
 internal:
   api-key: ${INTERNAL_API_KEY}

@@ -25,7 +25,7 @@ public class PlanoPagamento {
     private String tipoPack;
     @Column(columnDefinition = "TEXT")
     private String assinatura;
-
+    private String emailSocio;
     // Relacionamento: Um Plano tem vários Registos de Treino
     @OneToMany(mappedBy = "planoPagamento", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<RegistoTreino> registosTreino;
