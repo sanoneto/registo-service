@@ -9,13 +9,13 @@ import java.util.UUID;
 
 public interface EventsService {
     EventsResponse create(EventRequest request, String googleToken);
-    List<EventsResponse> listAll ();
-     void agendarAlerta(EventRequest request);
+    List<EventsResponse> listAll();
+    void agendarAlerta(EventRequest request);
     void enviarNotificacaoPush(PushSubscriptionDTO sub, String titulo, boolean isMobile, String username);
     String confirmarAlerta(UUID id);
 
     void deleteById(UUID id, String googleToken);
     EventsResponse findById(UUID id);
-    EventsResponse update(UUID id, EventRequest request);
-    List<EventsResponse> syncFromGoogle(String googleToken,String userId);
+    EventsResponse update(UUID id, EventRequest request, String googleToken);
+    List<EventsResponse> syncFromGoogle(String googleToken, String userId);
 }

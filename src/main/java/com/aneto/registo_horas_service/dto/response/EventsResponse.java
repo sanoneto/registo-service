@@ -25,6 +25,7 @@ public record EventsResponse(
 
         @Column(columnDefinition = "TEXT")
         String notes,
-        boolean sendAlert
+        boolean sendAlert,
+        boolean syncGoogle
 ) {
 }
