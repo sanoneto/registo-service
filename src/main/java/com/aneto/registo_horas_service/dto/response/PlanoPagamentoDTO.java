@@ -15,6 +15,7 @@ public class PlanoPagamentoDTO {
     private int aulasPack;
     private double valor;
     private String assinatura;
+    private String emailSocio;
     private String tipoPack; // Adicionado conforme discutimos
     private List<RegistoTreinoDTO> registosTreino; // Mapear também os treinos
 }

@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
@@ -15,9 +16,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Controller responsável pela gestão de eventos e integração com Google Calendar.
- */
 @RestController
 @RequestMapping("/api/v1")
 @RequiredArgsConstructor
@@ -32,11 +30,8 @@ public class EventoController {
             @RequestHeader(value = "Authorization", required = false) String authAppToken,
             @RequestHeader(value = "X-Google-Token", required = false) String googleToken
     ) {
-        log.info("Recebido pedido para criar evento. X-Google-Token presente: {}", googleToken != null);
-
-        if (authAppToken == null) {
-            log.warn("ALERTA: Header Authorization ausente. Verifique a Gateway ou o Interceptor do Frontend.");
-        }
+        log.info("Recebido pedido para criar evento. X-Google-Token presente: {}",
+                googleToken != null && !googleToken.isBlank());
 
         EventsResponse response = eventsService.create(eventRequest, googleToken);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -52,11 +47,8 @@ public class EventoController {
         log.info(">>> PROCESSANDO CONFIRMAÇÃO PARA ID: {}", id);
 
         String nomeEvento = eventsService.confirmarAlerta(id);
-
-        // Encode para evitar que caracteres especiais ou espaços quebrem a URL de redirecionamento
         String nomeEncoded = URLEncoder.encode(nomeEvento, StandardCharsets.UTF_8);
 
-        // Redireciona o utilizador para a landing page do React
         return ResponseEntity.status(HttpStatus.FOUND)
                 .location(URI.create("https://www.sanoneto.com/alerta-confirmado?evento=" + nomeEncoded))
                 .build();
@@ -69,7 +61,7 @@ public class EventoController {
             @RequestHeader(value = "X-Google-Token", required = false) String googleToken
     ) {
         log.info("Eliminando evento ID: {}. System Token: {}, Google Token: {}",
-                id, systemToken != null, googleToken != null);
+                id, systemToken != null, googleToken != null && !googleToken.isBlank());
 
         eventsService.deleteById(id, googleToken);
         return ResponseEntity.noContent().build();
@@ -83,17 +75,27 @@ public class EventoController {
     @PutMapping("/eventos/{id}")
     public ResponseEntity<EventsResponse> atualizarEvento(
             @PathVariable UUID id,
-            @RequestBody EventRequest request) {
-        return ResponseEntity.ok(eventsService.update(id, request));
+            @RequestBody EventRequest request,
+            @RequestHeader(value = "X-Google-Token", required = false) String googleToken
+    ) {
+        log.info("Atualizando evento ID: {}. X-Google-Token presente: {}",
+                id, googleToken != null && !googleToken.isBlank());
+
+        return ResponseEntity.ok(eventsService.update(id, request, googleToken));
     }
 
     @GetMapping("/eventos/sync-from-google")
     public ResponseEntity<List<EventsResponse>> syncFromGoogle(
             @RequestHeader("X-Google-Token") String googleToken,
-            @RequestHeader(value = "X-User-Id", required = false) String userId) {
+            @RequestHeader(value = "X-User-Id", required = false) String userId,
+            Authentication authentication
+    ) {
+        String resolvedUserId = (userId != null && !userId.isBlank())
+                ? userId
+                : (authentication != null ? authentication.getName() : null);
 
-        log.info("Iniciando sincronização Google para usuário: {}", userId);
-        List<EventsResponse> novosEventos = eventsService.syncFromGoogle(googleToken, userId);
+        log.info("Iniciando sincronização Google para utilizador: {}", resolvedUserId);
+        List<EventsResponse> novosEventos = eventsService.syncFromGoogle(googleToken, resolvedUserId);
         return ResponseEntity.ok(novosEventos);
     }
 }

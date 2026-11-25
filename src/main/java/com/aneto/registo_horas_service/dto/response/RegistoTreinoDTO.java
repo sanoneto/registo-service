@@ -16,4 +16,5 @@ public class RegistoTreinoDTO {
     private int aulasFeitas;
     private int saldo;
     private String assinatura;
+    private String emailSocio;
 }

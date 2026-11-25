@@ -14,9 +14,7 @@ import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.client.util.DateTime;
 import com.google.api.services.calendar.Calendar;
-import com.google.api.services.calendar.model.CalendarList;
-import com.google.api.services.calendar.model.CalendarListEntry;
-import com.google.api.services.calendar.model.EventDateTime;
+import com.google.api.services.calendar.model.*;
 import com.google.auth.http.HttpCredentialsAdapter;
 import com.google.auth.oauth2.AccessToken;
 import com.google.auth.oauth2.GoogleCredentials;
@@ -37,62 +35,70 @@ import reactor.core.publisher.Mono;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
-import java.util.List;
-import java.util.Map;
-import java.util.NoSuchElementException;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class EventsServiceImpl implements EventsService {
+
     private static final Logger log = LoggerFactory.getLogger(EventsServiceImpl.class);
+    private static final ZoneId ZONE_LISBOA = ZoneId.of("Europe/Lisbon");
+    private static final int MAX_TENTATIVAS = 10;
+
     private final EventoRepository eventRepository;
     private final EventsMapper mapper;
-    private final TaskScheduler taskScheduler; // Adicionado final
-    private final NotificationService notificationService; // Injetado aqui
+    private final TaskScheduler taskScheduler;
+    private final NotificationService notificationService;
     private final ObjectMapper objectMapper;
     private final WebClient targetServiceWebClient;
     private final TelegramBotService telegramBotService;
-
-    private static final int MAX_TENTATIVAS = 10;
 
     @Override
     public EventsResponse create(EventRequest request, String googleToken) {
         log.info("### CAMADA SERVICE: Iniciando criação do evento: {}", request.title());
 
-        // 1. Guarda localmente primeiro
         Evento novoEvento = mapper.toEntity(request);
-
-        // IMPORTANTE: Garante que o username vindo do request é guardado na entidade
-        // para que as repetições futuras saibam para quem enviar.
         novoEvento.setUsername(request.username());
         novoEvento = eventRepository.save(novoEvento);
 
-        // 2. Envio imediato via Telegram se for Mobile
-        if (request.isMobile()) {
-            log.info("📱 Detetado Mobile no Service: Iniciando busca de Chat ID para {}", request.username());
-            try {
-                // Agora passamos o userName que vem no DTO do request
-                enviarViaTelegram(request.title(), novoEvento.getId(), request.username());
-            } catch (Exception e) {
-                log.error("❌ Erro ao disparar Telegram: {}", e.getMessage());
-            }
-        }
-
-        // 3. Alerta Push / Repetições
+        // 1. Alerta insistente Telegram apenas na hora do evento (se sendAlert = true)
         if (request.sendAlert()) {
-            log.info("📢 Agendando fluxo de alertas para o evento...");
-            // Certifica-te que o agendarAlertaComRepeticao usa o userName da entidade
+            log.info("📢 Agendando alerta com confirmação para a hora do evento...");
             agendarAlertaComRepeticao(novoEvento.getId(), request);
         }
 
-        // 4. Sincronização Google Calendar (Código original mantido)
-        if (googleToken != null && !googleToken.isEmpty()) {
-            processarSincronizacaoGoogle(novoEvento, request, googleToken);
+        // 2. Sincronização automática com Google Calendar + Lembretes nativos no telemóvel
+        if (googleToken != null && !googleToken.isBlank()) {
+            sincronizarEventoComGoogle(novoEvento, googleToken);
         }
 
-        return mapper.toResponse(novoEvento);
+        return toEnrichedResponse(novoEvento);
+    }
+
+    @Override
+    public EventsResponse update(UUID id, EventRequest request, String googleToken) {
+        return eventRepository.findById(id).map(existente -> {
+            boolean horarioMudou = !existente.getStartTime().equals(request.startTime()) ||
+                    !existente.getReferenceDate().equals(request.referenceDate());
+
+            mapper.updateEntityFromDto(request, existente);
+            if (horarioMudou) {
+                existente.setAlertConfirmed(false);
+            }
+
+            Evento salvo = eventRepository.save(existente);
+
+            if (request.sendAlert() && horarioMudou) {
+                agendarAlertaComRepeticao(salvo.getId(), request);
+            }
+
+            if (googleToken != null && !googleToken.isBlank()) {
+                sincronizarEventoComGoogle(salvo, googleToken);
+            }
+
+            return toEnrichedResponse(salvo);
+        }).orElseThrow(() -> new NoSuchElementException("Evento não encontrado com o ID: " + id));
     }
 
     @Override
@@ -100,30 +106,41 @@ public class EventsServiceImpl implements EventsService {
         try {
             Calendar service = getCalendarService(googleToken);
 
-            // 1. Limitar a janela de tempo (ex: hoje até daqui a 3 meses)
+            // PASSO A: Enviar para o Google Calendar quaisquer eventos locais futuros que ainda não foram sincronizados
+            List<Evento> pendentesEnvio = eventRepository.findAll().stream()
+                    .filter(e -> e.getGoogleEventId() == null || e.getGoogleEventId().isBlank())
+                    .filter(e -> userId == null || userId.isBlank() || userId.equalsIgnoreCase(e.getUsername()))
+                    .filter(e -> e.getReferenceDate() != null && !e.getReferenceDate().isBefore(LocalDate.now(ZONE_LISBOA)))
+                    .collect(Collectors.toList());
+
+            for (Evento localPendente : pendentesEnvio) {
+                log.info("⬆️ Enviando evento local '{}' para o Google Calendar...", localPendente.getTitle());
+                sincronizarEventoComGoogle(localPendente, googleToken);
+            }
+
+            // PASSO B: Importar novos eventos do Google Calendar (próximos 90 dias)
             DateTime now = new DateTime(System.currentTimeMillis());
             DateTime limit = new DateTime(System.currentTimeMillis() + (90L * 24 * 60 * 60 * 1000));
 
-            // 2. Obter a lista de todos os calendários visíveis
             CalendarList calendarList = service.calendarList().list().execute();
-            List<Evento> todosEventosNovos = new java.util.ArrayList<>();
+            List<Evento> todosEventosNovos = new ArrayList<>();
 
             for (CalendarListEntry entry : calendarList.getItems()) {
-                // Ignorar calendários de feriados se desejar, ou filtrar por ‘ID’
                 if ("reader".equals(entry.getAccessRole()) && entry.getId().contains("#holiday")) {
-                    log.info("Ignorando calendário de feriados: {}", entry.getSummary());
                     continue;
                 }
-                log.info("Sincronizando calendário: {}", entry.getSummary());
 
                 com.google.api.services.calendar.model.Events events = service.events().list(entry.getId())
                         .setTimeMin(now)
-                        .setTimeMax(limit) // 👈 Essencial para evitar aniversários repetidos até 2036
+                        .setTimeMax(limit)
                         .setSingleEvents(true)
                         .execute();
 
-                for (com.google.api.services.calendar.model.Event gEvent : events.getItems()) {
-                    // Verificação de duplicados por ‘ID’ de Evento E Utilizador
+                if (events.getItems() == null) continue;
+
+                for (Event gEvent : events.getItems()) {
+                    if (gEvent.getId() == null || gEvent.getSummary() == null) continue;
+
                     if (!eventRepository.existsByGoogleEventIdAndUsername(gEvent.getId(), userId)) {
                         Evento novo = mapGoogleEventToEntity(gEvent, userId);
                         if (novo != null) {
@@ -132,16 +149,106 @@ public class EventsServiceImpl implements EventsService {
                     }
                 }
             }
-            return todosEventosNovos.stream().map(mapper::toResponse).collect(Collectors.toList());
+
+            return todosEventosNovos.stream()
+                    .map(this::toEnrichedResponse)
+                    .collect(Collectors.toList());
 
         } catch (Exception e) {
-            log.error("Erro na sincronização completa: ", e);
-            throw new RuntimeException("Falha ao ler agendas do Google");
+            log.error("Erro na sincronização completa com Google Calendar: ", e);
+            throw new RuntimeException("Falha ao sincronizar com Google Calendar: " + e.getMessage());
         }
     }
 
+    private void sincronizarEventoComGoogle(Evento evento, String googleToken) {
+        try {
+            Calendar service = getCalendarService(googleToken);
+            Event gEvent = buildGoogleEvent(evento);
+
+            if (evento.getGoogleEventId() != null && !evento.getGoogleEventId().isBlank()) {
+                try {
+                    Event updated = service.events()
+                            .update("primary", evento.getGoogleEventId(), gEvent)
+                            .execute();
+                    evento.setGoogleEventId(updated.getId());
+                    eventRepository.save(evento);
+                    log.info("✅ Evento '{}' atualizado no Google Calendar (ID: {})", evento.getTitle(), updated.getId());
+                    return;
+                } catch (Exception ex) {
+                    log.warn("⚠️ Evento não encontrado no Google para update, a criar novo: {}", ex.getMessage());
+                }
+            }
+
+            Event inserted = service.events().insert("primary", gEvent).execute();
+            evento.setGoogleEventId(inserted.getId());
+            eventRepository.save(evento);
+            log.info("✅ Evento '{}' criado no Google Calendar com alertas push (ID: {})", evento.getTitle(), inserted.getId());
+        } catch (Exception e) {
+            log.error("❌ Erro na sincronização com Google Calendar: {}", e.getMessage(), e);
+        }
+    }
+
+    private Event buildGoogleEvent(Evento evento) {
+        String descricao = (evento.getNotes() != null && !evento.getNotes().isBlank())
+                ? evento.getNotes()
+                : "";
+        if (evento.getProject() != null && !evento.getProject().isBlank()) {
+            descricao = "Projeto: " + evento.getProject() + (descricao.isEmpty() ? "" : "\n" + descricao);
+        }
+
+        Event gEvent = new Event()
+                .setSummary(evento.getTitle())
+                .setDescription(descricao);
+
+        LocalDate dataInicio = evento.getReferenceDate();
+        LocalTime horaInicio = evento.getStartTime() != null ? evento.getStartTime() : LocalTime.of(9, 0);
+        LocalTime horaFim = (evento.getEndTime() != null && evento.getEndTime().isAfter(horaInicio))
+                ? evento.getEndTime()
+                : horaInicio.plusHours(1);
+
+        ZonedDateTime zdtStart = ZonedDateTime.of(dataInicio, horaInicio, ZONE_LISBOA);
+        ZonedDateTime zdtEnd = ZonedDateTime.of(dataInicio, horaFim, ZONE_LISBOA);
+
+        String startRfc3339 = zdtStart.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+        String endRfc3339 = zdtEnd.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+
+        gEvent.setStart(new EventDateTime()
+                .setDateTime(new DateTime(startRfc3339))
+                .setTimeZone("Europe/Lisbon"));
+
+        gEvent.setEnd(new EventDateTime()
+                .setDateTime(new DateTime(endRfc3339))
+                .setTimeZone("Europe/Lisbon"));
+
+        EventReminder[] reminderOverrides = new EventReminder[]{
+                new EventReminder().setMethod("popup").setMinutes(30),
+                new EventReminder().setMethod("popup").setMinutes(10)
+        };
+        Event.Reminders reminders = new Event.Reminders()
+                .setUseDefault(false)
+                .setOverrides(Arrays.asList(reminderOverrides));
+        gEvent.setReminders(reminders);
+
+        return gEvent;
+    }
+
+    private EventsResponse toEnrichedResponse(Evento evento) {
+        boolean isSynced = evento.getGoogleEventId() != null && !evento.getGoogleEventId().isBlank();
+        return new EventsResponse(
+                evento.getId(),
+                evento.getUsername(),
+                evento.getTitle(),
+                evento.getProject(),
+                evento.getReferenceDate(),
+                evento.getStartTime(),
+                evento.getEndTime(),
+                evento.getNotes(),
+                evento.isSendAlert(),
+                isSynced
+        );
+    }
+
     private Calendar getCalendarService(String accessToken) {
-        // Usamos uma subclasse que apenas retorna o token sem tentar renová-lo
         AccessToken token = new AccessToken(accessToken, null);
         GoogleCredentials credentials = GoogleCredentials.create(token);
 
@@ -149,21 +256,18 @@ public class EventsServiceImpl implements EventsService {
                 new NetHttpTransport(),
                 GsonFactory.getDefaultInstance(),
                 new HttpCredentialsAdapter(credentials))
-                .setApplicationName("Registo-Horas")
+                .setApplicationName("ProAct-Agenda")
                 .build();
     }
 
     @Override
     @Transactional
     public String confirmarAlerta(UUID id) {
-        // 1. Procura o evento no banco
         Evento evento = eventRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Evento não encontrado com ID: " + id));
 
-        // 2. Verifica se o alerta já foi confirmado anteriormente
-        // Se alertConfirmed for false, significa que o alerta ainda está "ativo" ou pendente
         if (!evento.isAlertConfirmed()) {
-            evento.setAlertConfirmed(true); // Marca como confirmado (para parar de enviar notificações)
+            evento.setAlertConfirmed(true);
             eventRepository.save(evento);
             log.info("Alerta confirmado com sucesso para o evento: {}", id);
         } else {
@@ -177,21 +281,21 @@ public class EventsServiceImpl implements EventsService {
         LocalDateTime dataHoraEvento = LocalDateTime.of(request.referenceDate(), request.startTime());
 
         Instant momentoAlerta = dataHoraEvento
-                .atZone(ZoneId.systemDefault())
-                .toInstant()
-                .minus(0, ChronoUnit.MINUTES);
+                .atZone(ZONE_LISBOA)
+                .toInstant();
 
-        // Se o agendamento for feito para menos de 15 min a partir de agora, envia logo
         if (momentoAlerta.isBefore(Instant.now())) {
             momentoAlerta = Instant.now().plusSeconds(2);
         }
 
-        taskScheduler.schedule(() -> enviarNotificacaoPush(request.notificationSubscription(), request.title(), request.isMobile(), request.username()), momentoAlerta);
+        taskScheduler.schedule(
+                () -> enviarNotificacaoPush(request.notificationSubscription(), request.title(), request.isMobile(), request.username()),
+                momentoAlerta
+        );
     }
 
     @Override
     public void enviarNotificacaoPush(PushSubscriptionDTO sub, String titulo, boolean isMobile, String username) {
-        // Agora passamos o username para o método que contém a lógica de decisão (Telegram vs WebPush)
         enviarNotificacaoPushComId(sub, titulo, null, isMobile, username);
     }
 
@@ -200,27 +304,21 @@ public class EventsServiceImpl implements EventsService {
     public void deleteById(UUID id, String googleToken) {
         eventRepository.findById(id).ifPresentOrElse(
                 evento -> {
-                    // 1. Tenta apagar no Google Agenda apenas se tivermos o ID e o Token
                     if (evento.getGoogleEventId() != null && googleToken != null && !googleToken.isBlank()) {
                         try {
-                            // Movemos o getCalendarService para dentro do try
                             Calendar service = getCalendarService(googleToken);
                             service.events().delete("primary", evento.getGoogleEventId()).execute();
                             log.info(">>> Evento removido do Google Agenda: {}", evento.getGoogleEventId());
                         } catch (Exception e) {
-                            // Importante: Logar o erro mas permitir que o delete local continue
-                            log.error(">>> Erro ao apagar no Google (O evento pode já não existir lá): {}", e.getMessage());
+                            log.error(">>> Erro ao apagar no Google: {}", e.getMessage());
                         }
                     }
 
-                    // 2. Apaga no seu banco de dados local
-                    // Isso deve estar FORA do try do Google para garantir que o registo local suma
                     eventRepository.delete(evento);
                     log.info(">>> Evento com ID {} eliminado localmente.", id);
                 },
                 () -> {
                     log.warn(">>> Tentativa de eliminar evento inexistente: {}", id);
-                    // Opcional: lançar uma exceção específica para o Spring retornar 404 em vez de 500
                     throw new NoSuchElementException("Evento não encontrado com o ID: " + id);
                 }
         );
@@ -229,43 +327,21 @@ public class EventsServiceImpl implements EventsService {
     @Override
     public EventsResponse findById(UUID id) {
         return eventRepository.findById(id)
-                .map(mapper::toResponse)
+                .map(this::toEnrichedResponse)
                 .orElseThrow(() -> new RuntimeException("Evento não encontrado com o ID: " + id));
     }
 
     @Override
-    public EventsResponse update(UUID id, EventRequest request) {
-        return eventRepository.findById(id).map(existente -> {
-            boolean horarioMudou = !existente.getStartTime().equals(request.startTime()) ||
-                    !existente.getReferenceDate().equals(request.referenceDate());
-
-            mapper.updateEntityFromDto(request, existente);
-            if (horarioMudou) existente.setAlertConfirmed(false);
-
-            Evento salvo = eventRepository.save(existente);
-            if (request.sendAlert() && horarioMudou) agendarAlertaComRepeticao(salvo.getId(), request);
-
-            return mapper.toResponse(salvo);
-        }).orElseThrow();
-    }
-
-    @Override
     public List<EventsResponse> listAll() {
-        // 1. Vai buscar todas as entidades ao banco de dados
-        List<Evento> eventos = eventRepository.findAll();
-
-        // 2. Transforma a lista de entidades em lista de DTOs usando o mapper
-        return eventos.stream()
-                .map(mapper::toResponse)
+        return eventRepository.findAll().stream()
+                .map(this::toEnrichedResponse)
                 .collect(Collectors.toList());
     }
 
     private void agendarAlertaComRepeticao(UUID eventoId, EventRequest request) {
-        ZoneId zoneLisboa = ZoneId.of("Europe/Lisbon");
         LocalDateTime dataHora = LocalDateTime.of(request.referenceDate(), request.startTime());
-        Instant momentoInicio = dataHora.atZone(zoneLisboa).toInstant();
+        Instant momentoInicio = dataHora.atZone(ZONE_LISBOA).toInstant();
 
-        // Se o horário já passou, agenda para daqui a 5 segundos
         if (momentoInicio.isBefore(Instant.now())) {
             momentoInicio = Instant.now().plusSeconds(5);
         }
@@ -300,25 +376,18 @@ public class EventsServiceImpl implements EventsService {
         });
     }
 
-
     private void enviarNotificacaoPushComId(PushSubscriptionDTO sub, String titulo, UUID eventoId, boolean isMobile, String username) {
         if (isMobile) {
-            log.info("📱 Detetado Mobile: Enviando via Telegram para o evento {} (Utilizador: {})", eventoId, username);
-            // Agora passamos o username para a função que usa o WebClient
             enviarViaTelegram(titulo, eventoId, username);
         } else {
-            log.info("💻 Detetado Desktop: Enviando via Web Push para o evento {}", eventoId);
             enviarViaWebPush(sub, titulo, eventoId);
         }
     }
-
-    // Se o seu TelegramBotService tiver o método execute() herdado da biblioteca
 
     private boolean enviarViaTelegram(String titulo, UUID eventoId, String username) {
         String dynamicChatId = buscarTelegramChatIdRemoto(username);
         if (dynamicChatId == null || dynamicChatId.isBlank()) return false;
         try {
-
             String urlConfirmacao = "https://treg-aneto.com/api/v1/eventos/" + eventoId + "/confirmar-alerta";
 
             InlineKeyboardButton botaoConfirmar = InlineKeyboardButton.builder()
@@ -326,29 +395,24 @@ public class EventsServiceImpl implements EventsService {
                     .url(urlConfirmacao)
                     .build();
 
-            // 2. Montar o Teclado (Keyboard)
             InlineKeyboardMarkup keyboard = InlineKeyboardMarkup.builder()
                     .keyboardRow(new InlineKeyboardRow(botaoConfirmar))
                     .build();
 
-            // 3. Montar a Mensagem Final
             SendMessage message = SendMessage.builder()
                     .chatId(dynamicChatId)
-                    .text("🚨 *ALERTA TREG*\n\nEvento: " + titulo + "\n\n_Clique no botão abaixo para confirmar._")
+                    .text("🚨 *ALERTA PROACT*\n\nEvento: " + titulo + "\n\n_Clique no botão abaixo para confirmar._")
                     .parseMode("Markdown")
-                    .replyMarkup(keyboard) // Aqui entra o botão!
+                    .replyMarkup(keyboard)
                     .build();
 
-            // 4. Enviar usando o bot ativo
             telegramBotService.enviarMensagem(message);
             return true;
         } catch (Exception e) {
-            String msg = e.getMessage();
-            log.error("❌ Falha ao enviar Telegram para {}: {}", username, msg);
-            return false;   // bloqueado ou não, para
+            log.error("❌ Falha ao enviar Telegram para {}: {}", username, e.getMessage());
+            return false;
         }
     }
-
 
     private void enviarViaWebPush(PushSubscriptionDTO sub, String titulo, UUID eventoId) {
         if (sub == null || sub.getEndpoint() == null) {
@@ -378,78 +442,42 @@ public class EventsServiceImpl implements EventsService {
                 .timeout(Duration.ofSeconds(5))
                 .onErrorResume(e -> {
                     log.error("❌ Erro ao buscar ChatID remoto para {}: {}", username, e.getMessage());
-                    // Retorna um Mono vazio, que o .block() converterá para null
                     return Mono.empty();
                 })
                 .block();
     }
 
-    private void processarSincronizacaoGoogle(Evento novoEvento, EventRequest request, String googleToken) {
-        try {
-            Calendar service = getCalendarService(googleToken);
-            com.google.api.services.calendar.model.Event gEvent = new com.google.api.services.calendar.model.Event()
-                    .setSummary(request.title())
-                    .setDescription(request.notes());
-
-            // 1. Defina o formato padrão RFC3339 que o Google exige
-            DateTimeFormatter rfc3339Formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'");
-
-            // 2. Combine data e hora (Assumindo que são LocalDate e LocalTime)
-            OffsetDateTime startIso = request.referenceDate()
-                    .atTime(request.startTime())
-                    .atOffset(ZoneOffset.UTC);
-
-            OffsetDateTime endIso = request.referenceDate()
-                    .atTime(request.endTime())
-                    .atOffset(ZoneOffset.UTC);
-
-            // 3. Formate explicitamente para String antes de passar para o DateTime do Google
-            gEvent.setStart(new EventDateTime().setDateTime(new DateTime(startIso.format(rfc3339Formatter))));
-            gEvent.setEnd(new EventDateTime().setDateTime(new DateTime(endIso.format(rfc3339Formatter))));
-
-            com.google.api.services.calendar.model.Event executed = service.events().insert("primary", gEvent).execute();
-            novoEvento.setGoogleEventId(executed.getId());
-            eventRepository.save(novoEvento);
-        } catch (Exception e) {
-            log.error("Erro sincronização Google: {}", e.getMessage());
-        }
-    }
-
-    private Evento mapGoogleEventToEntity(com.google.api.services.calendar.model.Event gEvent, String userId) {
+    private Evento mapGoogleEventToEntity(Event gEvent, String userId) {
         Evento novo = new Evento();
         novo.setGoogleEventId(gEvent.getId());
         novo.setTitle(gEvent.getSummary());
         novo.setUsername(userId);
         novo.setNotes(gEvent.getDescription() != null ? gEvent.getDescription() : "Importado do Google");
 
-        // Tratar data de eventos com hora (DateTime)
         if (gEvent.getStart().getDateTime() != null) {
             LocalDateTime ldt = LocalDateTime.ofInstant(
                     Instant.ofEpochMilli(gEvent.getStart().getDateTime().getValue()),
-                    ZoneId.systemDefault()
+                    ZONE_LISBOA
             );
             novo.setReferenceDate(ldt.toLocalDate());
             novo.setStartTime(ldt.toLocalTime().truncatedTo(ChronoUnit.MINUTES));
-        }
-        // Tratar eventos de dia inteiro (Date) - Resolve o erro dos Aniversários
-        else if (gEvent.getStart().getDate() != null) {
+        } else if (gEvent.getStart().getDate() != null) {
             LocalDate date = LocalDate.parse(gEvent.getStart().getDate().toStringRfc3339().substring(0, 10));
             novo.setReferenceDate(date);
             novo.setStartTime(LocalTime.MIDNIGHT);
         } else {
-            return null; // Caso não tenha data nenhuma (inválido)
+            return null;
         }
 
         return novo;
     }
 
-    // Adicione esta anotação para correr ao iniciar
     @PostConstruct
     public void recuperarAlertasPendentes() {
         log.info("### 🔄 Verificando alertas pendentes para recuperação...");
 
-        LocalDate hoje = LocalDate.now();
-        LocalDateTime agora = LocalDateTime.now();
+        LocalDate hoje = LocalDate.now(ZONE_LISBOA);
+        LocalDateTime agora = LocalDateTime.now(ZONE_LISBOA);
 
         List<Evento> pendentes = eventRepository.findPendentesParaNotificar(hoje);
 
@@ -457,8 +485,6 @@ public class EventsServiceImpl implements EventsService {
 
         pendentes.forEach(evento -> {
             LocalDateTime dataHoraEvento = LocalDateTime.of(evento.getReferenceDate(), evento.getStartTime());
-
-            // 2. Só reinicia o fluxo se a hora do evento já passou ou é exatamente agora
             if (dataHoraEvento.isBefore(agora) || dataHoraEvento.isEqual(agora)) {
                 log.info("### 🚀 Retomando fluxo de repetição para: {}", evento.getTitle());
                 dispararFluxoRepeticao(evento.getId());
@@ -466,4 +492,3 @@ public class EventsServiceImpl implements EventsService {
         });
     }
 }
-

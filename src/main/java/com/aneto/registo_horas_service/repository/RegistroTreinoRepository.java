@@ -9,20 +9,19 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
+
 @Repository
 public interface RegistroTreinoRepository extends JpaRepository<RegistoTreino, Long> {
 
-    // Soma o campo aulasFeitas de todos os treinos registados para o sócio
-    @Query("SELECT SUM(r.aulasFeitas) FROM RegistoTreino r WHERE r.noSocio = :noSocio")
-    Integer sumAulasFeitasByNoSocio(@Param("noSocio") String noSocio);
+    long countByPlanoPagamentoId(Long planoPagamentoId);
 
-    // Método para a pesquisa no histórico (usado no Controller/Service)
+    List<RegistoTreino> findByPlanoPagamentoIdOrderByIdAsc(Long planoPagamentoId);
+
     Page<RegistoTreino> findByNoSocioContainingIgnoreCaseOrPlanoPagamentoNomeSocioContainingIgnoreCase(
-            String noSocio,
-            String nomeSocio,
-            Pageable pageable
-    );
-    long countByPlanoPagamentoId(Long planoId);
-    // Para o histórico cronológico
-    List<RegistoTreino> findByNoSocioOrderByDataDesc(String noSocio);
+            String noSocio, String nomeSocio, Pageable pageable);
+
+    // Fallback direto na tabela auth.tb_users caso o emailSocio não tenha sido preenchido no plano
+    @Query(value = "SELECT u.email FROM auth.tb_users u WHERE u.numero_socio = :noSocio OR u.username = :noSocio LIMIT 1", nativeQuery = true)
+    Optional<String> findEmailByNoSocioInAuth(@Param("noSocio") String noSocio);
 }
