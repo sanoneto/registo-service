@@ -12,7 +12,6 @@ import org.springframework.stereotype.Component;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static com.aneto.registo_horas_service.models.Training.TrainingRuleConstants.*;
 import static com.aneto.registo_horas_service.models.Training.TrainingUtils.*;
 
 @Component
@@ -24,7 +23,7 @@ public class TrainingValidator {
 
     // Exercícios proibidos para patologias lombares e anteversão pélvica severa
     private static final List<String> EXERCICIOS_PROIBIDOS_LOMBAR = List.of(
-            "Agachamento Livre", "Levantamento Terra", "Good Morning",
+            "Agachamento Livre", "Levantamento Terra", "Good Morning", "Good Morning com Barra Z",
             "Agachamento Zercher", "Jefferson Curl", "Thruster", "Agachamento com Barra"
     );
 
@@ -36,7 +35,9 @@ public class TrainingValidator {
 
         boolean temLesaoLombar = medicoLower.contains("lombar")
                 || medicoLower.contains("anterolistese")
+                || medicoLower.contains("retrolistese")
                 || medicoLower.contains("discal")
+                || medicoLower.contains("discopatia")
                 || visbodyLower.contains("anteversão")
                 || visbodyLower.contains("pélvica");
 
@@ -70,7 +71,10 @@ public class TrainingValidator {
             log.error("[ALERTA DE INVENTÁRIO] Nome fora do dicionário oficial: '{}' (original: '{}')", correctedName, ex.getName());
             throw new RuntimeException("Exercício fora do inventário: \"" + ex.getName() + "\". Substitui por um nome do dicionário.");
         }
-        validarMobilidadeCondicional(correctedName, pathologyText);
+
+        // NOTA CLÍNICA: Removida a chamada bloqueante validarMobilidadeCondicional(correctedName, pathologyText),
+        // pois exercícios como "Libertação e Ativação Escapular com Banda" e "Descompressão Lombo-Pélvica em Supino"
+        // têm aplicação transversal (postural, preventiva, cervical/torácica/anca) e não apenas na articulação homónima.
 
         String finalUrl = exerciseVideoService.getVideoUrl(correctedName);
 
@@ -122,7 +126,9 @@ public class TrainingValidator {
                         .filter(e -> e.getMuscleGroup() != null &&
                                 (e.getMuscleGroup().equalsIgnoreCase("Costas")
                                         || e.getMuscleGroup().equalsIgnoreCase("Costas / Cintura Escapular")
-                                        || e.getMuscleGroup().equalsIgnoreCase("Ombros")))
+                                        || e.getMuscleGroup().equalsIgnoreCase("Ombros")
+                                        || e.getMuscleGroup().equalsIgnoreCase("Reabilitação")
+                                        || e.getMuscleGroup().toLowerCase().contains("escapul")))
                         .count();
 
                 if (exPeito >= exCostasEOmbros) {

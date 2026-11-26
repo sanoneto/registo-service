@@ -6,13 +6,12 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-// Entidade
 @Entity
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@Table(name = "exercises" ,schema = "REGISTOS")
+@Table(name = "exercises", schema = "REGISTOS")
 public class Exercises {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -21,7 +20,7 @@ public class Exercises {
     @Column(nullable = false, unique = true)
     private String name;
 
-    @Column(nullable = false)
+    @Column(name = "video_url", nullable = false)
     private String videoUrl;
 
     private String category;
@@ -29,5 +28,6 @@ public class Exercises {
     @Column(name = "subcategory")
     private String subcategory; // pode ser null
 
-    // Getters e Setters
+    @Column(name = "clinical_indications", length = 500)
+    private String clinicalIndications;
 }
