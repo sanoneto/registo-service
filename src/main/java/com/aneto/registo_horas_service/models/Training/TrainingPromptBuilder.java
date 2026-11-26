@@ -79,43 +79,47 @@ public class TrainingPromptBuilder {
         String diretrizFocoEspecial = buildDiretrizFocoEspecial(aplicaFocoGluteoExtremo, isGluteFocus, protocol, exerciseDictionaryComSub);
         String diretrizVariedade = """
                 [SISTEMA DE VARIAÇÃO ANTI-PLATÔ]
-                - EXERCÍCIOS JÁ REALIZADOS (PROIBIDO REPETIR): %s.
-                - REGRA DE OURO: É estritamente proibido repetir o mesmo exercício em dias diferentes deste plano.
-                - TEMA: Focar em variações biomecânicas.
-                - RITMO OBRIGATÓRIO: O campo 'tempo' no JSON deve ser rigorosamente '%s'.
+- EXERCÍCIOS JÁ REALIZADOS (PROIBIDO REPETIR): %s.
+- REGRA DE OURO: É estritamente proibido repetir o mesmo exercício em dias diferentes deste plano.
+- TEMA: Focar em variações biomecânicas.
+- RITMO OBRIGATÓRIO: O campo 'tempo' no JSON deve ser rigorosamente '%s'.
                 """.formatted(listaParaEvitar, tempoNASM);
 
         String diretrizProtocolo = """
                 DIRETRIZES TÉCNICAS E FISIOLÓGICAS (%s):
-                - Séries: %s | Repetições: %s
-                - INTENSIDADE DE ESFORÇO (RPE / RIR): %s
-                - DESCANSO CIENTÍFICO: %s segundos fixos.
-                - RITMO (Tempo): %s
+- Séries: %s | Repetições: %s
+- INTENSIDADE DE ESFORÇO (RPE / RIR): %s
+- DESCANSO CIENTÍFICO: %s segundos fixos.
+- RITMO (Tempo): %s
                 """.formatted(protocoloEfetivo, setsEfetivas, repsEfetivas, rpeEfetivo, descansoEfetivo, protocol.getTempo());
 
         String diretrizSegurancaIniciante = isSedentary ? """
                 [ALERTA DE SEGURANÇA: ALUNO SEDENTÁRIO]
-                - O aluno nunca treinou. É TERMINANTEMENTE PROIBIDO levar à falha concêntrica (RPE máximo 6).
-                - Prioridade: Estabilidade hemodinâmica. Não usar superséries.
+- O aluno nunca treinou. É TERMINANTEMENTE PROIBIDO levar à falha concêntrica (RPE máximo 6).
+- Prioridade: Estabilidade hemodinâmica. Não usar superséries.
                 """ : "";
 
         String diretrizPeriodizacao = isDeloadWeek ? """
                 [SEMANA DE DELOAD - RECUPERAÇÃO PROGRAMADA (Semana %d do ciclo)]
-                - VOLUME: gera EXATAMENTE %d exercícios por dia.
-                - INTENSIDADE: RPE máximo 5-6 em todas as séries (mínimo 4 repetições em reserva).
+- VOLUME: gera EXATAMENTE %d exercícios por dia.
+- INTENSIDADE: RPE máximo 5-6 em todas as séries (mínimo 4 repetições em reserva).
                 """.formatted(weekNumber, volumeIdeal) : "";
 
         Set<String> nomesJaRealizados = (exerciciosDoS3 == null) ? Set.of() : new HashSet<>(exerciciosDoS3);
         String repertorioFiltrado = filtrarRepertorioSugerido(protocol.getSuggestedExercises(), nomesJaRealizados);
 
         String diretrizBiomecanica = """
-                DIRETRIZES DE SELEÇÃO BIOMECÂNICA ESTREITAS:
-                1. REPERTÓRIO: %s.
-                2. PROIBIDOS: %s.
-                3. ADAPTAÇÃO: Patologia "%s".
+                DIRETRIZES DE SELEÇÃO BIOMECÂNICA E PRESCRIÇÃO TRANSVERSAL:
+1. REPERTÓRIO: %s.
+2. PROIBIDOS: %s.
+3. ADAPTAÇÃO CLÍNICA: Patologia declarada "%s".
+4. PRESCRIÇÃO TRANSVERSAL DE REABILITAÇÃO E MOBILIDADE (NÃO RESTRINGIR A UMA ÚNICA ARTICULAÇÃO):
+   - Exercícios de cintura escapular (ex.: "Libertação e Ativação Escapular com Banda", "Wall Slide (Ombro)", "Wall Angels", "Retração Escapular em Decúbito Ventral", "Ativação do Serrátil Anterior com Banda") NÃO são exclusivos para patologia do ombro: prescreve-os também para cervicalgias, hipercifose torácica, anteriorização da cabeça, prevenção e ativação pré-treino de membro superior.
+   - Exercícios lombo-pélvicos (ex.: "Descompressão Lombo-Pélvica em Supino", "Basculação Pélvica em Supino", "Ponte Pélvica com Isometria", "Cat Cow") NÃO são exclusivos para lombalgias: prescreve-os também para anteversão pélvica/hiperlordose, sobrecarga da anca ou sacroilíaca, e retorno à calma/descompressão axial pós-carga.
+   - Contraindicação real: Em hérnia discal lombar aguda com intolerância à flexão, evitar flexão lombar forçada sob carga e priorizar estabilização neutra ("Estabilização Lombar", "Ponte Pélvica com Isometria").
                 """.formatted(repertorioFiltrado, protocol.getForbiddenExercises(), pathologyText);
 
-        String diretrizAquecimento = buildDiretrizAquecimento(pathologyEspecifica, pathologyText);
+        String diretrizAquecimento = buildDiretrizAquecimento(temPatologiaOuVisbody, pathologyText);
 
         List<String> sequenciaDias = gerarSequenciaDivisao(userRequest.getFrequencyPerWeek(), isGluteFocus, aplicaFocoGluteoExtremo);
         boolean temDiaDeCore = sequenciaDias.stream()
@@ -128,7 +132,7 @@ public class TrainingPromptBuilder {
         boolean permiteFinalizador = !isSedentary && !pathologyEspecifica && !isDeloadWeek && isObjetivoCompativel(objectiveText) && totalMinutos >= 40;
         String diretrizFinalizador = permiteFinalizador ? """
                 [FINALIZADOR METABÓLICO/ANAERÓBIO]
-                - Adiciona UM exercício FINAL de condicionamento metabólico em cada dia, na categoria FINALIZADOR (RPE 8-9).
+- Adiciona UM exercício FINAL de condicionamento metabólico em cada dia, na categoria FINALIZADOR (RPE 8-9).
                 """ : "";
 
         String diretrizNomenclaturaDias = buildDiretrizNomenclaturaDias(userRequest, sequenciaDias);
@@ -157,10 +161,10 @@ public class TrainingPromptBuilder {
 
         String regrasFinais = String.format(Locale.US, """
                         REGRAS CRÍTICAS DE FECHAMENTO:
-                        1. FREQUÊNCIA COMPLETA OBRIGATÓRIA: Gera exatamente %d objetos dentro do array 'plan' (Dia 1 até Dia %d).
-                        2. DURAÇÃO E VOLUME: O treino deve durar %d minutos. Gera EXATAMENTE %d exercícios por dia.
-                        3. INTENSIDADE & RITMO: Respeitar a escala RPE (%s), Ritmo %s e Descanso %s segundos.
-                        4. TOTAIS DIETA: %d kcal, %dg Prot, %dg Carbs, %dg Fats.
+1. FREQUÊNCIA COMPLETA OBRIGATÓRIA: Gera exatamente %d objetos dentro do array 'plan' (Dia 1 até Dia %d).
+2. DURAÇÃO E VOLUME: O treino deve durar %d minutos. Gera EXATAMENTE %d exercícios por dia.
+3. INTENSIDADE & RITMO: Respeitar a escala RPE (%s), Ritmo %s e Descanso %s segundos.
+4. TOTAIS DIETA: %d kcal, %dg Prot, %dg Carbs, %dg Fats.
                         """,
                 dias, dias, totalMinutos, volumeIdeal, rpeEfetivo, protocol.getTempo(), descansoEfetivo, macros.dailyCalories(), macros.protein(), macros.carbs(), macros.fats());
 
@@ -222,9 +226,9 @@ public class TrainingPromptBuilder {
 
         return """
                 [REGRA DE PROPORÇÃO DE VOLUME POSTURAL (RÁCIO 2:1)]
-                - Devido à protração de ombros e cabeça anteriorizada detetadas no VisBody:
-                - No dia UPPER, é OBRIGATÓRIO prescrever EXATAMENTE o dobro de exercícios para a CADEIA POSTERIOR (Costas, Trapézio Médio/Inferior e Deltóide Posterior) em relação aos exercícios de Peito.
-                - Exemplo para 6 exercícios no dia UPPER: 3 de Costas/Escápula, 1 de Peito, 1 de Ombro Posterior/Lateral, 1 de Braços.
+- Devido à protração de ombros e cabeça anteriorizada detetadas no VisBody:
+- No dia UPPER, é OBRIGATÓRIO prescrever EXATAMENTE o dobro de exercícios para a CADEIA POSTERIOR (Costas, Trapézio Médio/Inferior e Deltóide Posterior) em relação aos exercícios de Peito.
+- Exemplo para 6 exercícios no dia UPPER: 3 de Costas/Escápula, 1 de Peito, 1 de Ombro Posterior/Lateral, 1 de Braços.
                 """;
     }
 
@@ -257,14 +261,14 @@ public class TrainingPromptBuilder {
 
         return """
                 [DIRETRIZES TÉCNICAS DERIVADAS DO SCANNER VISBODY]
-                1. CORREÇÃO LOMBO-PÉLVICA (ANTEVERSÃO PÉLVICA DETETADA):
-                   - Proibido qualquer carga axial direta na coluna (ex: Agachamento Livre/Barra nas costas).
-                   - OBRIGATÓRIO incluir exercícios de ativação do Glúteo Máximo e Transverso do Abdómen no dia LOWER.
-                2. CORREÇÃO DA CINTURA ESCAPULAR E CERVICAL (PROTRAÇÃO DE OMBROS E CABEÇA PROJETADA):
-                   - No dia UPPER, priorizar a proporção 2:1 de Puxadas/Remadas (Cadeia Posterior) em relação aos exercícios de Peito (Cadeia Anterior).
-                   - Foco obrigatório em retratores da escápula (Rombóides e Trapézio Inferior) e rotadores externos (ex: Wall Slide, Face Pull, Rotação Externa).
-                3. ADAPTAÇÃO JOELHO ESQUERDO (HIPEREXTENSÃO DETETADA):
-                   - Instrução obrigatória nas 'notas/details': "Manter um ligeiro flexo funcional (evitar o bloqueio/semiflexão do joelho no final do movimento)".
+1. CORREÇÃO LOMBO-PÉLVICA (ANTEVERSÃO PÉLVICA DETETADA):
+  - Proibido qualquer carga axial direta na coluna (ex: Agachamento Livre/Barra nas costas).
+  - OBRIGATÓRIO incluir exercícios de ativação do Glúteo Máximo e Transverso do Abdómen no dia LOWER.
+2. CORREÇÃO DA CINTURA ESCAPULAR E CERVICAL (PROTRAÇÃO DE OMBROS E CABEÇA PROJETADA):
+  - No dia UPPER, priorizar a proporção 2:1 de Puxadas/Remadas (Cadeia Posterior) em relação aos exercícios de Peito (Cadeia Anterior).
+  - Foco obrigatório em retratores da escápula (Rombóides e Trapézio Inferior) e rotadores externos (ex: Wall Slide, Face Pull, Rotação Externa, Libertação e Ativação Escapular com Banda).
+3. ADAPTAÇÃO JOELHO ESQUERDO (HIPEREXTENSÃO DETETADA):
+  - Instrução obrigatória nas 'notas/details': "Manter um ligeiro flexo funcional (evitar o bloqueio/semiflexão do joelho no final do movimento)".
                 """;
     }
 
@@ -273,9 +277,9 @@ public class TrainingPromptBuilder {
 
         return """
                 [SISTEMA DE PRESCRIÇÃO NUTRICIONAL DO VISBODY]
-                - A aluna apresenta BMR reduzido e perfil de baixa Massa Muscular Esquelética.
-                - A distribuição de macronutrientes do JSON de resposta DEVE priorizar o aporte proteico (mínimo 2.0g/kg a 2.2g/kg) para estimular a síntese proteica sem ultrapassar o gasto calórico total.
-                - Não prescrever défices calóricos agressivos; focar em RECOMPOSIÇÃO CORPORAL.
+- A aluna apresenta BMR reduzido e perfil de baixa Massa Muscular Esquelética.
+- A distribuição de macronutrientes do JSON de resposta DEVE priorizar o aporte proteico (mínimo 2.0g/kg a 2.2g/kg) para estimular a síntese proteica sem ultrapassar o gasto calórico total.
+- Não prescrever défices calóricos agressivos; focar em RECOMPOSIÇÃO CORPORAL.
                 """;
     }
 
@@ -284,9 +288,9 @@ public class TrainingPromptBuilder {
 
         return """
                 [REQUISITO CRÍTICO NOS CAMPOS 'details' E 'notas' DO JSON]
-                - Para exercícios do dia LOWER, o campo 'notas' DEVE conter explicitamente o aviso: "Manter retroversão pélvica consciente / sem hiperextensão lombar (VisBody: anteversão)".
-                - Para exercícios com membros inferiores, incluir a nota: "Evitar o bloqueio articular completo do joelho esquerdo (VisBody: hiperextensão)".
-                - Para exercícios do dia UPPER, o campo 'details' DEVE incluir: "Foco na depressão e retração escapular (VisBody: ombros enrolados)".
+- Para exercícios do dia LOWER, o campo 'notas' DEVE conter explicitamente o aviso: "Manter retroversão pélvica consciente / sem hiperextensão lombar (VisBody: anteversão)".
+- Para exercícios com membros inferiores, incluir a nota: "Evitar o bloqueio articular completo do joelho esquerdo (VisBody: hiperextensão)".
+- Para exercícios do dia UPPER, o campo 'details' DEVE incluir: "Foco na depressão e retração escapular (VisBody: ombros enrolados)".
                 """;
     }
 
@@ -294,8 +298,8 @@ public class TrainingPromptBuilder {
         if (aplicaFocoGluteoExtremo) {
             return """
                     [FOCO PRIORITÁRIO EXTREMO: GLÚTEOS]
-                    - O aluno pediu foco quase exclusivo em Glúteos.
-                    - EXERCÍCIOS DISPONÍVEIS PARA ESTE FOCO: %s.
+- O aluno pediu foco quase exclusivo em Glúteos.
+- EXERCÍCIOS DISPONÍVEIS PARA ESTE FOCO: %s.
                     """.formatted(listarExerciciosGluteo(dictComSub));
         } else if (isGluteFocus) {
             return "[FOCO EM GLÚTEOS — dentro da metodologia do protocolo %s]\n".formatted(protocol.getLabel());
@@ -303,10 +307,10 @@ public class TrainingPromptBuilder {
         return "";
     }
 
-    private String buildDiretrizAquecimento(boolean pathologyEspecifica, String pathologyText) {
-        return pathologyEspecifica ?
-                "[REGRA OBRIGATÓRIA DE AQUECIMENTO] O aluno TEM patologia (\"%s\"). Order 1 deve ser um exercício da categoria REABILITAÇÃO ou MOBILIDADE do dicionário oficial abaixo, focado nessa área.\n".formatted(pathologyText) :
-                "[REGRA OBRIGATÓRIA DE AQUECIMENTO] Order 1 deve ser um exercício da categoria MOBILIDADE do dicionário oficial abaixo (nunca um nome fora do dicionário).\n";
+    private String buildDiretrizAquecimento(boolean temPatologiaOuVisbody, String pathologyText) {
+        return temPatologiaOuVisbody ?
+                "[REGRA OBRIGATÓRIA DE AQUECIMENTO] O aluno TEM patologia ou alteração postural (\"%s\"). Order 1 deve ser um exercício da categoria REABILITAÇÃO ou MOBILIDADE do dicionário oficial abaixo, aplicado de forma transversal à cadeia cinética (ombro/escápula/cervical/torácica ou lombar/pelve/anca) ou como ativação preventiva.\n".formatted(pathologyText) :
+                "[REGRA OBRIGATÓRIA DE AQUECIMENTO] Order 1 deve ser um exercício da categoria MOBILIDADE ou REABILITAÇÃO (ativação escapular, lombo-pélvica ou mobilidade articular) do dicionário oficial abaixo (nunca um nome fora do dicionário).\n";
     }
 
     private String buildDiretrizTreino(List<String> sequencia, String durationText, int volumeIdeal) {
@@ -324,7 +328,7 @@ public class TrainingPromptBuilder {
     private String buildDiretrizCardioCore(int volumeIdeal) {
         return """
                 [REGRA OBRIGATÓRIA: CARDIO EM DIAS COM BLOCO DE CORE]
-                - Dias de CORE exigem OBRIGATORIAMENTE %d exercícios de CARDIO do dicionário.
+- Dias de CORE exigem OBRIGATORIAMENTE %d exercícios de CARDIO do dicionário.
                 """.formatted(CARDIO_OBRIGATORIO_POR_DIA_CORE);
     }
 
