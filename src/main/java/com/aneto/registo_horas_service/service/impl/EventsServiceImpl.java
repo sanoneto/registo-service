@@ -23,6 +23,7 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -53,6 +54,9 @@ public class EventsServiceImpl implements EventsService {
     private final ObjectMapper objectMapper;
     private final WebClient targetServiceWebClient;
     private final TelegramBotService telegramBotService;
+
+    @Value("${app.urls.api-base-url}")
+    private String apiBaseUrl;
 
     @Override
     public EventsResponse create(EventRequest request, String googleToken) {
@@ -388,7 +392,22 @@ public class EventsServiceImpl implements EventsService {
         String dynamicChatId = buscarTelegramChatIdRemoto(username);
         if (dynamicChatId == null || dynamicChatId.isBlank()) return false;
         try {
-            String urlConfirmacao = "https://treg-aneto.com/api/v1/eventos/" + eventoId + "/confirmar-alerta";
+            String baseUrlLimpa = (apiBaseUrl != null && apiBaseUrl.endsWith("/"))
+                    ? apiBaseUrl.substring(0, apiBaseUrl.length() - 1)
+                    : apiBaseUrl;
+            String urlConfirmacao = baseUrlLimpa + "/api/v1/eventos/" + eventoId + "/confirmar-alerta";
+
+            boolean isLocalhost = baseUrlLimpa != null &&
+                    (baseUrlLimpa.contains("://localhost") || baseUrlLimpa.contains("://127.0.0.1"));
+
+            if (isLocalhost) {
+                String mensagemLocal = "🚨 *ALERTA PROACT*\n\n" +
+                        "Evento: " + titulo + "\n\n" +
+                        "_Clique no link abaixo para confirmar (ambiente local):_\n" +
+                        urlConfirmacao;
+
+                return telegramBotService.enviarMensagemSimples(dynamicChatId, mensagemLocal);
+            }
 
             InlineKeyboardButton botaoConfirmar = InlineKeyboardButton.builder()
                     .text("Confirmar ✅")
@@ -436,12 +455,17 @@ public class EventsServiceImpl implements EventsService {
 
     private String buscarTelegramChatIdRemoto(String username) {
         return targetServiceWebClient.get()
-                .uri("/telegram-id/{username}", username)
+                .uri("/api/auth/telegram-id/{username}", username)
                 .retrieve()
                 .bodyToMono(String.class)
                 .timeout(Duration.ofSeconds(5))
                 .onErrorResume(e -> {
-                    log.error("❌ Erro ao buscar ChatID remoto para {}: {}", username, e.getMessage());
+                    Throwable causa = (e.getCause() != null) ? e.getCause() : e;
+                    log.error("❌ Erro ao buscar ChatID remoto para {}: {} -> {} ({})",
+                            username,
+                            e.getClass().getSimpleName(),
+                            causa.getClass().getSimpleName(),
+                            causa.getMessage());
                     return Mono.empty();
                 })
                 .block();
