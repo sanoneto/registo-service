@@ -32,4 +32,19 @@ public class TelegramBotService {
         }
     }
 
+    public boolean enviarMensagemSimples(String chatId, String texto) {
+        try {
+            SendMessage message = SendMessage.builder()
+                    .chatId(chatId)
+                    .text(texto)
+                    .parseMode("Markdown")
+                    .build();
+            telegramClient.execute(message);
+            return true;
+        } catch (Exception e) {
+            log.error("❌ Erro de API do Telegram ao enviar mensagem simples: {}", e.getMessage());
+            return false;
+        }
+    }
+
 }

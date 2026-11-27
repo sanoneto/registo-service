@@ -5,6 +5,7 @@ import com.aneto.registo_horas_service.dto.response.EventsResponse;
 import com.aneto.registo_horas_service.service.EventsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -23,6 +24,9 @@ import java.util.UUID;
 public class EventoController {
 
     private final EventsService eventsService;
+
+    @Value("${app.urls.frontend-base-url}")
+    private String frontendBaseUrl;
 
     @PostMapping("/eventos")
     public ResponseEntity<EventsResponse> criarEvento(
@@ -49,8 +53,12 @@ public class EventoController {
         String nomeEvento = eventsService.confirmarAlerta(id);
         String nomeEncoded = URLEncoder.encode(nomeEvento, StandardCharsets.UTF_8);
 
+        String frontendLimpo = frontendBaseUrl.endsWith("/")
+                ? frontendBaseUrl.substring(0, frontendBaseUrl.length() - 1)
+                : frontendBaseUrl;
+
         return ResponseEntity.status(HttpStatus.FOUND)
-                .location(URI.create("https://www.sanoneto.com/alerta-confirmado?evento=" + nomeEncoded))
+                .location(URI.create(frontendLimpo + "/alerta-confirmado?evento=" + nomeEncoded))
                 .build();
     }
 

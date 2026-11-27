@@ -18,7 +18,7 @@ spring:
       password: ${SPRING_DATA_REDIS_PASSWORD:}
       repositories:
         enabled: false
-      time-to-live: 86400000   # TTL default (24h) — agora dentro do local certo
+      time-to-live: 86400000
 
   jackson:
     deserialization:
@@ -30,9 +30,9 @@ spring:
       mode: never
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/horasdb
-    username: horas_user
-    password: horas_pass
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/horasdb}
+    username: ${SPRING_DATASOURCE_USERNAME:horas_user}
+    password: ${SPRING_DATASOURCE_PASSWORD:horas_pass}
     driver-class-name: ${SPRING_DATASOURCE_DRIVER:org.postgresql.Driver}
 
   jpa:
@@ -114,7 +114,7 @@ server:
   forward-headers-strategy: native
 
 url:
-  micro_service_auth: ${URI_AUTH_SERVICE}
+  micro_service_auth: http://localhost:8081
 
 springdoc:
   api-docs:
@@ -153,9 +153,12 @@ telegram:
       anetoBot: ${TELEGRAM_BOT_TOKEN}
 
 internal:
-  api-key: ${INTERNAL_API_KEY}
+  api-key: ${INTERNAL_API_KEY:local-internal-secret-key-2026}
 
 app:
+  urls:
+    api-base-url: ${APP_API_BASE_URL:http://localhost:8085}
+    frontend-base-url: ${APP_FRONTEND_BASE_URL:http://localhost:5173}
   queries:
     monthly-summary: "SELECT TO_CHAR(data_registo, 'YYYY-MM') AS mes_e_ano, SUM(horas_trabalhadas) AS total_horas_trabalhadas 
     FROM registos.registos_horas rh

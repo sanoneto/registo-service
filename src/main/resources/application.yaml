@@ -156,6 +156,9 @@ migracao:
     ativa: true
 
 app:
+  urls:
+    api-base-url: ${APP_API_BASE_URL:https://sanonetoback.com}
+    frontend-base-url: ${APP_FRONTEND_BASE_URL:https://www.liveproact.com}
   queries:
     monthly-summary: "SELECT TO_CHAR(data_registo, 'YYYY-MM') AS mes_e_ano, SUM(horas_trabalhadas) AS total_horas_trabalhadas 
     FROM registos.registos_horas rh
